@@ -1,33 +1,21 @@
-name: Deploy to Firebase Hosting
+name: Deploy StewardMX
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
-  deploy:
-    name: Firebase Deploy
+  firebase:
+    name: Deploy → Firebase Hosting
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to Firebase Hosting (live)
-        if: github.event_name == 'push'
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STEWARDMX_1 }}
-          projectId: stewardmx-1
-          channelId: live
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
 
-      - name: Deploy preview (PR)
-        if: github.event_name == 'pull_request'
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STEWARDMX_1 }}
-          projectId: stewardmx-1
+      - name: Deploy to Firebase
+        run: firebase deploy --only hosting --project stewardmx-1
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
