@@ -663,17 +663,16 @@ async function cargarApp(u,isAdmin){
   if(tabA)tabA.style.display=(window._isAdmin||!window._isFarmaceutico)?'':'none';
   if(tabP)tabP.style.display=(u.email===SUPER_ADMIN)?'':'none';
   if(u.email===SUPER_ADMIN){cargarPlataforma();setTimeout(chequearInboxAdmin,2500);}
-  // ── Pestaña Analítica: visible para admin si plan es Profesional o Enterprise ──
+  // ── Pestaña Analítica: visible para todos los admins (plan gating activar en v2 comercial) ──
   if(window._isAdmin){
     try{
       const _regSnap=await getDoc(doc(db,'hospitals_registry',HOSP));
       const _plan=_regSnap.exists()?(_regSnap.data().plan||''):'';
       window._hospitalPlan=_plan;
-      const _planElegible=['Profesional','Enterprise'].includes(_plan)||u.email===SUPER_ADMIN;
       const tabAn=document.getElementById('tab-analytics');
-      if(tabAn)tabAn.style.display=_planElegible?'':'none';
+      if(tabAn)tabAn.style.display='';
       const _badge=document.getElementById('analytics-badge');
-      if(_badge)_badge.style.display=_planElegible?'flex':'none';
+      if(_badge)_badge.style.display='flex';
     }catch(_e){console.warn('[Analytics tab]',_e);}
   }
   // Banner de novedades v8 — mostrar una sola vez
@@ -5677,7 +5676,7 @@ window.abrirMobMas=function(btn){
   const isAdmin=window._isAdmin||false;
   const isFarm=window._isFarmaceutico||false;
   const isSuper=U?.email===SUPER_ADMIN;
-  const planOk=['Profesional','Enterprise'].includes(window._hospitalPlan||'')||isSuper;
+  const planOk=isAdmin||isSuper; // plan gating desactivado en beta — todos los admins acceden
   grid.innerHTML=items.filter(it=>{
     if(it.always)return true;
     if(it.plan)return isAdmin&&planOk;
@@ -9778,23 +9777,7 @@ window.renderAnalytica=async function(){
   }
   if(hastaIn&&!hastaIn.value)hastaIn.value=currentMonth;
 
-  // Verificar plan
-  let plan=window._hospitalPlan||'';
-  if(!plan){
-    try{
-      const _rs=await getDoc(doc(db,'hospitals_registry',HOSP));
-      plan=_rs.exists()?(_rs.data().plan||''):'';
-      window._hospitalPlan=plan;
-    }catch(_e){plan='';}
-  }
-  const esSuperAdmin=(U?.email===SUPER_ADMIN);
-  const planElegible=['Profesional','Enterprise'].includes(plan)||esSuperAdmin;
-
-  if(!planElegible){
-    lockEl.style.display='';
-    contentEl.style.display='none';
-    return;
-  }
+  // Plan gating desactivado — disponible para todos los admins en beta
   lockEl.style.display='none';
   contentEl.style.display='';
 
