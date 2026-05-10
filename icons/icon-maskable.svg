@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Maskable: safe zone is center 80% — fill entire background -->
+  <rect width="512" height="512" fill="#0a1628"/>
+  <!-- Cross / medical symbol subtle -->
+  <rect x="236" y="140" width="40" height="152" rx="14" fill="rgba(0,212,168,0.15)"/>
+  <rect x="180" y="196" width="152" height="40" rx="14" fill="rgba(0,212,168,0.15)"/>
+  <!-- SM text -->
+  <text x="256" y="330" font-family="system-ui, -apple-system, sans-serif" font-size="128" font-weight="800" fill="#00d4a8" text-anchor="middle" letter-spacing="-4">SM</text>
+  <circle cx="256" cy="390" r="8" fill="#00d4a8" opacity="0.5"/>
+</svg>

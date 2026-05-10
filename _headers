@@ -1,0 +1,18 @@
+# Service worker: never cache (must always be fresh)
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Guide page: short cache (content updates frequently)
+/guia.html
+  Cache-Control: no-cache
+
+# Main app shell: always fresh from network
+/index.html
+  Cache-Control: no-cache
+
+# Icons and manifest: 1 day (not immutable — could change)
+/icons/*
+  Cache-Control: public, max-age=86400
+
+/manifest.json
+  Cache-Control: public, max-age=86400

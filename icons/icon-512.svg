@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a1628"/>
+  <rect x="52" y="52" width="408" height="408" rx="64" fill="#0d1e38"/>
+  <!-- Cross / medical symbol subtle -->
+  <rect x="236" y="116" width="40" height="172" rx="16" fill="rgba(0,212,168,0.15)"/>
+  <rect x="170" y="182" width="172" height="40" rx="16" fill="rgba(0,212,168,0.15)"/>
+  <!-- SM text -->
+  <text x="256" y="348" font-family="system-ui, -apple-system, sans-serif" font-size="144" font-weight="800" fill="#00d4a8" text-anchor="middle" letter-spacing="-4">SM</text>
+  <!-- Tagline dot -->
+  <circle cx="256" cy="416" r="10" fill="#00d4a8" opacity="0.5"/>
+</svg>
