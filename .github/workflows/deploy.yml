@@ -6,16 +6,32 @@ on:
       - main
 
 jobs:
-  firebase:
-    name: Deploy → Firebase Hosting
+  deploy:
+    name: Firebase + Netlify
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
+      # ── Firebase ──────────────────────────────────────────────
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Deploy to Firebase
+      - name: Deploy → Firebase Hosting
         run: firebase deploy --only hosting --project stewardmx-1
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      # ── Netlify ───────────────────────────────────────────────
+      - name: Deploy → Netlify
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: '.'
+          production-branch: main
+          production-deploy: true
+          deploy-message: "Deploy ${{ github.sha }}"
+          enable-pull-request-comment: false
+          enable-commit-comment: false
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID:    ${{ secrets.NETLIFY_SITE_ID }}
