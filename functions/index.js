@@ -15,18 +15,18 @@
 
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
 const db = admin.firestore();
-const ANTHROPIC_KEY = defineSecret('ANTHROPIC_KEY');
 
 // ════════════════════════════════════════════════════════════════════
 // ── 1. Proxy seguro a Anthropic ─────────────────────────────────────
+// El secret 'ANTHROPIC_KEY' se declara SOLO aquí (no a nivel de módulo)
+// para que las demás functions puedan desplegarse sin necesitarlo.
 // ════════════════════════════════════════════════════════════════════
 exports.anthropicProxy = onCall(
-  { secrets: [ANTHROPIC_KEY], cors: true, region: 'us-central1', timeoutSeconds: 60 },
+  { secrets: ['ANTHROPIC_KEY'], cors: true, region: 'us-central1', timeoutSeconds: 60 },
   async (req) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Login requerido');
 
@@ -53,7 +53,8 @@ exports.anthropicProxy = onCall(
     if (count > 30) throw new HttpsError('resource-exhausted', 'Rate limit excedido (30/min)');
     await db.doc(`_ratelimits/${rlKey}`).set({ n: count, ts: Date.now() });
 
-    const apiKey = ANTHROPIC_KEY.value();
+    // Acceso al secret via process.env (inyectado por Firebase al tenerlo en secrets:[])
+    const apiKey = process.env.ANTHROPIC_KEY;
     if (!apiKey) throw new HttpsError('failed-precondition', 'API key no configurada en secrets');
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
