@@ -14542,6 +14542,8 @@ window.abrirConfigEHR = async function() {
   const cdsu = document.getElementById('ehr-cdshooks-url');
   if (whu) whu.textContent = 'https://us-central1-stewardmx-1.cloudfunctions.net/ehrWebhook?hospId=' + HOSP;
   if (cdsu) cdsu.textContent = 'https://us-central1-stewardmx-1.cloudfunctions.net/cdsHooks?hospId=' + HOSP;
+  // Renderizar filas de mapeo (con valores vacíos por defecto)
+  _renderMappingRows({});
   // Cargar configuración existente
   try {
     const snap = await getDoc(doc(db, 'hospitals', HOSP, 'ehr_config', 'main'));
@@ -14556,6 +14558,8 @@ window.abrirConfigEHR = async function() {
       set('ehr-name', d.ehrName);
       const cb = document.getElementById('ehr-enabled'); if (cb) cb.checked = !!d.enabled;
       const td = document.getElementById('ehr-token-display'); if (td) td.textContent = d.webhookToken || '(pendiente de generar)';
+      // Cargar mapeo de campos guardado
+      if (d.fieldMapping) _renderMappingRows(d.fieldMapping);
     }
   } catch (_e) { /* sin config previa */ }
   modal.style.display = 'flex';
@@ -14571,6 +14575,7 @@ window.guardarConfigEHR = async function() {
     tokenEndpoint: get('ehr-token-endpoint'),
     ehrName: get('ehr-name'),
     enabled: !!(document.getElementById('ehr-enabled') && document.getElementById('ehr-enabled').checked),
+    fieldMapping: _getFieldMapping(),
     updatedAt: serverTimestamp(),
   };
   // Generar webhook token si no existe
@@ -14581,6 +14586,52 @@ window.guardarConfigEHR = async function() {
   await setDoc(doc(db, 'hospitals', HOSP, 'ehr_config', 'main'), cfg, { merge: true });
   toast('✅ Configuración EHR guardada', 'ok');
   document.getElementById('ehr-cfg-modal').style.display = 'none';
+};
+
+// ── Mapeo de campos EHR ──────────────────────────────────────────────
+// Campos que StewardMX necesita y cómo el EHR los puede llamar
+const _MAPPING_FIELDS = [
+  { key:'nombre',        label:'Nombre del paciente',    hint:'patient_name, nombre_completo' },
+  { key:'exp',           label:'No. de expediente',      hint:'chart_no, expediente, mrn' },
+  { key:'edad',          label:'Edad (años)',             hint:'age, edad, years' },
+  { key:'sexo',          label:'Sexo (M/F)',              hint:'gender, sexo, sex' },
+  { key:'cama',          label:'Cama',                   hint:'bed, cama, room' },
+  { key:'service',       label:'Servicio / Área',         hint:'ward, servicio, department' },
+  { key:'dx',            label:'Diagnóstico',             hint:'diagnosis, diagnostico, dx' },
+  { key:'requester',     label:'Médico tratante',         hint:'physician, medico, doctor' },
+  { key:'medicationName',label:'Antibiótico',             hint:'drug, medicamento, antibiotic' },
+  { key:'dosage',        label:'Dosis',                   hint:'dose, dosis, dosage' },
+  { key:'route',         label:'Vía de administración',   hint:'route, via, admin_route' },
+  { key:'creat',         label:'Creatinina (para TFG)',   hint:'creatinine, creatinina, scr' },
+  { key:'peso',          label:'Peso (kg)',               hint:'weight, peso, kg' },
+];
+
+function _renderMappingRows(existingMap) {
+  const c = document.getElementById('field-mapping-rows');
+  if (!c) return;
+  c.innerHTML = _MAPPING_FIELDS.map((f, i) =>
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:6px 12px;${i < _MAPPING_FIELDS.length-1 ? 'border-bottom:1px solid var(--brd2);' : ''}align-items:center;">
+      <div style="font-size:10.5px;color:var(--t2);">${f.label}</div>
+      <input data-mapkey="${f.key}" value="${existingMap[f.key]||''}" placeholder="${f.hint}" style="width:100%;box-sizing:border-box;padding:4px 8px;border:1px solid var(--brd2);border-radius:4px;background:var(--s1);color:var(--t1);font-size:10px;font-family:monospace;">
+    </div>`
+  ).join('');
+}
+
+function _getFieldMapping() {
+  const map = {};
+  document.querySelectorAll('[data-mapkey]').forEach(el => {
+    const v = el.value.trim();
+    if (v) map[el.dataset.mapkey] = v;
+  });
+  return map;
+}
+
+window.toggleMapSection = function(btn) {
+  const s = document.getElementById('map-section');
+  const ch = document.getElementById('map-chevron');
+  const open = s.style.display !== 'none';
+  s.style.display = open ? 'none' : 'block';
+  if (ch) ch.textContent = open ? '▶' : '▼';
 };
 
 window.regenerarToken = async function() {
@@ -16553,6 +16604,30 @@ input:focus,select:focus,textarea:focus{
           <input id="ehr-token-endpoint" placeholder="https://ehr.myhospital.mx/oauth2/token" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;margin-bottom:10px;">
           <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Nombre del EHR (para mostrar en pacientes)</label>
           <input id="ehr-name" placeholder="ej. MedScript, Medilink, Epic..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;margin-bottom:16px;">
+          <!-- Mapeo de campos -->
+          <div style="margin-bottom:14px;">
+            <button type="button" onclick="toggleMapSection(this)" style="display:flex;align-items:center;gap:7px;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);color:var(--purple);border-radius:6px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer;width:100%;">
+              <span id="map-chevron" style="font-size:10px;">▶</span>
+              🗺️ Mapeo de campos del EHR
+              <span style="font-size:10px;color:var(--t3);font-weight:400;margin-left:auto;">si tu EHR usa nombres distintos</span>
+            </button>
+            <div id="map-section" style="display:none;margin-top:10px;">
+              <div style="font-size:10px;color:var(--t3);margin-bottom:10px;line-height:1.7;">
+                Tu EHR puede llamar los datos con nombres distintos a los de StewardMX.<br>
+                Escribe aquí cómo se llama cada campo <b style="color:var(--t2);">en tu expediente electrónico</b>. Déjalo vacío si ya usa el mismo nombre.
+              </div>
+              <div style="background:var(--s2);border:1px solid var(--brd2);border-radius:8px;overflow:hidden;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;padding:7px 12px;border-bottom:1px solid var(--brd2);background:var(--s1);">
+                  <div style="font-size:10px;font-weight:700;color:var(--t3);">Campo en StewardMX</div>
+                  <div style="font-size:10px;font-weight:700;color:var(--t3);">Nombre en tu EHR</div>
+                </div>
+                <div id="field-mapping-rows"></div>
+              </div>
+              <div style="font-size:10px;color:var(--t3);margin-top:8px;line-height:1.6;">
+                💡 <b>Ejemplo:</b> Si tu EHR manda el paciente como <code style="background:var(--s2);padding:1px 4px;border-radius:3px;">nombre_completo</code>, escribe eso en la celda de "Nombre del paciente".
+              </div>
+            </div>
+          </div>
           <div style="display:flex;gap:8px;align-items:center;">
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);cursor:pointer;"><input type="checkbox" id="ehr-enabled"> Activar sincronización automática</label>
           </div>

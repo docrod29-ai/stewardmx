@@ -114,6 +114,55 @@ exports.sendPROANotification = onCall(
 // ════════════════════════════════════════════════════════════════════
 
 /**
+ * Aplica el mapeo de campos configurado por el admin.
+ * Si el EHR manda { nombre_completo: "Juan" } y el mapeo dice { nombre: "nombre_completo" },
+ * el resultado tendrá { nombre: "Juan", ...resto }.
+ */
+function applyFieldMapping(raw, fieldMapping) {
+  if (!fieldMapping || !Object.keys(fieldMapping).length) return raw;
+  const out = Object.assign({}, raw);
+  for (const [stdKey, ehrKey] of Object.entries(fieldMapping)) {
+    if (ehrKey && raw[ehrKey] !== undefined && raw[stdKey] === undefined) {
+      out[stdKey] = raw[ehrKey];
+    }
+  }
+  return out;
+}
+
+/**
+ * Normaliza el valor de sexo a 'M' o 'F' independientemente de cómo lo mande el EHR.
+ */
+function normalizeSexo(val) {
+  if (!val) return '';
+  const v = String(val).toLowerCase().trim();
+  if (['m', 'male', 'masculino', 'hombre', 'h', 'masc'].includes(v)) return 'M';
+  if (['f', 'female', 'femenino', 'mujer', 'fem', 'fem.'].includes(v)) return 'F';
+  return String(val).toUpperCase().slice(0, 1);
+}
+
+/**
+ * Busca si ya existe un paciente en el censo con el mismo fhirId o mismo nombre.
+ * Devuelve el docId del existente o null si no se encontró.
+ */
+async function findExistingPatient(hospId, month, patientFhirId, patientName) {
+  // 1. Por fhirId (más confiable)
+  if (patientFhirId) {
+    const ref = db.doc(`hospitals/${hospId}/months/${month}/patients/ehr_${patientFhirId}`);
+    const snap = await ref.get();
+    if (snap.exists) return `ehr_${patientFhirId}`;
+  }
+  // 2. Por nombre exacto (fallback para EHRs sin ID estándar)
+  if (patientName) {
+    const q = await db.collection(`hospitals/${hospId}/months/${month}/patients`)
+      .where('nombre', '==', patientName)
+      .limit(1)
+      .get();
+    if (!q.empty) return q.docs[0].id;
+  }
+  return null;
+}
+
+/**
  * Obtiene token OAuth2 client_credentials desde el EHR (SMART on FHIR).
  * Si no hay clientId/clientSecret usa staticToken.
  * Retorna el valor de Authorization header (ej. "Bearer eyJ…")
@@ -484,36 +533,14 @@ exports.ehrWebhook = onRequest(
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const body = req.body || {};
+    const rawBody = req.body || {};
 
     // Detectar si es FHIR MedicationRequest o JSON simplificado
-    const isFHIR = body.resourceType === 'MedicationRequest';
+    const isFHIR = rawBody.resourceType === 'MedicationRequest';
 
-    let hospId, token, patientName, patientId, medicationName, dosage, route, requester, service;
-
-    if (isFHIR) {
-      // FHIR R4 MedicationRequest
-      hospId = req.query.hospId;
-      token = req.headers['x-stewardmx-token'] || req.query.token;
-      patientName = body.subject?.display || 'Paciente';
-      patientId = body.subject?.reference || null;
-      medicationName = getMedName(body);
-      dosage = getDose(body);
-      route = getRoute(body);
-      requester = getRequester(body);
-      service = body.encounter?.display || null;
-    } else {
-      // JSON simplificado
-      hospId = body.hospId || req.query.hospId;
-      token = body.token || req.headers['x-stewardmx-token'];
-      patientName = body.patientName || 'Paciente';
-      patientId = body.patientId || null;
-      medicationName = body.medication || 'ATB no especificado';
-      dosage = body.dosage || null;
-      route = body.route || null;
-      requester = body.requester || 'Médico';
-      service = body.service || null;
-    }
+    // hospId y token — antes del mapeo (campos de sistema, no de paciente)
+    const hospId = (rawBody.hospId || req.query.hospId || '').trim();
+    const token  = rawBody.token || req.headers['x-stewardmx-token'] || req.query.token;
 
     if (!hospId) return res.status(400).json({ ok: false, error: 'hospId requerido' });
 
@@ -531,20 +558,57 @@ exports.ehrWebhook = onRequest(
     }
     if (!validToken) return res.status(401).json({ ok: false, error: 'Token inválido' });
 
-    // Guardar solicitud
+    // ── Aplicar mapeo de campos configurado por el admin ──────────────
+    // Si el EHR manda { nombre_completo: "Juan" } y el mapeo dice { nombre: "nombre_completo" },
+    // body tendrá { nombre: "Juan" } para los pasos siguientes.
+    const body = isFHIR ? rawBody : applyFieldMapping(rawBody, ehrCfgData.fieldMapping || {});
+
+    // ── Extraer campos según el tipo de payload ───────────────────────
+    let patientName, patientFhirId, medicationName, dosage, route, requester, service,
+        edad, sexo, cama, dx, exp, creat, peso;
+
+    if (isFHIR) {
+      patientName    = body.subject?.display || 'Paciente';
+      patientFhirId  = body.subject?.reference?.split('/').pop() || null;
+      medicationName = getMedName(body);
+      dosage         = getDose(body);
+      route          = getRoute(body);
+      requester      = getRequester(body);
+      service        = body.encounter?.display || null;
+    } else {
+      patientName    = body.nombre    || body.patientName  || body.patient_name  || 'Paciente';
+      patientFhirId  = body.patientId || body.fhirId       || null;
+      medicationName = body.medicationName || body.medication || body.drug || body.antibiotic || 'ATB no especificado';
+      dosage         = body.dosage    || body.dosis         || null;
+      route          = body.route     || body.via           || null;
+      requester      = body.requester || body.medico        || body.physician || 'Médico';
+      service        = body.service   || body.servicio      || body.ward    || null;
+      // Campos extra del expediente (enriquecen el censo)
+      edad  = body.edad  || body.age    ? Number(body.edad || body.age)  : null;
+      sexo  = normalizeSexo(body.sexo  || body.gender || body.sex || '');
+      cama  = body.cama  || body.bed    || body.room   || null;
+      dx    = body.dx    || body.diagnostico || body.diagnosis || null;
+      exp   = body.exp   || body.expediente  || body.chart_no  || body.mrn || null;
+      creat = body.creat || body.creatinina  || body.creatinine || null;
+      peso  = body.peso  || body.weight      ? Number(body.peso || body.weight) : null;
+    }
+
+    // ── Guardar solicitud en ehr_requests y upsert al CENSO ───────────
     let docId;
     try {
       const fhirMedicationRequestId = isFHIR ? (body.id || `fhir_${Date.now()}`) : `web_${Date.now()}`;
-      const patientFhirId = isFHIR ? (body.subject?.reference?.split('/').pop() || null) : null;
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+      // Guardar en Cola PROA (ehr_requests)
       const docRef = await db.collection(`hospitals/${hospId}/ehr_requests`).add({
         fhirMedicationRequestId,
         patientName,
-        patientFhirId,
+        patientFhirId: patientFhirId || null,
         medicationName,
-        dosage,
-        route,
-        requester,
-        service,
+        dosage:    dosage    || null,
+        route:     route     || null,
+        requester: requester || 'Médico',
+        service:   service   || null,
         status: 'pending',
         source: isFHIR ? 'fhir_webhook' : 'generic_webhook',
         fhirContext: isFHIR ? JSON.stringify(body) : null,
@@ -552,26 +616,41 @@ exports.ehrWebhook = onRequest(
       });
       docId = docRef.id;
 
-      // Upsert paciente al CENSO mensual (months/{YYYY-MM}/patients/) para que aparezca
-      // en la tabla principal del equipo PROA, no sólo en la Cola EHR.
+      // ── Upsert al CENSO (deduplicación por fhirId o nombre) ─────────
+      // El paciente aparece en la tabla principal del equipo PROA automáticamente.
       try {
-        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-        const censoDocId = `ehr_${patientFhirId || fhirMedicationRequestId}`;
-        await db.doc(`hospitals/${hospId}/months/${currentMonth}/patients/${censoDocId}`).set({
-          nombre: patientName,
-          fhirId: patientFhirId || null,
+        // Buscar si ya existe para actualizar en vez de crear duplicado
+        const existingDocId = await findExistingPatient(hospId, currentMonth, patientFhirId, patientName);
+        const censoDocId = existingDocId || `ehr_${patientFhirId || fhirMedicationRequestId}`;
+        const censoRef   = db.doc(`hospitals/${hospId}/months/${currentMonth}/patients/${censoDocId}`);
+
+        // Construir datos del paciente (solo campos con valor)
+        const pacData = {
+          nombre:    patientName,
+          fhirId:    patientFhirId || null,
           fhirMedicationRequestId,
           ehrSource: ehrCfgData.ehrName || 'EHR',
-          atbs: [{ nom: medicationName, dosis: dosage, via: route, inicio: new Date().toISOString().slice(0, 10) }],
+          atbs: [{ nom: medicationName, dosis: dosage || '', via: route || '', inicio: new Date().toISOString().slice(0, 10) }],
           auto_synced: true,
-          requester,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+          requester:   requester || null,
+          updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
+        };
+        // Agregar campos opcionales solo si tienen valor (no sobreescribir con null)
+        if (edad)    pacData.edad    = edad;
+        if (sexo)    pacData.sexo    = sexo;
+        if (cama)    pacData.cama    = cama;
+        if (service) pacData.svc     = service;
+        if (dx)      pacData.dx      = dx;
+        if (exp)     pacData.exp     = exp;
+        if (creat)   pacData.creat   = String(creat);
+        if (peso)    pacData.peso    = peso;
+
+        await censoRef.set(pacData, { merge: true });
       } catch (censoErr) {
         console.error('[ehrWebhook] error upserting censo paciente:', censoErr.message);
       }
 
-      // Notificar equipo PROA
+      // Notificar equipo PROA vía FCM
       await notificarEquipoPROA(
         hospId,
         '⚕ Nuevo ATB para revisión PROA',
