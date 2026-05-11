@@ -2894,6 +2894,7 @@ window.abrirMotorMicro=pid=>{const p=PACS.find(x=>x.id===pid);if(!p)return;abrir
 
 function abrirFormPaciente(p){
   p=p||{};
+  atbRowCount=0; // reset row counter so ATB IDs start fresh for each patient
   const sv=Object.keys(CAMAS).length?Object.keys(CAMAS):['UCI','Terapia Intermedia','Medicina Interna','Cirugía General','Ginecología/Obstetricia','Pediatría','Urgencias','Ortopedia','Hemodiálisis','Oncología'];
   const opt=(vals,cur)=>vals.map(v=>'<option value="'+v+'"'+(cur===v?' selected':'')+'>'+v+'</option>').join('');
   const ck=(mid,val)=>val?'checked':'';
@@ -12283,6 +12284,9 @@ window.renderFlujograma=function(){
 // ══════════════════════════════════════════════════════
 // MÓDULO TRASPLANTE / HEMATOLOGÍA
 // ══════════════════════════════════════════════════════
+// Browsers block <script> execution when injected via innerHTML (HTML5 spec).
+// _execScripts clones each script node so the browser parses & runs it.
+function _execScripts(c){Array.from(c.querySelectorAll('script')).forEach(function(s){var n=document.createElement('script');n.textContent=s.textContent;c.appendChild(n);s.remove();});}
 const _TX_SUBTABS=[
   {id:'tx-tipo',label:'🫀 Tipo y Fase'},
   {id:'tx-profilaxis',label:'💊 Profilaxis'},
@@ -12325,6 +12329,7 @@ window.renderTrasplantePac=function(pid){
   else if(sub==='tx-neutropenia')cont.innerHTML=_renderTxNeutropenia(p);
   else if(sub==='tx-pretx')cont.innerHTML=_renderTxPreTx(p);
   else if(sub==='tx-24h')cont.innerHTML=_renderTxProtocolo24h(p);
+  _execScripts(cont); // re-run scripts blocked by innerHTML assignment
 };
 
 function _txCard(titulo,contenido,color){
