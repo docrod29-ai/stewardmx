@@ -12049,6 +12049,7 @@ const _TX_SUBTABS=[
   {id:'tx-profilaxis',label:'💊 Profilaxis'},
   {id:'tx-patogenos',label:'🦠 Patógenos por Fase'},
   {id:'tx-cmv',label:'🔬 CMV Monitor'},
+  {id:'tx-neutropenia',label:'🩸 Neutropenia F.'},
   {id:'tx-pretx',label:'📋 Pre-Trasplante'},
   {id:'tx-24h',label:'🚨 Protocolo 24h'},
 ];
@@ -12082,6 +12083,7 @@ window.renderTrasplantePac=function(pid){
   else if(sub==='tx-profilaxis')cont.innerHTML=_renderTxProfilaxis(p);
   else if(sub==='tx-patogenos')cont.innerHTML=_renderTxPatogenos(p);
   else if(sub==='tx-cmv')cont.innerHTML=_renderTxCMV(p);
+  else if(sub==='tx-neutropenia')cont.innerHTML=_renderTxNeutropenia(p);
   else if(sub==='tx-pretx')cont.innerHTML=_renderTxPreTx(p);
   else if(sub==='tx-24h')cont.innerHTML=_renderTxProtocolo24h(p);
 };
@@ -12795,47 +12797,502 @@ function _renderTxPreTx(p){
     const nom=document.getElementById('pt_nombre_doc')?.value||'Paciente';
     const med=document.getElementById('pt_medico')?.value||'';
     const hosp=document.getElementById('pt_hospital')?.value||'';
-    const fecha=new Date().toLocaleDateString('es-MX');
-    function row(lbl,id){const v=document.getElementById(id)?.value||'—';const pos=v.includes('+');const neg=v.includes('-')||v==='Negativo'||v==='Indetectable'||v==='Negativos';return '<tr><td>'+lbl+'</td><td class="'+(pos?'pos':neg?'neg':'')+'">'+(v||'—')+'</td></tr>';}
-    const wordContent='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="UTF-8"><style>body{font-family:Calibri,sans-serif;font-size:11pt;}h1{font-size:16pt;color:#2E4057;}h2{font-size:13pt;color:#2E4057;border-bottom:1px solid #ccc;}table{border-collapse:collapse;width:100%;margin:10px 0;}td,th{border:1px solid #aaa;padding:6px 10px;font-size:10pt;}th{background:#2E4057;color:white;font-weight:bold;}.pos{color:#c00;font-weight:bold;}.neg{color:#007700;}.rec{background:#fff3cd;border-left:4px solid #ffc107;padding:8px 12px;margin:8px 0;}</style></head><body>'
+    const fecha=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+    const gv=id=>document.getElementById(id)?.value||'—';
+    const gc=id=>document.getElementById(id)?.checked?'Sí':'No';
+    function row(lbl,id){
+      const v=gv(id);
+      const pos=v.includes('+')||v.toLowerCase().includes('reactivo')||v.toLowerCase().includes('detectable')||v.toLowerCase().includes('positivo');
+      const neg=v.includes('-')||v.toLowerCase().includes('negativo')||v.toLowerCase().includes('indetectable');
+      return '<tr><td style="padding:5px 8px;border:1px solid #ccc;">'+lbl+'</td><td style="padding:5px 8px;border:1px solid #ccc;font-weight:'+(pos?'bold':'normal')+';color:'+(pos?'#cc0000':neg?'#006600':'#333')+'">'+v+'</td></tr>';
+    }
+    // ── Collect lab values for smart summary
+    const cmvRec=gv('pt_cmv'),cmvDon=gv('pd_cmv');
+    const ebvRec=gv('pt_ebv'),hbsagRec=gv('pt_hbsag'),hbcRec=gv('pt_hbc'),hbsAbs=gv('pt_hbs_t');
+    const hcvRec=gv('pt_hcv'),hcvrnaRec=gv('pt_hcvrna'),hivRec=gv('pt_hiv'),cd4=gv('pt_cd4');
+    const tbRec=gv('pt_qft'),chagasRec=gv('pt_chagas'),toxoRec=gv('pt_toxo'),strongRec=gv('pt_strongy');
+    const histoRec=gv('pt_histo'),g6pd=gv('pt_g6pd');
+    const hbsagDon=gv('pd_hbsag'),hbcDon=gv('pd_hbc'),hcvDon=gv('pd_hcv'),hivDon=gv('pd_hiv');
+    const hbvdnaDon=gv('pd_hbvdna'),hcvrnaDon=gv('pd_hcvrna'),chagasDon=gv('pd_chagas');
+    const sifilisDon=gv('pd_sifilis'),tbDon=gv('pd_qft'),meningDon=gv('pd_meningitis');
+    const hbs_num=parseFloat(hbsAbs)||0;
+    const isPos=v=>v.includes('+')||v.toLowerCase().includes('reactivo')||v.toLowerCase().includes('detectable')||v.toLowerCase().includes('positivo');
+    const isNeg=v=>v.includes('-')||v.toLowerCase().includes('negativo')||v.toLowerCase().includes('indetectable');
+
+    // ── Build smart clinical summary
+    let alertas=[],recsInfecto=[],recsHemato=[],recsNefro=[],recsCardio=[],recsOtros=[];
+
+    // CMV
+    const cmvDR=(isPos(cmvDon)?'D+':'D-')+'/'+(isPos(cmvRec)?'R+':'R-');
+    if(cmvDR==='D+/R-'){
+      alertas.push('<b style="color:#cc0000;">⚠️ CMV: Combinación D+/R- — RIESGO MUY ALTO de enfermedad CMV post-trasplante.</b>');
+      recsInfecto.push('CMV D+/R-: Iniciar <b>letermovir 480 mg VO QD</b> desde Día 0 (ajustar a 240 mg si ciclosporina). Mantener hasta Día 100 estándar; hasta Día 200 en alto riesgo (HAM, GVHD, depleción T). Monitoreo CMV PCR quincenal × 6 meses. Marty FM et al. NEJM 2017.');
+    } else if(cmvDR==='D+/R+'||cmvDR==='D-/R+'){
+      recsInfecto.push('CMV '+cmvDR+': Riesgo '+((cmvDR==='D+/R+')?'ALTO':'MODERADO')+'. Profilaxis con valganciclovir 900 mg VO QD × 3–6 meses (SOT) o Día 100 (TCMH). Monitoreo PCR mensual.');
+    } else if(cmvDR==='D-/R-'){
+      recsInfecto.push('CMV D-/R-: Riesgo bajo. Medidas de prevención primaria (donantes CMV-negativos de productos hemáticos). Monitoreo PCR a inicio y si síntomas.');
+    }
+
+    // HBV receptor
+    if(isPos(hbsagRec)){
+      alertas.push('<b style="color:#cc0000;">⚠️ HBsAg REACTIVO en receptor — Hepatitis B activa. Requiere tratamiento y evaluación hepatológica urgente antes del trasplante.</b>');
+      recsInfecto.push('HBsAg+: Iniciar/continuar <b>entecavir 0.5–1 mg VO QD</b> (ajustar si ERC) o tenofovir alafenamida 25 mg QD. Indefinido en trasplante. Evaluar fibrosis hepática (FibroScan o biopsia). Referir a Hepatología.');
+      recsOtros.push('<b>Hepatología/Gastroenterología:</b> Valoración urgente por HBsAg+ en receptor. Definir tratamiento antiHBV definitivo y estadificación de daño hepático pre-TX.');
+    } else if(isPos(hbcRec)&&!isPos(hbsagRec)){
+      recsInfecto.push('Anti-HBc+ con HBsAg-: Riesgo de reactivación HBV con IS intensa. Iniciar <b>entecavir o tenofovir</b> profiláctico si Anti-CD20, corticoides dosis alta, IAT, quimio, o rituximab. Monitoreo HBV DNA c/1–3 meses.');
+    }
+    if(hbs_num>0&&hbs_num<10){
+      recsInfecto.push('Anti-HBs '+hbs_num+' UI/L: Nivel subprotector (&lt;10 UI/L). Aplicar refuerzo de vacuna HBV × 3 dosis (doble dosis 40 µg) antes del TX si tiempo lo permite. Re-titular 4–8 semanas post-esquema.');
+    } else if(hbs_num>=10&&hbs_num<100){
+      recsInfecto.push('Anti-HBs '+hbs_num+' UI/L: Nivel marginalmente protector. Considerar refuerzo × 1–2 dosis. Monitoreo post-TX semestral.');
+    }
+
+    // HBV donador
+    if(isPos(hbcDon)&&!isPos(hbsagDon)){
+      alertas.push('<b style="color:#e65c00;">⚠️ DONADOR Anti-HBc+ / HBsAg-: Riesgo de transmisión HBV oculta al receptor. Profilaxis mandatoria.</b>');
+      recsInfecto.push('Donador Anti-HBc+/HBsAg-: Receptor debe recibir profilaxis con entecavir ≥12 meses (indefinida en IS intensa). Monitoreo HBV DNA mensual año 1, trimestral año 2.');
+    }
+    if(isPos(hbsagDon)){
+      alertas.push('<b style="color:#cc0000;">⚠️ DONADOR HBsAg REACTIVO — Órgano de alto riesgo HBV. Uso solo con receptor HBsAg+ o Anti-HBs >100 UI/L. Decisión multidisciplinaria urgente.</b>');
+      recsInfecto.push('Donador HBsAg+: Profilaxis intensificada con entecavir + inmunoglobulina antiHBs (HBIG) peri-TX (SOT). Monitoreo HBV DNA semanal × 1 mes, luego mensual. Hepatología obligatoria.');
+    }
+
+    // HCV
+    if(isPos(hcvRec)){
+      if(isPos(hcvrnaRec)){
+        alertas.push('<b style="color:#cc0000;">⚠️ HCV RNA DETECTABLE en receptor — Hepatitis C activa. Tratamiento con AAD obligatorio antes del TX.</b>');
+        recsInfecto.push('HCV activa (RNA+): Tratamiento con antivirales de acción directa (AAD) pangenotípicos: <b>sofosbuvir/velpatasvir 400/100 mg QD × 12 semanas</b> (SVR >98%). Diferir trasplante si posible hasta SVR confirmado. Monitoreo HCV RNA semanas 4, 12 post-tx AAD y 12 semanas post-TX.');
+        recsOtros.push('<b>Hepatología:</b> Valoración urgente y prescripción de AAD en receptor con HCV RNA+. Estadificar fibrosis hepática (FibroScan). Definir urgencia del trasplante vs. tratamiento primero.');
+      } else {
+        recsInfecto.push('Anti-HCV+ con RNA-: SVR previo probable o falso positivo. Confirmar con genotyping o repetir RNA (COBAS 6800) si duda. Monitoreo HCV RNA cada 6 meses post-TX con IS intensa.');
+      }
+    }
+    if(isPos(hcvDon)&&isPos(hcvrnaDon)){
+      alertas.push('<b style="color:#cc0000;">⚠️ DONADOR HCV RNA DETECTABLE — Órgano de riesgo. Receptor debe recibir AAD post-TX (sofosbuvir/velpatasvir × 12 sem). Protocolo D+/R- HCV institucional obligatorio.</b>');
+      recsOtros.push('<b>Hepatología:</b> Definir protocolo D+HCV/R- con AAD anticipados o post-trasplante inmediato (semana 1–4). Consentimiento informado específico.');
+    }
+
+    // HIV
+    if(isPos(hivRec)){
+      alertas.push('<b style="color:#e65c00;">⚠️ VIH+ en receptor. Trasplante factible con CD4 >200 y CV indetectable. Continuidad de TAR perioperatoria crítica.</b>');
+      const cd4n=parseFloat(cd4)||0;
+      recsInfecto.push('VIH+: Mantener TAR sin interrumpir (ajustar formulación IV si cirugía prolongada). CD4 actual: '+cd4+' cells/µL. '+(cd4n<200?'CD4 <200: diferir TX si no es urgente. Optimizar TAR y profilaxis (cotrimoxazol, azitromicina MAI si <50).':'CD4 ≥200: trasplante posible. Cotrimoxazol indefinido.')+' Revisar interacciones TAR-inmunosupresores (especialmente calcineurina con ritonavir/cobicistat → monitoreo estrecho de niveles).');
+      recsOtros.push('<b>Infectología VIH:</b> Revisar y ajustar TAR para minimizar interacciones con inmunosupresores. Preferir TAR sin inhibidores de proteasa/cobicistat si es posible (dolutegravir + TDF/TAF + 3TC es preferible).');
+    }
+    if(isPos(hivDon)){
+      alertas.push('<b style="color:#cc0000;">⚠️ DONADOR VIH+: Protocolo HOPE Act (EUA) u equivalente. Uso solo en receptor VIH+. Requiere aprobación IRB o comité de ética institucional.</b>');
+    }
+
+    // TB
+    if(isPos(tbRec)){
+      alertas.push('<b style="color:#e65c00;">⚠️ QFT/IGRA POSITIVO en receptor — TB latente. Profilaxis obligatoria antes del trasplante.</b>');
+      recsInfecto.push('TB latente (QFT/IGRA+): Iniciar <b>isoniazida 300 mg + B6 25 mg VO QD × 9 meses</b>, o régimen corto 3HP (rifapentina + isoniazida × 12 semanas, 1 vez/semana) si posible antes del TX. Descartar TB activa con Rx/TC tórax + BK esputo si síntomas. Monitoreo PFH mensual durante tratamiento.');
+    }
+    if(isPos(tbDon)){
+      alertas.push('<b style="color:#e65c00;">⚠️ QFT/IGRA POSITIVO en donador — Riesgo de transmisión. Receptor debe recibir profilaxis isoniazida post-TX.</b>');
+      recsInfecto.push('TB latente en donador: Iniciar isoniazida 300 mg + B6 al receptor post-TX si no tiene contraindicación. Monitoreo PFH mensual.');
+    }
+
+    // Chagas
+    if(isPos(chagasRec)){
+      alertas.push('<b style="color:#cc0000;">⚠️ CHAGAS POSITIVO en receptor — Riesgo de reactivación severa con IS. Tratamiento y monitoreo obligatorios.</b>');
+      recsInfecto.push('Chagas (T. cruzi IgG+): Tratamiento con <b>benznidazol 5 mg/kg/día × 60 días</b> antes del TX (SOT) o monitoreo estrecho post-TX (TCMH). Parasitemia por PCR cada 2 semanas × primeros 3 meses post-TX. Si reactivación: benznidazol urgente + reducir IS si posible. Cardiopatía chagásica: ECG y ecocardiograma.');
+      recsCardio.push('Evaluar cardiopatía chagásica: ECG de 12 derivaciones + ecocardiograma + Holter 24h. Chagas cardíaco puede contraindicar trasplante renal y es indicación de trasplante cardíaco.');
+    }
+    if(isPos(chagasDon)){
+      alertas.push('<b style="color:#cc0000;">⚠️ DONADOR CON CHAGAS — Riesgo de transmisión documentado. Receptor requiere monitoreo intensivo con PCR post-TX.</b>');
+      recsInfecto.push('Donador Chagas+: Monitoreo receptor con PCR T. cruzi semanal × 4 semanas, luego mensual × 6 meses. Si parasitemia: benznidazol inmediato.');
+    }
+
+    // Toxoplasma
+    if(!isPos(toxoRec)&&isNeg(toxoRec)){
+      recsInfecto.push('Toxoplasma IgG negativo en receptor: Riesgo de toxoplasmosis primaria si donador es IgG+. Cotrimoxazol profiláctico (estándar en SOT) protege también contra Toxoplasma. Si cotrimoxazol contraindicado: atovacuona o pirimetamina + dapsona (si G6PD normal).');
+    }
+
+    // Strongyloides
+    if(isPos(strongRec)){
+      recsInfecto.push('Strongyloides IgG+: Tratar con <b>ivermectina 200 µg/kg VO × 2 dosis (días 1 y 15)</b> antes del TX. Síndrome de hiperinfestación con IS puede ser fatal. Confirmar negativización con ELISA post-tratamiento.');
+    }
+
+    // Histo
+    if(isPos(histoRec)){
+      alertas.push('<b style="color:#e65c00;">⚠️ HISTOPLASMA ANTIGENURIA POSITIVO — Histoplasmosis activa o reciente. Tratamiento obligatorio pre-TX.</b>');
+      recsInfecto.push('Histoplasma Ag+: Confirmar con cultivos + PCR si disponible. Tratar con <b>itraconazol 200 mg VO BID × 12 semanas</b> (enfermedad leve) o anfotericina B liposomal 3 mg/kg/día (enfermedad moderada-grave). Repetir Ag al terminar tratamiento. Diferir TX hasta negativización.');
+    }
+
+    // G6PD
+    if(isPos(g6pd)||g6pd.toLowerCase().includes('deficiente')){
+      recsInfecto.push('G6PD DEFICIENTE: Contraindicado cotrimoxazol (riesgo hemólisis). Usar <b>atovacuona 1500 mg VO QD</b> para profilaxis PCP. Dapsona también contraindicada. Alternativa: pentamidina inhalada 300 mg/mes.');
+    }
+
+    // Meningitis donador
+    if(isPos(meningDon)||meningDon.toLowerCase().includes('meningitis')){
+      alertas.push('<b style="color:#cc0000;">⚠️ CAUSA DE MUERTE: MENINGITIS BACTERIANA — Riesgo de transmisión al receptor. Requiere estudio microbiológico completo del donador y profilaxis dirigida.</b>');
+      recsInfecto.push('Donador con meningitis bacteriana: Obtener resultado de cultivos LCR + hemocultivos del donador. Si N. meningitidis o H. influenzae: profilaxis receptor con ciprofloxacino 500 mg VO DU o ceftriaxona 250 mg IM DU. Si S. pneumoniae: no requiere profilaxis de contacto. Monitoreo estrecho primeras 72h post-TX.');
+    }
+
+    // Sífilis donador
+    if(isPos(sifilisDon)){
+      recsInfecto.push('VDRL/RPR reactivo en donador: Obtener FTA-ABS o TPHA. Si confirmado: penicilina G benzatínica 2.4 MU IM DU al receptor (profilaxis). Monitoreo VDRL cuantitativo al receptor post-TX.');
+    }
+
+    // Nefrology recs based on data
+    const creat=gv('pt_creatinina'),egfr=gv('pt_egfr');
+    if(creat!=='—'||egfr!=='—'){
+      const egfrN=parseFloat(egfr)||0;
+      if(egfrN>0&&egfrN<30){
+        recsNefro.push('TFG '+egfr+' mL/min/1.73m²: ERC avanzada estadio G4-G5. Ajuste de dosis de antimicrobianos obligatorio (cotrimoxazol dosis profiláctica segura hasta TFG >15; tenofovir: TDF contraindicado si TFG <30, preferir TAF o entecavir). Vigilar nefrotoxicidad adicional de antifúngicos.');
+      } else if(egfrN>=30&&egfrN<60){
+        recsNefro.push('TFG '+egfr+' mL/min/1.73m²: ERC estadio G3. Ajuste de cotrimoxazol (400/80 mg QD en lugar de DS BID). Vigilar valganciclovir (requiere ajuste: si TFG 25-59: 450 mg QD). Evitar aminoglucósidos sin monitoreo de niveles.');
+      }
+    }
+    if(recsNefro.length===0){recsNefro.push('Sin contraindicaciones nefrológicas identificadas con los datos disponibles. Confirmar TFG y proteinuria basal pre-TX. Monitoreo de función renal con calcineurina estándar.');}
+
+    // Hematology recs
+    const linf=gv('pt_linfocitos'),anc=gv('pt_anc');
+    if(isNeg(hivRec)&&!alertas.some(a=>a.includes('CMV D+/R-'))){
+      recsHemato.push('Hemograma pre-TX: documentar BHC con diferencial. Referencia basal para seguimiento de mielotoxicidad (cotrimoxazol, ganciclovir, valganciclovir). Si linfocitos <200/µL al inicio: reforzar profilaxis PCP y añadir profilaxis CMV independientemente de serología.');
+    }
+    recsHemato.push('Perfil vacunal: documentar esquema completo. Vacunar ANTES del TX (IS reduce inmunogenicidad): influenza (anual), neumococo PCV20 o PCV15+PPSV23, Tdap, VZV (viva: mín. 4 sem antes; contraindicada post-TX), HBV (si Anti-HBs <100 UI/L), hepatitis A, Hib, meningococo B+ACWY. Consult Infectología para calendarios específicos.');
+
+    // Cardiology
+    if(recsCardio.length===0&&!isPos(chagasRec)){
+      recsCardio.push('Sin alertas cardíacas basadas en los datos serológicos actuales. Evaluación cardiovascular estándar pre-TX (ECG, ecocardiograma, ± prueba de esfuerzo según protocolo institucional).');
+    }
+
+    // General
+    recsOtros.push('<b>Odontología / Cirugía maxilofacial:</b> Clearance dental obligatorio ≥4–6 semanas antes del TX. Tratar focos dentales activos, granulomas periapicales y enfermedad periodontal severa. Crítico en TX cardíaco y pulmonar.');
+    recsOtros.push('<b>PROA / Farmacia:</b> Revisar interacciones medicamentosas completas antes de iniciar inmunosupresión: calcineurina inhibidores (tacrolimus/ciclosporina) interactúan con azoles (niveles ×3–10), rifampicina (reducción crítica de niveles), macrólidos, antagonistas del calcio. Ajustar profilaxis según TFG y perfil de interacciones.');
+
+    const alerta_html=alertas.length?'<div style="background:#fff3cd;border:2px solid #ffc107;border-radius:4px;padding:12px;margin:12px 0;"><b style="font-size:12pt;color:#856404;">⚠️ ALERTAS CRÍTICAS</b><ul style="margin:8px 0 0;padding-left:20px;">'+alertas.map(a=>'<li style="margin-bottom:6px;font-size:10pt;">'+a+'</li>').join('')+'</ul></div>':'';
+
+    function recSec(titulo,items,color){
+      if(!items.length)return '';
+      return '<h3 style="font-size:12pt;color:'+color+';margin:16px 0 6px;border-left:4px solid '+color+';padding-left:8px;">'+titulo+'</h3>'
+        +'<ul style="margin:0;padding-left:18px;">'+items.map(i=>'<li style="font-size:10pt;margin-bottom:6px;line-height:1.5;">'+i+'</li>').join('')+'</ul>';
+    }
+
+    const recsHTML=recSec('Infectología / PROA',recsInfecto,'#1a5276')
+      +recSec('Hematología',recsHemato,'#7b241c')
+      +recSec('Nefrología',recsNefro,'#1a7a4a')
+      +recSec('Cardiología',recsCardio,'#922b21')
+      +recSec('Otras Especialidades',recsOtros,'#5b2c6f');
+
+    const wordContent='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">'
+      +'<head><meta charset="UTF-8"><style>'
+      +'body{font-family:Calibri,sans-serif;font-size:11pt;color:#222;line-height:1.5;}'
+      +'h1{font-size:17pt;color:#1a3a5c;margin-bottom:2px;}'
+      +'h2{font-size:13pt;color:#1a3a5c;border-bottom:2px solid #1a3a5c;padding-bottom:3px;margin-top:18px;margin-bottom:8px;}'
+      +'h3{font-size:12pt;margin:14px 0 4px;}'
+      +'table{border-collapse:collapse;width:100%;margin:8px 0;font-size:10pt;}'
+      +'td,th{border:1px solid #aaa;padding:5px 9px;}'
+      +'th{background:#1a3a5c;color:white;font-weight:bold;text-align:left;}'
+      +'tr:nth-child(even){background:#f2f6fc;}'
+      +'.pos{color:#cc0000;font-weight:bold;} .neg{color:#006600;}'
+      +'.footer{font-size:9pt;color:#666;margin-top:24px;border-top:1px solid #ccc;padding-top:8px;}'
+      +'</style></head><body>'
       +'<h1>EVALUACIÓN INFECTOLÓGICA PRE-TRASPLANTE</h1>'
-      +'<p><b>Hospital:</b> '+hosp+' &nbsp;&nbsp; <b>Fecha:</b> '+fecha+'</p>'
-      +'<p><b>Paciente:</b> '+nom+' &nbsp;&nbsp; <b>Médico:</b> '+med+'</p>'
-      +'<h2>RECEPTOR — Serología</h2>'
+      +'<p style="color:#666;font-size:10pt;margin-top:2px;">Programa de Optimización de Antimicrobianos (PROA) — Infectología</p>'
+      +'<table style="width:100%;border:none;margin:8px 0;"><tr>'
+      +'<td style="border:none;padding:2px 0;font-size:10pt;"><b>Hospital:</b> '+hosp+'</td>'
+      +'<td style="border:none;padding:2px 0;font-size:10pt;"><b>Fecha:</b> '+fecha+'</td>'
+      +'</tr><tr>'
+      +'<td style="border:none;padding:2px 0;font-size:10pt;"><b>Paciente:</b> '+nom+'</td>'
+      +'<td style="border:none;padding:2px 0;font-size:10pt;"><b>Médico:</b> '+med+'</td>'
+      +'</tr></table>'
+      +alerta_html
+      +'<h2>1. SEROLOGÍA DEL RECEPTOR</h2>'
       +'<table><tr><th>Estudio</th><th>Resultado</th></tr>'
       +row('CMV IgG','pt_cmv')+row('EBV VCA IgG','pt_ebv')+row('HSV-1/2 IgG','pt_hsv')+row('VZV IgG','pt_vzv')
-      +row('HBsAg','pt_hbsag')+row('Anti-HBc total','pt_hbc')+'<tr><td>Anti-HBs</td><td>'+(document.getElementById('pt_hbs_t')?.value||'—')+' UI/L</td></tr>'
+      +row('HBsAg','pt_hbsag')+row('Anti-HBc total','pt_hbc')
+      +'<tr><td style="padding:5px 8px;border:1px solid #ccc;">Anti-HBs</td><td style="padding:5px 8px;border:1px solid #ccc;">'+(document.getElementById('pt_hbs_t')?.value||'—')+' UI/L</td></tr>'
       +row('HBV DNA','pt_hbvdna')+row('Anti-HCV','pt_hcv')+row('HCV RNA','pt_hcvrna')
-      +row('HIV Ag/Ab','pt_hiv')+row('HTLV-1/2','pt_htlv')
-      +row('Chagas IgG','pt_chagas')+row('Toxoplasma IgG','pt_toxo')+row('Strongyloides IgG','pt_strongy')
-      +row('QFT/IGRA TB','pt_qft')+row('Rx Tórax','pt_rxtx')
-      +row('Histoplasma urinario Ag','pt_histo')+row('G6PD','pt_g6pd')
-      +'<tr><td>CD4 (si VIH+)</td><td>'+(document.getElementById('pt_cd4')?.value||'—')+' cells/μL</td></tr>'
+      +row('HIV Ag/Ab','pt_hiv')+'<tr><td style="padding:5px 8px;border:1px solid #ccc;">CD4 (si VIH+)</td><td style="padding:5px 8px;border:1px solid #ccc;">'+(document.getElementById('pt_cd4')?.value||'—')+' cells/μL</td></tr>'
+      +row('HTLV-1/2','pt_htlv')
+      +row('Chagas IgG (T. cruzi)','pt_chagas')+row('Toxoplasma IgG','pt_toxo')+row('Strongyloides IgG','pt_strongy')
+      +row('QFT/IGRA (TB latente)','pt_qft')+row('Rx/TC de tórax','pt_rxtx')
+      +row('Histoplasma Ag urinario','pt_histo')+row('G6PD','pt_g6pd')
       +'</table>'
-      +'<h2>DONADOR — Serología</h2>'
+      +'<h2>2. SEROLOGÍA DEL DONADOR</h2>'
       +'<table><tr><th>Estudio</th><th>Resultado</th></tr>'
       +row('CMV IgG','pd_cmv')+row('EBV IgG','pd_ebv')+row('HSV IgG','pd_hsv')
       +row('HBsAg','pd_hbsag')+row('Anti-HBc total','pd_hbc')+row('HBV DNA','pd_hbvdna')
       +row('Anti-HCV','pd_hcv')+row('HCV RNA','pd_hcvrna')+row('HIV Ag/Ab','pd_hiv')
       +row('HTLV-1/2','pd_htlv')+row('Chagas IgG','pd_chagas')+row('Sífilis VDRL/RPR','pd_sifilis')
-      +row('QFT/IGRA TB','pd_qft')+row('Urocultivo','pd_urocult')
-      +row('Hemocultivos','pd_hemocult')+row('Meningitis bacteriana (causa de muerte)','pd_meningitis')
+      +row('QFT/IGRA (TB)','pd_qft')+row('Urocultivo','pd_urocult')
+      +row('Hemocultivos','pd_hemocult')+row('Causa de muerte/diagnóstico','pd_meningitis')
       +'</table>'
-      +'<h2>RECOMENDACIONES</h2>'
-      +(document.getElementById('pretx-recs')?.innerText||'Completar laboratorios para generar recomendaciones.')
-      +'<br><br><p><b>Firma:</b> '+med+' — Infectología / PROA &nbsp;&nbsp;&nbsp; <b>Fecha:</b> '+fecha+'</p>'
-      +'<p style="font-size:9pt;color:#666;">Referencias: IDSA 2024 · AST-IDCOP 2019 · KDIGO 2024 · OMS 2023 · Marty FM NEJM 2017 · AASLD 2023</p>'
+      +'<h2>3. RESUMEN CLÍNICO Y ANÁLISIS DE RIESGO</h2>'
+      +'<p style="font-size:10.5pt;line-height:1.6;">La evaluación infectológica pre-trasplante de <b>'+nom+'</b> fue realizada el '+fecha+' con base en los estudios serológicos del receptor y el donador disponibles al momento. '
+      +'El análisis automatizado identificó <b>'+alertas.length+' alerta(s) de alto impacto clínico</b> y genera las siguientes recomendaciones por especialidad.'
+      +(alertas.length?(' Se requiere resolución de las alertas marcadas antes de proceder con el trasplante electivo.'):'')+'</p>'
+      +'<h2>4. RECOMENDACIONES POR ESPECIALIDAD</h2>'
+      +recsHTML
+      +'<h2>5. RECOMENDACIONES DEL FORMULARIO PRE-TX</h2>'
+      +'<div style="background:#f8f9fa;border-left:4px solid #1a3a5c;padding:10px 14px;font-size:10pt;line-height:1.6;">'
+      +(document.getElementById('pretx-recs')?.innerText||'(Completar campos del formulario para generar recomendaciones automáticas.)')
+      +'</div>'
+      +'<br><br>'
+      +'<table style="width:100%;border:none;"><tr>'
+      +'<td style="border:none;padding:2px 0;width:50%;"><b>Firma del especialista:</b><br><br>'+med+'<br><span style="font-size:9pt;color:#666;">Infectología / PROA</span></td>'
+      +'<td style="border:none;padding:2px 0;width:50%;"><b>Fecha y hora:</b><br><br>'+fecha+'<br><span style="font-size:9pt;color:#666;">'+new Date().toLocaleTimeString('es-MX')+'</span></td>'
+      +'</tr></table>'
+      +'<div class="footer">'
+      +'<b>Referencias:</b> IDSA 2024 · AST-IDCOP 2023 · KDIGO Transplant 2024 · ESCMID CMV 2023 · AASLD HBV 2023 · '
+      +'Marty FM et al. NEJM 2017 (letermovir) · Avery RK et al. NEJM 2022 (maribavir) · '
+      +'Freifeld AG et al. CID 2011 (MASCC) · Carmona-Bayonas A et al. JCO 2015 (CISNE) · '
+      +'OMS TB 2023 · NOM-045-SSA2-2005 · NOM-004-SSA3-2012<br>'
+      +'<span style="color:#999;">Generado por StewardMX — Sistema PROA | stewardmx-1.web.app | '+new Date().toISOString()+'</span>'
+      +'</div>'
       +'</body></html>';
     const blob=new Blob([wordContent],{type:'application/msword'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    a.href=url;a.download='PreTrasplante_'+nom.replace(/\\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.doc';
+    a.href=url;
+    a.download='EvalPreTX_'+nom.replace(/\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.doc';
     a.click();URL.revokeObjectURL(url);
   };
   window._pretxRecs();
   })();<\/script>`;
   // Dental clearance note
   html+=_txCard('Clearance Dental','<p style="font-size:11px;color:var(--t2);line-height:1.6;margin:0;">Realizar evaluación dental completa y tratar focos infecciosos orales ≥4–6 semanas antes del trasplante. Especialmente crítico en SOT cardíaco y pulmonar.</p>','var(--amber)');
+  return html;
+}
+
+function _renderTxNeutropenia(p){
+  const pid=p?.id||'';
+  const nomPac=p?.nombre||'—';
+  const inmunoList=p?.inmunosupresores||[];
+  // Risk levels by drug class for context
+  const riskMap={
+    'Timoglobulina (ATG)':'MUY ALTO','Ciclofosfamida':'MUY ALTO','Fludarabina':'MUY ALTO',
+    'Cladribina':'MUY ALTO','Carfilzomib':'ALTO','Venetoclax':'ALTO','Obinutuzumab':'ALTO',
+    'Rituximab':'ALTO','Gemtuzumab':'ALTO','Inotuzumab':'ALTO','Blinatumomab':'ALTO',
+    'Axicabtagene (Yescarta)':'MUY ALTO','Tisagenlecleucel (Kymriah)':'MUY ALTO',
+    'Lisocabtagene (Breyanzi)':'MUY ALTO','Ciltacabtagene (Carvykti)':'MUY ALTO',
+    'Tacrolimus':'ALTO','Ciclosporina':'ALTO','Micofenolato (MMF)':'MODERADO',
+    'Azatioprina':'MODERADO','Sirolimus':'MODERADO','Everolimus':'MODERADO',
+    'Prednisona ≥20mg/día':'ALTO','Metilprednisolona pulsos':'MUY ALTO',
+    'Ibrutinib':'MODERADO','Acalabrutinib':'MODERADO','Zanubrutinib':'MODERADO',
+    'Idelalisib':'ALTO','Copanlisib':'ALTO','Duvelisib':'ALTO',
+    'Ruxolitinib':'ALTO','Baricitinib':'MODERADO','Tofacitinib':'MODERADO',
+    'Daratumumab':'ALTO','Isatuximab':'ALTO',
+    'Lenalidomida':'MODERADO','Pomalidomida':'ALTO','Talidomida':'MODERADO',
+    'Bortezomib':'ALTO','Carfilzomib':'MUY ALTO','Ixazomib':'MODERADO',
+    'Belinostat':'ALTO','Romidepsina':'ALTO','Vorinostat':'MODERADO',
+    'Nivolumab':'BAJO','Pembrolizumab':'BAJO','Atezolizumab':'BAJO',
+    'Epcoritamab':'ALTO','Mosunetuzumab':'ALTO','Glofitamab':'ALTO',
+  };
+  // Compute highest risk from patient inmunosupresores
+  let maxRisk='DESCONOCIDO',maxRiskColor='var(--t2)',maxRiskDrug='';
+  const rankMap={'MUY ALTO':4,'ALTO':3,'MODERADO':2,'BAJO':1,'DESCONOCIDO':0};
+  (inmunoList||[]).forEach(drug=>{
+    const r=riskMap[drug];
+    if(r&&rankMap[r]>rankMap[maxRisk]){maxRisk=r;maxRiskDrug=drug;}
+  });
+  if(maxRisk==='MUY ALTO')maxRiskColor='var(--red)';
+  else if(maxRisk==='ALTO')maxRiskColor='var(--amber)';
+  else if(maxRisk==='MODERADO')maxRiskColor='#60a5fa';
+  else if(maxRisk==='BAJO')maxRiskColor='var(--teal)';
+
+  const uid=Date.now();
+  let html='';
+
+  // ── Definición y contexto
+  html+=_txCard('🩸 NEUTROPENIA FEBRIL — DEFINICIÓN Y CONTEXTO',`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div style="background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.2);border-radius:6px;padding:10px;">
+        <div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;margin-bottom:5px;">Definición ANC</div>
+        <div style="font-size:12px;color:var(--t1);">ANC &lt; <b>500 cells/µL</b><br><span style="font-size:10.5px;color:var(--t2);">o &lt;1000 con caída esperada ≤500</span></div>
+      </div>
+      <div style="background:rgba(255,152,0,.06);border:1px solid rgba(255,152,0,.2);border-radius:6px;padding:10px;">
+        <div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;margin-bottom:5px;">Definición Fiebre</div>
+        <div style="font-size:12px;color:var(--t1);">Temp ≥ <b>38.3°C</b> oral única<br><span style="font-size:10.5px;color:var(--t2);">o ≥38°C × 1h sostenida</span></div>
+      </div>
+    </div>
+    ${inmunoList.length?`<div style="background:var(--s2);border-radius:6px;padding:10px;margin-bottom:10px;">
+      <div style="font-size:10px;color:var(--t2);margin-bottom:4px;">Inmunosupresión del paciente — Riesgo de NF</div>
+      <div style="font-size:13px;font-weight:700;color:${maxRiskColor};">${maxRisk}</div>
+      <div style="font-size:10.5px;color:var(--t2);margin-top:2px;">${maxRiskDrug?'Fármaco de mayor riesgo: '+maxRiskDrug:'Basado en inmunosupresores registrados'}</div>
+    </div>`:''}
+    <div style="font-size:10.5px;color:var(--t2);line-height:1.6;"><b style="color:var(--t1);">Urgencia real:</b> La neutropenia febril no tratada tiene mortalidad del 5–20%. En pacientes trasplantados o con IS intensa, el riesgo sube ≥30%. <b>Hemocultivos × 2 antes del primer antibiótico, siempre.</b></div>
+  `,'var(--red)');
+
+  // ── MASCC Score
+  html+=`<div style="background:var(--s1);border:1px solid var(--brd2);border-radius:8px;padding:16px 18px;margin-bottom:14px;">
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:4px;">MASCC SCORE — Multinational Association for Supportive Care in Cancer</div>
+    <div style="font-size:10.5px;color:var(--t2);margin-bottom:12px;line-height:1.5;">Identifica pacientes de BAJO RIESGO de complicaciones en neutropenia febril. <b style="color:var(--blue);">≥21 puntos = bajo riesgo</b> (posible manejo ambulatorio + ATB oral). <b style="color:var(--red);">&lt;21 = alto riesgo</b> (hospitalización + ATB IV).</div>
+    <div id="mascc-items-${uid}">
+      <div style="margin-bottom:8px;">
+        <label style="font-size:11px;font-weight:600;color:var(--t1);display:block;margin-bottom:4px;">1. Carga de la enfermedad (síntomas de la NF)</label>
+        <select id="mascc-burden-${uid}" onchange="window._calcMascc${uid}()" style="width:100%;background:var(--s2);border:1px solid var(--brd);border-radius:5px;color:var(--t1);padding:6px;font-size:11px;">
+          <option value="">— Seleccionar —</option>
+          <option value="5">Sin síntomas o síntomas leves (5 pts)</option>
+          <option value="3">Síntomas moderados (3 pts)</option>
+          <option value="0">Síntomas graves o críticos (0 pts)</option>
+        </select>
+      </div>
+      ${[
+        {id:`mascc-hypot-${uid}`,label:'2. Sin hipotensión (PAS ≥ 90 mmHg)',pts:5},
+        {id:`mascc-copd-${uid}`,label:'3. Sin EPOC activa',pts:4},
+        {id:`mascc-solid-${uid}`,label:'4. Tumor sólido O hemato sin infección fúngica previa',pts:4},
+        {id:`mascc-desh-${uid}`,label:'5. Sin deshidratación que requiera fluidos IV',pts:3},
+        {id:`mascc-out-${uid}`,label:'6. Paciente ambulatorio al inicio de la fiebre',pts:3},
+        {id:`mascc-age-${uid}`,label:'7. Edad < 60 años',pts:2},
+      ].map(item=>`<label style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:5px;background:var(--s2);margin-bottom:5px;cursor:pointer;">
+        <input type="checkbox" id="${item.id}" onchange="window._calcMascc${uid}()" style="accent-color:var(--blue);width:15px;height:15px;flex-shrink:0;">
+        <span style="font-size:11px;color:var(--t1);flex:1;">${item.label}</span>
+        <span style="font-size:11px;font-weight:700;color:var(--blue);flex-shrink:0;">+${item.pts}</span>
+      </label>`).join('')}
+    </div>
+    <div id="mascc-result-${uid}" style="margin-top:12px;padding:12px;border-radius:6px;background:var(--s2);text-align:center;">
+      <div style="font-size:11px;color:var(--t2);">Completa los criterios para calcular el score</div>
+    </div>
+  </div>
+  <script>(function(){
+    window._calcMascc${uid}=function(){
+      const burden=parseInt(document.getElementById('mascc-burden-${uid}')?.value)||0;
+      const hypot=document.getElementById('mascc-hypot-${uid}')?.checked?5:0;
+      const copd=document.getElementById('mascc-copd-${uid}')?.checked?4:0;
+      const solid=document.getElementById('mascc-solid-${uid}')?.checked?4:0;
+      const desh=document.getElementById('mascc-desh-${uid}')?.checked?3:0;
+      const outp=document.getElementById('mascc-out-${uid}')?.checked?3:0;
+      const age=document.getElementById('mascc-age-${uid}')?.checked?2:0;
+      const score=burden+hypot+copd+solid+desh+outp+age;
+      const low=score>=21;
+      const el=document.getElementById('mascc-result-${uid}');
+      if(!el)return;
+      el.style.background=low?'rgba(0,212,168,.08)':'rgba(255,77,109,.08)';
+      el.style.border='1px solid '+(low?'rgba(0,212,168,.3)':'rgba(255,77,109,.3)');
+      el.innerHTML='<div style="font-size:22px;font-weight:800;color:'+(low?'var(--teal)':'var(--red)')+';">MASCC: '+score+' / 26</div>'
+        +'<div style="font-size:13px;font-weight:700;color:'+(low?'var(--teal)':'var(--red)')+';">'+(low?'⬇️ BAJO RIESGO':'🔴 ALTO RIESGO')+'</div>'
+        +'<div style="font-size:11px;color:var(--t2);margin-top:6px;line-height:1.5;">'
+        +(low?'Mortalidad ~1%. <b>Considerar ATB oral (amoxicilina-clavulanato + ciprofloxacino) + manejo ambulatorio</b> si cumple criterios adicionales (soporte en casa, seguimiento estrecho, sin fallo orgánico).'
+          :'Mortalidad ~40%. <b>Hospitalización urgente. ATB IV empírico inmediato.</b> No diferir > 60 min desde ingreso.')
+        +'</div>'
+        +'<div style="font-size:10px;color:var(--t3);margin-top:6px;">Freifeld AG et al. CID 2011 · Klastersky J et al. JCO 2000</div>';
+    };
+  })();<\/script>`;
+
+  // ── CISNE Score
+  html+=`<div style="background:var(--s1);border:1px solid var(--brd2);border-radius:8px;padding:16px 18px;margin-bottom:14px;">
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:4px;">CISNE SCORE — Clinical Index of Stable Febrile Neutropenia</div>
+    <div style="font-size:10.5px;color:var(--t2);margin-bottom:12px;line-height:1.5;"><b style="color:var(--amber);">Solo aplicar en pacientes ESTABLES</b> (sin hipotensión, sin datos de fallo orgánico, no parece séptico). Permite identificar pacientes de bajo riesgo real para manejo ambulatorio u oral.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+      ${[
+        {id:`cisne-ecog-${uid}`,label:'ECOG ≥ 2',pts:2,detail:'Limitación funcional significativa'},
+        {id:`cisne-gluc-${uid}`,label:'Hiperglucemia de estrés',pts:2,detail:'Glucosa >121 mg/dL sin DM previa'},
+        {id:`cisne-copd-${uid}`,label:'EPOC activa',pts:1,detail:'Diagnóstico previo + tratamiento'},
+        {id:`cisne-cv-${uid}`,label:'Enf. cardiovascular crónica',pts:1,detail:'ICC, cardiopatía isquémica, etc.'},
+        {id:`cisne-muc-${uid}`,label:'Mucositis NCI grado ≥ 2',pts:1,detail:'Ulceraciones que limitan ingesta oral'},
+        {id:`cisne-mono-${uid}`,label:'Monocitos < 200 cells/µL',pts:1,detail:'Monocitopenia severa'},
+      ].map(item=>`<label style="display:flex;align-items:flex-start;gap:8px;padding:8px;border-radius:5px;background:var(--s2);cursor:pointer;">
+        <input type="checkbox" id="${item.id}" onchange="window._calcCisne${uid}()" style="accent-color:var(--purple);width:15px;height:15px;flex-shrink:0;margin-top:1px;">
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:600;color:var(--t1);">${item.label} <b style="color:var(--purple);">+${item.pts}</b></div>
+          <div style="font-size:10px;color:var(--t3);">${item.detail}</div>
+        </div>
+      </label>`).join('')}
+    </div>
+    <div id="cisne-result-${uid}" style="margin-top:4px;padding:12px;border-radius:6px;background:var(--s2);text-align:center;">
+      <div style="font-size:11px;color:var(--t2);">Selecciona los criterios para calcular</div>
+    </div>
+  </div>
+  <script>(function(){
+    window._calcCisne${uid}=function(){
+      const items=[{id:'cisne-ecog-${uid}',pts:2},{id:'cisne-gluc-${uid}',pts:2},{id:'cisne-copd-${uid}',pts:1},{id:'cisne-cv-${uid}',pts:1},{id:'cisne-muc-${uid}',pts:1},{id:'cisne-mono-${uid}',pts:1}];
+      const score=items.reduce((s,i)=>s+(document.getElementById(i.id)?.checked?i.pts:0),0);
+      const el=document.getElementById('cisne-result-${uid}');
+      if(!el)return;
+      let risk,color,compl,rec;
+      if(score===0){risk='MUY BAJO';color='var(--teal)';compl='0.36%';rec='Candidato a ATB oral ambulatorio si resto de criterios lo permiten.';}
+      else if(score<=2){risk='BAJO';color='#60a5fa';compl='6.2%';rec='Valorar ambulatorio con seguimiento estrecho (revisión en 24–48h).';}
+      else if(score<=4){risk='INTERMEDIO';color='var(--amber)';compl='22%';rec='Hospitalización recomendada. ATB IV. Reevaluar en 48–72h.';}
+      else{risk='ALTO';color='var(--red)';compl='36%';rec='Hospitalización urgente. ATB IV + valoración de infección fúngica invasora.';}
+      el.style.background=score<=2?'rgba(0,212,168,.06)':score<=4?'rgba(255,152,0,.07)':'rgba(255,77,109,.07)';
+      el.style.border='1px solid '+(score<=2?'rgba(0,212,168,.25)':score<=4?'rgba(255,152,0,.25)':'rgba(255,77,109,.25)');
+      el.innerHTML='<div style="font-size:22px;font-weight:800;color:'+color+';">CISNE: '+score+' / 8</div>'
+        +'<div style="font-size:13px;font-weight:700;color:'+color+';">'+risk+'</div>'
+        +'<div style="font-size:11px;color:var(--t2);margin-top:4px;">Complicaciones serias esperadas: <b>'+compl+'</b></div>'
+        +'<div style="font-size:11px;color:var(--t1);margin-top:6px;line-height:1.5;">'+rec+'</div>'
+        +'<div style="font-size:10px;color:var(--t3);margin-top:6px;">Carmona-Bayonas A et al. JCO 2015 · Soria A et al. Ann Oncol 2018</div>';
+    };
+  })();<\/script>`;
+
+  // ── Riesgo por inmunosupresión
+  const riskRows=[
+    {cat:'CAR-T / Bispecíficos',drugs:'Axicabtagene, Tisagenlecleucel, Ciltacabtagene, Blinatumomab, Epcoritamab',riesgo:'MUY ALTO',c:'var(--red)',nadir:'Días 7–14 post-infusión (aplasia prolongada)',nota:'Riesgo de CRS + NF simultáneos. G-CSF + profilaxis antifúngica preemptiva.'},
+    {cat:'ATG / Ciclofosfamida',drugs:'Timoglobulina, Ciclofosfamida HD, Fludarabina, Cladribina',riesgo:'MUY ALTO',c:'var(--red)',nadir:'7–14 días post-quimio',nota:'Depleción linfocitaria profunda. CMV, hongos y Pneumocystis simultáneos frecuentes.'},
+    {cat:'Inhibidores de calcineurina + esteroides',drugs:'Tacrolimus, Ciclosporina + Prednisona ≥20mg',riesgo:'ALTO',c:'var(--amber)',nadir:'Variable (crónico)',nota:'CMV + Candida + BK + Pneumocystis. Siempre cotrimoxazol profiláctico.'},
+    {cat:'Inhibidores de PI3K / BTK intensos',drugs:'Idelalisib, Copanlisib, Duvelisib, Ibrutinib + esteroide',riesgo:'ALTO',c:'var(--amber)',nadir:'Primeros 6 meses',nota:'Pneumocystis, CMV, hongos. Cotrimoxazol obligatorio con idelalisib.'},
+    {cat:'Anti-CD20 / Anti-CD38',drugs:'Rituximab, Obinutuzumab, Daratumumab, Isatuximab',riesgo:'ALTO',c:'var(--amber)',nadir:'Meses 1–6 (agammaglobulinemia)',nota:'Reactivación HBV (siempre profilaxis), infecciones encapsuladas. Revisar IgG basal.'},
+    {cat:'Inhibidores de JAK',drugs:'Ruxolitinib, Baricitinib, Tofacitinib',riesgo:'MODERADO-ALTO',c:'#f97316',nadir:'Primeras 12 semanas',nota:'Herpes zoster, TB, hongos. VZV vacuna antes de iniciar. Ruxolitinib: cotrimoxazol si IS adicional.'},
+    {cat:'IMiDs / PI3K leves / BTK leves',drugs:'Lenalidomida, Pomalidomida, Ibrutinib, Acalabrutinib',riesgo:'MODERADO',c:'#60a5fa',nadir:'Variable',nota:'Neumonía por organismos encapsulados. IgG mensual. Profilaxis antiviral VZV.'},
+    {cat:'mTOR / Antiproliferativos',drugs:'Sirolimus, Everolimus, Micofenolato, Azatioprina',riesgo:'MODERADO',c:'#60a5fa',nadir:'Variable (crónico)',nota:'Cotrimoxazol. Ajustar dosis de MMF si neutropenia (ANC <1500 suspender temporalmente).'},
+    {cat:'Checkpoint inhibitors',drugs:'Nivolumab, Pembrolizumab, Atezolizumab, Ipilimumab',riesgo:'BAJO',c:'var(--teal)',nadir:'Raro (irAE > infección)',nota:'El riesgo infeccioso es bajo; vigilar irAE-neumonitis, colitis. Si se combinan con IS: riesgo ALTO.'},
+  ];
+  html+=_txCard('⚠️ RIESGO DE NEUTROPENIA FEBRIL POR CLASE DE INMUNOSUPRESIÓN',`
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:10.5px;">
+      <thead><tr>
+        <th style="background:var(--s2);padding:6px 8px;text-align:left;font-size:10px;color:var(--t2);font-weight:600;border-bottom:1px solid var(--brd2);">Clase</th>
+        <th style="background:var(--s2);padding:6px 8px;text-align:left;font-size:10px;color:var(--t2);font-weight:600;border-bottom:1px solid var(--brd2);">Riesgo</th>
+        <th style="background:var(--s2);padding:6px 8px;text-align:left;font-size:10px;color:var(--t2);font-weight:600;border-bottom:1px solid var(--brd2);">Nadir esperado</th>
+        <th style="background:var(--s2);padding:6px 8px;text-align:left;font-size:10px;color:var(--t2);font-weight:600;border-bottom:1px solid var(--brd2);">Consideración PROA</th>
+      </tr></thead>
+      <tbody>
+        ${riskRows.map((r,i)=>`<tr style="background:${i%2?'var(--s2)':'transparent'};">
+          <td style="padding:7px 8px;border-bottom:1px solid var(--brd2);color:var(--t1);font-weight:600;">${r.cat}<div style="font-size:9.5px;color:var(--t3);font-weight:400;margin-top:1px;">${r.drugs}</div></td>
+          <td style="padding:7px 8px;border-bottom:1px solid var(--brd2);"><span style="font-weight:700;color:${r.c};font-size:11px;">${r.riesgo}</span></td>
+          <td style="padding:7px 8px;border-bottom:1px solid var(--brd2);color:var(--t2);">${r.nadir}</td>
+          <td style="padding:7px 8px;border-bottom:1px solid var(--brd2);color:var(--t2);line-height:1.45;">${r.nota}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>
+  `,'var(--amber)');
+
+  // ── Protocolo empírico ATB
+  html+=_txCard('💊 ATB EMPÍRICO — NEUTROPENIA FEBRIL (IDSA 2024)',`
+    <div style="margin-bottom:10px;font-size:10.5px;color:var(--t2);line-height:1.6;"><b style="color:var(--t1);">Inicio en ≤60 min del diagnóstico.</b> Hemocultivos × 2 (1 periférico + 1 de catéter si PICC/PORT), urocultivo, Rx tórax antes del antibiótico. BHC, QS, PFH, PCR.</div>
+    <div style="display:grid;gap:8px;">
+      <div style="background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.2);border-radius:6px;padding:11px;">
+        <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px;">🔴 ALTO RIESGO (MASCC &lt;21 / CISNE ≥3) · Hospitalización + IV</div>
+        <div style="font-size:11px;color:var(--t1);margin-bottom:4px;"><b>Monoterapia estándar:</b></div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:2px;">• Piperacilina-tazobactam 4.5g IV c/6h (infusión extendida 4h)</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:2px;">• Cefepime 2g IV c/8h — si riesgo bajo de Pseudomonas resistente</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:8px;">• Imipenem/meropenem — si colonizado con BLEE o riesgo hospitalario alto</div>
+        <div style="font-size:11px;color:var(--t1);margin-bottom:4px;"><b>Agregar vancomicina/teicoplanina si:</b></div>
+        <div style="font-size:10.5px;color:var(--t2);">Inestabilidad hemodinámica · Neumonía clínica · Catéter infectado probable · Mucositis severa · Colonización MRSA · Hemocultivo preliminar Gram+ · VVS signos cutáneos</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--t1);margin-bottom:4px;"><b>Cobertura antifúngica empírica (NF persistente ≥4 días sin foco):</b></div>
+        <div style="font-size:10.5px;color:var(--t2);">Caspofungina 70mg IV carga → 50mg/día · Micafungina 100mg/día · Si sospecha Aspergillus: voriconazol o isavuconazol</div>
+      </div>
+      <div style="background:rgba(0,212,168,.06);border:1px solid rgba(0,212,168,.2);border-radius:6px;padding:11px;">
+        <div style="font-size:11px;font-weight:700;color:var(--teal);margin-bottom:6px;">🟢 BAJO RIESGO (MASCC ≥21 + CISNE 0–2) · Considerar oral/ambulatorio</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px;">• <b>Amoxicilina-clavulanato 875/125mg VO c/8h</b> + <b>ciprofloxacino 500–750mg VO c/12h</b></div>
+        <div style="font-size:10.5px;color:var(--t2);margin-bottom:4px;">— Alternativa si alergia: clindamicina + ciprofloxacino</div>
+        <div style="font-size:10.5px;color:var(--t2);">⚠️ <b>No ambulatorio</b> si: inestabilidad, mucositis NCI ≥2, vómito/diarrea, VVS, soporte en casa no garantizado, primera NF de riesgo desconocido, trasplante &lt;100 días.</div>
+      </div>
+      <div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:6px;padding:11px;">
+        <div style="font-size:11px;font-weight:700;color:var(--purple);margin-bottom:6px;">⏱ DURACIÓN Y DESESCALADA</div>
+        <div style="font-size:11px;color:var(--t2);line-height:1.6;">• <b>ANC ≥500</b> por ≥2 días consecutivos + afebril ≥48h → suspender ATB<br>• Hemocultivos negativos a 48–72h + bajo riesgo → switch a oral (amoxicilina-clav)<br>• <b>NF de alto riesgo sin foco:</b> mínimo hasta ANC recuperado + 7 días afebril<br>• <b>Bacteriemia documentada:</b> según foco (S. aureus: mín. 14d; Candida: 14d post-última positiva)</div>
+      </div>
+    </div>
+    <div style="margin-top:10px;font-size:10px;color:var(--t3);text-align:right;">Fuentes: IDSA Guidelines CID 2011 (Freifeld) · IDSA Update 2024 · ESMO 2022 · ASCO 2024</div>
+  `,'var(--teal)');
+
+  // ── G-CSF
+  html+=_txCard('💉 G-CSF (FILGRASTIM / PEGFILGRASTIM) — INDICACIONES EN NF',`
+    <div style="font-size:11px;color:var(--t2);line-height:1.7;">
+      <b style="color:var(--t1);">No rutinario en NF establecida</b> (no acorta morbilidad si ya hay fiebre establecida). <b>Sí indicado:</b><br>
+      • Profíláctico: riesgo de NF &gt;20% con el esquema de quimio (ASCO Grade A)<br>
+      • NF complicada: sepsis severa, neumonía, infección fúngica invasora, SNC, hospitalización prolongada<br>
+      • Trasplante alogénico: según protocolo del centro (GVHD: cuidado con G-CSF)<br>
+      • CAR-T: Filgrastim desde Día +7 si ANC &lt;100 × 2 días consecutivos<br><br>
+      <b style="color:var(--t1);">Dosis:</b> Filgrastim 5 µg/kg/día SC hasta ANC ≥10,000 o &gt;1,000 por 2 días. Pegfilgrastim: dosis única (no en trasplante alogénico salvo protocolo).<br><br>
+      <b style="color:var(--amber);">⚠️ Trasplante de médula: NUNCA iniciar G-CSF sin autorización del hematólogo tratante.</b>
+    </div>
+  `,'var(--blue)');
+
   return html;
 }
 
