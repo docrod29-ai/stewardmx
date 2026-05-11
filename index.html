@@ -12282,15 +12282,16 @@ window.renderFlujograma=function(){
 };
 
 // ══════════════════════════════════════════════════════════════════════
-// ASISTENTE DE VOZ UNIVERSAL — Flotante, fuera del modal, siempre activo
-// Funciona en paralelo con CUALQUIER formulario o vista de la app.
+// ASISTENTE DE VOZ UNIVERSAL v2 — Flotante, fuera del modal, siempre activo
+// TFG automática · múltiples ATBs · detección de paciente · comandos de voz
 // ══════════════════════════════════════════════════════════════════════
 window._va={active:false,recog:null,final:'',processing:false};
 
 window._vaInit=function(){
   if(document.getElementById('va-fab'))return;
   const fab=document.createElement('div');
-  fab.id='va-fab';fab.title='Asistente de Voz — Dictado con IA';fab.textContent='🎙️';
+  fab.id='va-fab';fab.title='Asistente Clínico IA — Dictado por voz';
+  fab.innerHTML='<div id="va-wave"><span></span><span></span><span></span><span></span><span></span></div><span id="va-fab-icon">🎙️</span>';
   fab.onclick=window._vaTogglePanel;
   document.body.appendChild(fab);
   const panel=document.createElement('div');
@@ -12298,15 +12299,19 @@ window._vaInit=function(){
   panel.innerHTML=
     '<div id="va-head">'
     +'<div style="display:flex;align-items:center;gap:9px;">'
-    +'<div id="va-mic-btn" onclick="window._vaToggle()" title="Iniciar/pausar grabación" style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;flex-shrink:0;transition:all .3s;">🎙️</div>'
-    +'<div><div style="font-size:11.5px;font-weight:700;color:#fff;letter-spacing:.3px;">Asistente Clínico IA</div>'
-    +'<div id="va-status" style="font-size:10px;color:rgba(255,255,255,.75);">Listo — toca el mic para grabar</div></div>'
-    +'</div>'
-    +'<button onclick="window._vaTogglePanel()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:20px;cursor:pointer;padding:0;line-height:1;" title="Cerrar">✕</button>'
+    +'<div id="va-mic-btn" onclick="window._vaToggle()" title="Iniciar/pausar grabación" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;flex-shrink:0;transition:all .3s;">🎙️</div>'
+    +'<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#fff;letter-spacing:.3px;">Asistente Clínico IA</div>'
+    +'<div id="va-status" style="font-size:10px;color:rgba(255,255,255,.75);">Listo — toca el mic para grabar</div></div></div>'
+    +'<button onclick="window._vaTogglePanel()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:20px;cursor:pointer;padding:0 0 0 8px;line-height:1;" title="Cerrar">✕</button>'
     +'</div>'
     +'<div id="va-ctx" style="padding:5px 12px;font-size:10px;color:var(--t3);background:var(--s2);border-bottom:1px solid var(--brd2);"></div>'
-    +'<div id="va-transcript" style="min-height:72px;max-height:160px;overflow-y:auto;padding:10px 12px;font-size:11px;color:var(--t2);line-height:1.65;white-space:pre-wrap;font-style:italic;">Habla con el paciente — la transcripción aparece aquí en tiempo real...</div>'
-    +'<div id="va-advisor" style="display:none;max-height:160px;overflow-y:auto;padding:8px 12px;border-top:1px solid var(--brd2);font-size:10.5px;line-height:1.55;"></div>'
+    +'<div id="va-pac-match" style="display:none;padding:7px 12px;background:rgba(0,212,168,.07);border-bottom:1px solid rgba(0,212,168,.2);font-size:10.5px;"></div>'
+    +'<div id="va-transcript" style="min-height:80px;max-height:148px;overflow-y:auto;padding:10px 12px;font-size:11px;color:var(--t2);line-height:1.65;white-space:pre-wrap;font-style:italic;">Habla con el paciente — la transcripción aparece aquí en tiempo real...</div>'
+    +'<div style="padding:2px 12px 4px;font-size:9.5px;color:var(--t3);">Comandos: <b>«guardar»</b> · <b>«nuevo paciente»</b> · <b>«limpiar»</b> · <b>«analizar»</b></div>'
+    +'<div id="va-waveform" style="display:none;padding:4px 12px 4px;align-items:flex-end;justify-content:center;gap:3px;height:34px;">'
+    +'<div class="va-bar"></div><div class="va-bar"></div><div class="va-bar"></div><div class="va-bar"></div>'
+    +'<div class="va-bar"></div><div class="va-bar"></div><div class="va-bar"></div><div class="va-bar"></div></div>'
+    +'<div id="va-advisor" style="display:none;max-height:165px;overflow-y:auto;padding:8px 12px;border-top:1px solid var(--brd2);font-size:10.5px;line-height:1.55;"></div>'
     +'<div style="padding:9px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
     +'<button id="va-fill-btn" onclick="window._vaFill()" style="background:rgba(167,139,250,.18);border:1px solid rgba(167,139,250,.5);color:var(--purple);border-radius:6px;padding:9px;font-size:11.5px;font-weight:700;cursor:pointer;">✨ Llenar con IA</button>'
     +'<button onclick="window._vaClear()" style="background:var(--s2);border:1px solid var(--brd2);color:var(--t2);border-radius:6px;padding:9px;font-size:11.5px;cursor:pointer;">🗑 Limpiar</button>'
@@ -12331,6 +12336,23 @@ window._vaUpdateCtx=function(){
 
 window._vaToggle=function(){if(window._va.active)window._vaStop();else window._vaStart();};
 
+window._vaCheckCommands=function(text){
+  const t=text.toLowerCase();
+  if(t.includes('guardar')){toast('💾 Guardando...','ok');window._va.final=window._va.final.replace(/guardar/gi,'').trim();try{document.getElementById('btn-guardar-pac')?.click();}catch(_){}return true;}
+  if(t.includes('nuevo paciente')){toast('➕ Abriendo nuevo paciente...','ok');window._va.final=window._va.final.replace(/nuevo paciente/gi,'').trim();try{document.querySelector('[onclick*="abrirFormPaciente"]')?.click();}catch(_){}return true;}
+  if(t.includes('limpiar')||t.includes('borrar todo')){window._vaClear();return true;}
+  if(t.includes('analizar')||t.includes('llenar campos')||t.includes('llenar formulario')){window._vaFill();return true;}
+  if(t.includes('cancelar')||t.includes('cerrar formulario')){try{cerrarModal();}catch(_){}return true;}
+  return false;
+};
+
+window._vaBuscarPac=function(nombre){
+  if(!nombre||!window.PACS||!window.PACS.length)return null;
+  const n=nombre.toLowerCase().trim();
+  const scored=window.PACS.map(p=>{const pn=(p.nombre||'').toLowerCase();const tokens=n.split(/\s+/);let score=tokens.filter(tk=>tk.length>2&&pn.includes(tk)).length;if(pn===n)score+=10;return{pac:p,score};}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
+  return scored.length?scored[0].pac:null;
+};
+
 window._vaStart=function(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){toast('Dictado requiere Chrome o Edge ≥89','am');return;}
@@ -12338,7 +12360,7 @@ window._vaStart=function(){
   r.onresult=function(e){
     let irim='';
     for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal)window._va.final+=e.results[i][0].transcript+' ';
+      if(e.results[i].isFinal){const seg=e.results[i][0].transcript;window._va.final+=seg+' ';window._vaCheckCommands(seg);}
       else irim+=e.results[i][0].transcript;
     }
     const el=document.getElementById('va-transcript');
@@ -12348,15 +12370,17 @@ window._vaStart=function(){
     window._va.active=false;
     document.getElementById('va-fab')?.classList.remove('listening');
     const m=document.getElementById('va-mic-btn');
-    if(m){m.style.background='rgba(255,255,255,.15)';m.style.borderColor='rgba(255,255,255,.35)';m.textContent='🎙️';}
+    if(m){m.style.background='rgba(255,255,255,.15)';m.style.borderColor='rgba(255,255,255,.35)';m.innerHTML='🎙️';}
+    const wf=document.getElementById('va-waveform');if(wf)wf.style.display='none';
     const s=document.getElementById('va-status');
     if(s)s.textContent='Error: '+ev.error+' — verifica permisos de micrófono';
   };
   r.onend=function(){if(window._va.active){try{r.start();}catch(_){}}};
   r.start();window._va.recog=r;window._va.active=true;
   const m=document.getElementById('va-mic-btn');
-  if(m){m.style.background='rgba(239,68,68,.35)';m.style.borderColor='rgba(239,68,68,.7)';m.textContent='⏸';}
+  if(m){m.style.background='rgba(239,68,68,.35)';m.style.borderColor='rgba(239,68,68,.7)';m.innerHTML='⏸';}
   const s=document.getElementById('va-status');if(s)s.textContent='🔴 Grabando conversación...';
+  const wf=document.getElementById('va-waveform');if(wf)wf.style.display='flex';
   document.getElementById('va-fab')?.classList.add('listening');
   document.getElementById('va-panel')?.classList.add('open');
   window._vaUpdateCtx();
@@ -12366,8 +12390,9 @@ window._vaStop=function(){
   window._va.active=false;
   if(window._va.recog){try{window._va.recog.stop();}catch(_){}window._va.recog=null;}
   const m=document.getElementById('va-mic-btn');
-  if(m){m.style.background='rgba(255,255,255,.15)';m.style.borderColor='rgba(255,255,255,.35)';m.textContent='🎙️';}
+  if(m){m.style.background='rgba(255,255,255,.15)';m.style.borderColor='rgba(255,255,255,.35)';m.innerHTML='🎙️';}
   const s=document.getElementById('va-status');if(s)s.textContent='⏸ Pausado — toca mic para continuar';
+  const wf=document.getElementById('va-waveform');if(wf)wf.style.display='none';
   document.getElementById('va-fab')?.classList.remove('listening');
 };
 
@@ -12376,83 +12401,121 @@ window._vaClear=function(){
   const t=document.getElementById('va-transcript');
   if(t)t.textContent='Habla con el paciente — la transcripción aparece aquí en tiempo real...';
   const adv=document.getElementById('va-advisor');if(adv){adv.style.display='none';adv.innerHTML='';}
+  const pm=document.getElementById('va-pac-match');if(pm){pm.style.display='none';pm.innerHTML='';}
   const s=document.getElementById('va-status');if(s)s.textContent='Listo — toca el mic para grabar';
 };
 
 window._vaFill=async function(){
   const text=window._va.final.trim();
   if(!text){toast('Graba primero — toca el micrófono','am');return;}
-  if(!window._anthropicProxyURL&&!window._abgApiKey){toast('Configura la API Key de Anthropic en Administración del hospital','am');return;}
+  if(!window._anthropicProxyURL&&!window._abgApiKey){toast('Configura la API Key de Anthropic en Administración','am');return;}
   if(window._va.processing)return;
   window._va.processing=true;
   window._vaStop();
   const btn=document.getElementById('va-fill-btn');
   if(btn){btn.disabled=true;btn.textContent='⌛ Analizando...';}
-  const s=document.getElementById('va-status');if(s)s.textContent='Enviando a IA...';
+  const st=document.getElementById('va-status');if(st)st.textContent='🧠 IA analizando conversación...';
   try{
     const modalOpen=document.getElementById('modal-bg')?.classList.contains('open');
     const tab=modalOpen?document.querySelector('#modal-bdy .ftab.active')?.textContent?.trim():'';
     const view=window.currentView||'censo';
-    const ctxStr='Vista: '+view+(modalOpen?'. Formulario abierto, pestaña: '+(tab||'Paciente'):'');
-    const sys='Eres el asistente clínico de StewardMX (PROA hospitalario México). Contexto: '+ctxStr+'\n'
-      +'Analiza la conversación médico-paciente y extrae TODOS los datos clínicos. SOLO devuelve JSON. La respuesta EMPIEZA con { y TERMINA con }. Sin markdown, sin texto adicional.\n\n'
-      +'{"paciente":{"nombre":null,"edad":null,"sexo":null,"exp":null,"servicio":null,"cama":null,"medico":null,"dx":null,"gravedad":null,"focoInf":null,"via":null,"renal":null,"bacteriemia":null,"accion":null,"rev":null,"notas":null},'
-      +'"atb":[{"nombre":null,"dosis":null,"via":null,"dias":null}],'
-      +'"micro":{"cult":null,"muestra":null,"organismo":null,"fenotipo":null},'
-      +'"labs":{"hb":null,"leucocitos":null,"neutrofilos":null,"plaquetas":null,"creatinina":null,"bun":null,"pcr":null,"procalcitonina":null,"lactato":null,"glucosa":null,"sodio":null,"potasio":null,"otros":null},'
-      +'"missing":["campos clínicos importantes no mencionados que el médico debería preguntar al paciente según NOM-004 para historia clínica completa"],'
-      +'"sugerencias":["recomendaciones PROA/infectología basadas en los datos mencionados"],'
-      +'"alertas":["alertas clínicas críticas si las hay"]}';
-    const res=await llamarAnthropicSeguro([{role:'user',content:text}],sys,1500,'claude-sonnet-4-5');
+    const sys=`Eres el asistente clínico de StewardMX (PROA hospitalario México). Vista: ${view}${modalOpen?'. Formulario abierto, pestaña: '+(tab||'Paciente'):''}
+
+Analiza la conversación médico-paciente y extrae TODOS los datos clínicos. DEVUELVE ÚNICAMENTE JSON válido — sin markdown, sin texto extra. Inicia con { y termina con }.
+
+{"paciente":{"nombre":null,"edad":null,"sexo":null,"expediente":null,"servicio":null,"cama":null,"medico":null,"peso":null,"dx":null,"gravedad":null,"focoInf":null,"tipoVisita":null,"inmuno":null,"indic":null,"bacteriemia":null,"accion":null,"rev":null,"durplan":null,"notas":null},"labs":{"creatinina":null,"hb":null,"leucocitos":null,"neutrofilos":null,"plaquetas":null,"bun":null,"pcr":null,"procalcitonina":null,"lactato":null,"glucosa":null,"sodio":null,"potasio":null,"otros":null},"atb":[{"nombre":null,"dosis":null,"via":null,"durplan":null}],"micro":{"cult":null,"muestra":null,"organismo":null,"fenotipo":null},"missing":["campos NOM-004 no mencionados que el médico debe preguntar"],"sugerencias":["recomendaciones PROA basadas en los datos"],"alertas":["alertas clínicas o de resistencia críticas"]}
+
+Reglas estrictas:
+- gravedad: "leve"|"moderada"|"grave"|"critica"
+- focoInf: "sí"|"no-aplica"|"pendiente"|"no"
+- tipoVisita: "seguimiento"|"interconsulta"|"urgente"|"trasplante"
+- inmuno: "no"|"corticoides"|"quimioterapia"|"trasplante"|"VIH"|"otra"
+- indic: "sí"|"parcial"|"no"
+- bacteriemia: "no"|"sí"|"sospecha"
+- accion: "mantener"|"desescalar"|"suspender"|"vo"|"escalar"|"ajustar"|"cambiar"
+- rev: "24h"|"48h"|"72h"|"1 semana"|"alta"
+- durplan: "3-5d"|"5-7d"|"7-10d"|"14d"|"≥21d"|"indefinida"
+- atb.via: "IV"|"VO"|"IM"|"SC"|"Inhal"|"Tópica"
+- micro.cult: "sí"|"posterior"|"pendiente"|"positivo"|"negativo"|"no"
+- creatinina: número en mg/dL (solo el número, ej. 1.8)
+- edad, peso: solo el número sin unidades
+- Si hay varios ATB, todos van en el array atb[]
+- servicio: inferir del contexto (ej. "Medicina Interna", "UCI", "Cirugía General")`;
+    const res=await llamarAnthropicSeguro([{role:'user',content:text}],sys,2000,'claude-sonnet-4-5');
     const raw=res?.content?.[0]?.text||'';
     const cleaned=raw.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'').trim();
-    const m=cleaned.match(/\{[\s\S]*\}/);
-    if(!m)throw new Error('Sin JSON válido en respuesta');
-    const d=JSON.parse(m[0]);
-    // ── Helpers
-    const fill=(id,val)=>{if(val==null||val==='')return;const el=document.getElementById(id);if(el)el.value=val;};
-    const selOpt=(id,val)=>{if(!val)return;const el=document.getElementById(id);if(!el)return;const o=Array.from(el.options).find(op=>op.value===val||op.text===val||op.text.toLowerCase().includes(String(val).toLowerCase()));if(o)el.value=o.value;};
-    // ── Paciente
+    const mJSON=cleaned.match(/\{[\s\S]*\}/);
+    if(!mJSON)throw new Error('Sin JSON válido en respuesta IA');
+    const d=JSON.parse(mJSON[0]);
+    // ── Helpers de llenado
+    const fill=(id,val)=>{if(val==null||val===''||String(val)==='null')return false;const el=document.getElementById(id);if(!el)return false;el.value=String(val);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;};
+    const selOpt=(id,val)=>{if(!val||String(val)==='null')return false;const el=document.getElementById(id);if(!el||el.tagName!=='SELECT')return false;const v=String(val).toLowerCase().trim();const o=Array.from(el.options).find(op=>op.value===val||op.value.toLowerCase()===v||op.text.toLowerCase()===v||op.text.toLowerCase().includes(v)||v.includes(op.value.toLowerCase()));if(o){el.value=o.value;el.dispatchEvent(new Event('change',{bubbles:true}));return true;}return false;};
+    const selSvc=(val)=>{if(!val)return;const svc=document.getElementById('f-svc');if(!svc)return;const v=String(val).toLowerCase().trim();const o=Array.from(svc.options).find(op=>op.text.toLowerCase().includes(v)||op.value.toLowerCase().includes(v)||v.includes(op.value.toLowerCase()));if(o){svc.value=o.value;svc.dispatchEvent(new Event('change',{bubbles:true}));}};
+    let n=0;
+    // ── Datos del paciente
     if(d.paciente){
       const p=d.paciente;
-      fill('f-nom',p.nombre);fill('f-edad',p.edad);fill('f-exp',p.exp);fill('f-cama',p.cama);
-      fill('f-medico',p.medico);fill('f-dx',p.dx);fill('f-notas',p.notas);fill('f-renal',p.renal);
-      selOpt('f-sexo',p.sexo);selOpt('f-grav',p.gravedad);selOpt('f-bact',p.bacteriemia);
-      selOpt('f-accion',p.accion);selOpt('f-rev',p.rev);
-      selOpt('f-foco',p.focoInf==='sí'||p.focoInf===true?'sí':p.focoInf==='no'||p.focoInf===false?'no':'pendiente');
-      const svc=document.getElementById('f-servicio');
-      if(svc&&p.servicio){if(svc.tagName==='SELECT'){const o=Array.from(svc.options).find(op=>op.text.toLowerCase().includes(p.servicio.toLowerCase())||op.value.toLowerCase().includes(p.servicio.toLowerCase()));if(o)svc.value=o.value;}else svc.value=p.servicio;}
+      if(fill('f-nom',p.nombre))n++;if(fill('f-edad',p.edad))n++;if(fill('f-exp',p.expediente))n++;
+      if(fill('f-cama',p.cama))n++;if(fill('f-medico',p.medico))n++;if(fill('f-dx',p.dx))n++;
+      if(fill('f-notas',p.notas))n++;if(fill('f-peso',p.peso))n++;
+      if(selOpt('f-sexo',p.sexo))n++;if(selOpt('f-grav',p.gravedad))n++;
+      if(selOpt('f-bact',p.bacteriemia))n++;if(selOpt('f-accion',p.accion))n++;
+      if(selOpt('f-rev',p.rev))n++;if(selOpt('f-inmuno',p.inmuno))n++;
+      if(selOpt('f-indic',p.indic))n++;if(selOpt('f-foco',p.focoInf))n++;
+      if(selOpt('f-durplan',p.durplan))n++;
+      if(p.servicio)selSvc(p.servicio);
+      if(p.tipoVisita&&typeof selTipoVisita==='function'){try{selTipoVisita(p.tipoVisita);n++;}catch(_){}}
     }
-    // ── Microbiología
+    // ── Creatinina → TFG automático (CKD-EPI 2021)
+    if(d.labs&&d.labs.creatinina!=null&&String(d.labs.creatinina)!=='null'){
+      if(fill('f-creat',d.labs.creatinina))n++;
+      setTimeout(()=>{try{(window.calcTFG||calcTFG)();}catch(_){}},180);
+    }
+    // ── ATB múltiples filas
+    if(d.atb&&d.atb.length){
+      const need=d.atb.length;
+      let rows=document.querySelectorAll('[id^="atb-"][id$="-nom"]').length||0;
+      while(rows<need){try{addAtbRow();rows++;}catch(_){break;}}
+      d.atb.forEach((a,i)=>{
+        if(!a||(!a.nombre&&!a.dosis&&!a.via))return;
+        if(fill('atb-'+i+'-nom',a.nombre))n++;
+        if(fill('atb-'+i+'-dosis',a.dosis))n++;
+        const vEl=document.getElementById('atb-'+i+'-via');
+        if(vEl&&a.via){const vo=Array.from(vEl.options).find(op=>op.value===a.via||op.text===a.via||op.value.toLowerCase()===String(a.via).toLowerCase());if(vo){vEl.value=vo.value;n++;}}
+        if(a.durplan)selOpt('f-durplan',a.durplan);
+      });
+    }
+    // ── Microbiología + fenotipo automático
     if(d.micro){
-      selOpt('f-cult',d.micro.cult);selOpt('f-muestra',d.micro.muestra);
-      if(d.micro.organismo){const org=document.getElementById('f-org');if(org){const o=Array.from(org.options).find(op=>op.text.toLowerCase().includes(d.micro.organismo.toLowerCase()));if(o){org.value=o.value;try{inferirFenotipo();}catch(_){}}}
+      if(selOpt('f-cult',d.micro.cult))n++;
+      if(fill('f-muestra',d.micro.muestra))n++;
+      if(d.micro.organismo){
+        const orgEl=document.getElementById('f-org');
+        if(orgEl){const ov=Array.from(orgEl.options).find(op=>op.text.toLowerCase().includes(d.micro.organismo.toLowerCase())||d.micro.organismo.toLowerCase().includes(op.text.toLowerCase().split(' ')[0]));if(ov){orgEl.value=ov.value;n++;try{inferirFenotipo();}catch(_){}try{mostrarResistenciasIntrinsecas(ov.value);}catch(_){}}}
       }
     }
-    // ── ATB row 0
-    if(d.atb&&d.atb[0]){
-      const a=d.atb[0];
-      fill('atb-0-nom',a.nombre);fill('atb-0-dosis',a.dosis);
-      if(a.via){const v=document.getElementById('atb-0-via');if(v){const o=Array.from(v.options).find(op=>op.value===a.via||op.text===a.via);if(o)v.value=o.value;}}
-    }
-    // ── Switch tab si hay datos de micro/org
-    if(d.micro?.organismo||d.micro?.cult){
-      const microTab=document.querySelector('#modal-bdy button.ftab[onclick*="ft-micro"]');if(microTab)microTab.click();
-    }
-    // ── Panel de asesor PROA
+    // ── Detección de paciente en PACS
+    const pac=window._vaBuscarPac(d.paciente?.nombre);
+    const pm=document.getElementById('va-pac-match');
+    if(pac&&pm){
+      pm.innerHTML='<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:15px;">👤</span><div style="flex:1;"><div style="font-weight:700;color:var(--teal);font-size:11px;">Paciente encontrado en censo</div><div style="font-size:10px;color:var(--t2);">'+escHtml(pac.nombre)+' — '+escHtml(pac.servicio||'S/S')+' — Cama '+escHtml(String(pac.cama||'—'))+'</div></div><button onclick="try{abrirFormPaciente(\''+pac.id+'\');}catch(_){} document.getElementById(\'va-pac-match\').style.display=\'none\';" style="background:var(--teal);border:none;color:#fff;border-radius:5px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">Abrir ↗</button></div>';
+      pm.style.display='block';
+    }else if(pm)pm.style.display='none';
+    // ── Panel asesor PROA
     let ah='';
-    if(d.alertas?.length){ah+='<div style="color:var(--red);font-weight:700;margin-bottom:5px;">🚨 Alertas:</div>';d.alertas.forEach(x=>{ah+='<div style="color:var(--red);margin-bottom:3px;">• '+x+'</div>';});}
-    if(d.sugerencias?.length){ah+='<div style="color:var(--teal);font-weight:700;margin:6px 0 4px;">💡 PROA / Infectología:</div>';d.sugerencias.forEach(x=>{ah+='<div style="color:var(--t2);margin-bottom:3px;">• '+x+'</div>';});}
-    if(d.missing?.length){ah+='<div style="color:var(--amber);font-weight:700;margin:6px 0 4px;">❓ Preguntar al paciente:</div>';d.missing.forEach(x=>{ah+='<div style="color:var(--t2);margin-bottom:3px;">• '+x+'</div>';});}
+    if(d.alertas?.length){ah+='<div style="color:var(--red);font-weight:700;margin-bottom:5px;font-size:11px;">🚨 Alertas:</div>';d.alertas.forEach(x=>{ah+='<div style="color:var(--red);margin-bottom:3px;font-size:10.5px;">• '+x+'</div>';});}
+    if(d.sugerencias?.length){ah+='<div style="color:var(--teal);font-weight:700;margin:6px 0 4px;font-size:11px;">💡 PROA:</div>';d.sugerencias.forEach(x=>{ah+='<div style="color:var(--t2);margin-bottom:3px;font-size:10.5px;">• '+x+'</div>';});}
+    if(d.missing?.length){ah+='<div style="color:var(--amber);font-weight:700;margin:6px 0 4px;font-size:11px;">❓ Preguntar al paciente:</div>';d.missing.forEach(x=>{ah+='<div style="color:var(--t2);margin-bottom:3px;font-size:10.5px;">• '+x+'</div>';});}
     const adv=document.getElementById('va-advisor');
-    if(adv){adv.innerHTML=ah||'<div style="color:var(--teal);">✅ Sin alertas adicionales.</div>';adv.style.display='block';}
+    if(adv){adv.innerHTML=ah||'<div style="color:var(--teal);font-size:10.5px;">✅ Sin alertas adicionales.</div>';adv.style.display='block';}
     if(btn){btn.disabled=false;btn.textContent='✨ Llenar con IA';}
-    if(s)s.textContent='✅ Campos completados';
-    toast('✅ Campos completados por IA','ok');
+    if(st)st.textContent='✅ '+n+' campos completados';
+    toast('✅ '+n+' campos completados por IA','ok');
+    setTimeout(()=>{try{document.getElementById('f-nom')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(_){}},350);
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='✨ Llenar con IA';}
-    const s2=document.getElementById('va-status');if(s2)s2.textContent='Error: '+e.message;
-    toast('Error IA: '+e.message,'rd');
+    const st2=document.getElementById('va-status');if(st2)st2.textContent='Error: '+e.message;
+    toast('Error IA dictado: '+e.message,'rd');
   }finally{window._va.processing=false;}
 };
 // Alias para compatibilidad con botón en formulario
@@ -14594,15 +14657,30 @@ select option{background:var(--s2);}
 .sir-btn.sir-s:hover,.sir-btn.sir-s.active{background:rgba(0,212,168,.15);border-color:var(--teal);color:var(--teal);}
 .sir-btn.sir-i:hover,.sir-btn.sir-i.active{background:rgba(245,166,35,.15);border-color:var(--amber);color:var(--amber);}
 .sir-btn.sir-r:hover,.sir-btn.sir-r.active{background:rgba(255,77,109,.15);border-color:var(--red);color:var(--red);}
-/* ── Asistente de Voz Universal ── */
-#va-fab{position:fixed;bottom:22px;right:22px;z-index:9990;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 18px rgba(109,40,217,.55);transition:all .3s;user-select:none;}
+/* ── Asistente de Voz Universal v2 ── */
+#va-fab{position:fixed;bottom:22px;right:22px;z-index:9990;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;cursor:pointer;box-shadow:0 4px 18px rgba(109,40,217,.55);transition:all .3s;user-select:none;}
 #va-fab:hover{transform:scale(1.1);box-shadow:0 6px 26px rgba(109,40,217,.75);}
 #va-fab.listening{background:linear-gradient(135deg,#dc2626,#ea580c);animation:va-pulse 1.5s infinite;}
+#va-fab-icon{font-size:22px;line-height:1;}
+#va-wave{display:none;align-items:flex-end;gap:2px;height:20px;}
+#va-fab.listening #va-wave{display:flex;}
+#va-fab.listening #va-fab-icon{display:none;}
+#va-wave span{width:3px;border-radius:2px;background:rgba(255,255,255,.9);animation:va-bar-anim .7s ease-in-out infinite alternate;}
+#va-wave span:nth-child(1){height:6px;animation-delay:0s;}
+#va-wave span:nth-child(2){height:14px;animation-delay:.12s;}
+#va-wave span:nth-child(3){height:20px;animation-delay:.24s;}
+#va-wave span:nth-child(4){height:14px;animation-delay:.36s;}
+#va-wave span:nth-child(5){height:6px;animation-delay:.48s;}
+@keyframes va-bar-anim{from{transform:scaleY(.25);opacity:.4;}to{transform:scaleY(1);opacity:1;}}
 @keyframes va-pulse{0%,100%{box-shadow:0 4px 18px rgba(220,38,38,.5);}50%{box-shadow:0 4px 28px rgba(220,38,38,.8),0 0 0 10px rgba(220,38,38,.1);}}
-#va-panel{position:fixed;bottom:84px;right:22px;z-index:9989;width:348px;background:var(--s1);border:1px solid var(--brd2);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.35);display:none;flex-direction:column;overflow:hidden;max-height:calc(100vh - 110px);}
-#va-panel.open{display:flex;}
+#va-panel{position:fixed;bottom:86px;right:22px;z-index:9989;width:356px;background:var(--s1);border:1px solid var(--brd2);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.35);display:none;flex-direction:column;overflow:hidden;max-height:calc(100vh - 112px);}
+#va-panel.open{display:flex;animation:va-slide-in .22s cubic-bezier(.2,.8,.2,1);}
+@keyframes va-slide-in{from{opacity:0;transform:translateY(10px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
 #va-head{padding:11px 14px;background:linear-gradient(135deg,#7c3aed,#6d28d9);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;}
-@media(max-width:600px){#va-fab{bottom:14px;right:14px;width:48px;height:48px;font-size:20px;}#va-panel{width:calc(100vw - 24px);right:12px;bottom:72px;}}
+.va-bar{width:4px;border-radius:3px;background:linear-gradient(to top,rgba(124,58,237,.5),rgba(167,139,250,.9));animation:va-panel-bar .7s ease-in-out infinite alternate;}
+.va-bar:nth-child(2){animation-delay:.09s;}.va-bar:nth-child(3){animation-delay:.18s;}.va-bar:nth-child(4){animation-delay:.27s;}.va-bar:nth-child(5){animation-delay:.36s;}.va-bar:nth-child(6){animation-delay:.27s;}.va-bar:nth-child(7){animation-delay:.18s;}.va-bar:nth-child(8){animation-delay:.09s;}
+@keyframes va-panel-bar{from{height:4px;opacity:.35;}to{height:22px;opacity:1;}}
+@media(max-width:600px){#va-fab{bottom:14px;right:14px;width:50px;height:50px;}#va-panel{width:calc(100vw - 24px);right:12px;bottom:72px;max-height:calc(100vh - 90px);}}
 .modal-bg{display:none;position:fixed;inset:0;background:var(--bg-overlay);z-index:var(--z-modal);align-items:center;justify-content:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
 .modal-bg.open{display:flex;animation:fadeIn .2s ease;}
 .modal-box{background:var(--s1);border:1px solid var(--brd);border-radius:var(--r-lg);width:720px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;box-shadow:var(--sh-lg);animation:mIn .25s cubic-bezier(.2,.8,.2,1);}
