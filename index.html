@@ -81,6 +81,9 @@ const STAFF_ROL={MANAGER:'Manager',CONTADOR:'Contador'};
 const PLATFORM_SENTINEL='__platform__';
 const PLAN_ELEGIBLES=[PLAN.PROFESIONAL,PLAN.ENTERPRISE];
 
+// ── ATBs de amplio espectro (usados en gate de sepsis y alertas 24h) ──
+const BROAD_URGENCIAS=['meropenem','imipenem','ertapenem','piperacilina','pip-tazo','cefepime','vancomicina','linezolid','tigeciclina','colistina','anfotericina','caspofungina','micafungina'];
+
 // ── Listas de diagnósticos infectológicos y focos infecciosos ──
 const DX_LIST=[
   // ══ RESPIRATORIO / PULMONAR ══
@@ -673,6 +676,9 @@ async function cargarApp(u,isAdmin){
       if(tabAn)tabAn.style.display='';
       const _badge=document.getElementById('analytics-badge');
       if(_badge)_badge.style.display='flex';
+      // Mostrar pestaña Alertas 24h para admins
+      const tabA24=document.getElementById('tab-alertas24h');
+      if(tabA24)tabA24.style.display='';
     }catch(_e){console.warn('[Analytics tab]',_e);}
   }
   // Banner de novedades v8 — mostrar una sola vez
@@ -1744,8 +1750,31 @@ window.guardar=async()=>{
     bacteriemia:gv('f-bact'),riesgo:gv('f-riesgo'),
     accion:gv('f-accion'),adecuacion:gv('f-adec'),rev:gv('f-rev'),notas:gv('f-notas'),
     abgFoto:window._abgFoto64||null,
+    // Nuevos campos v40
+    tipoVisita:gv('f-tipo-visita')||'seguimiento',
+    icMotivo:gv('f-ic-motivo')||'',icPregunta:gv('f-ic-pregunta')||'',
+    icServicio:gv('f-ic-servicio')||'',icUrgencia:gv('f-ic-urgencia')||'rutinaria',
+    atbPrevios:(typeof getAtbPrevios==='function'?getAtbPrevios():[]),
+    urgenciasQsofa:parseInt(gv('f-urgencias-qsofa')||'0')||(window._qsofaGateScore||0),
+    urgenciasSofa:parseInt(gv('f-urgencias-sofa')||'0')||(window._sofaGateScore||0),
     ts:serverTimestamp(),updatedBy:U.email,updatedAt:new Date().toISOString()
   };
+  // ── GATE: Urgencias + ATB amplio espectro → requiere criterios de sepsis ──
+  const svcActual=(data.servicio||'').toLowerCase();
+  const esUrgencias=svcActual.includes('urgencia')||svcActual.includes('urgenc');
+  const tieneAmplioEspectro=atbListData.some(a=>BROAD_URGENCIAS.some(b=>(a.nombre||'').toLowerCase().includes(b)));
+  if(esUrgencias&&tieneAmplioEspectro&&!window._qsofaGateScore){
+    const qsofaDoc=parseInt(gv('f-urgencias-qsofa')||'0');
+    const sofaDoc=parseInt(gv('f-urgencias-sofa')||'0');
+    if(qsofaDoc<2&&sofaDoc<2){
+      _mostrarGateSepsis(()=>{
+        window._guardarBusy=false;
+        if(btnGuardar){btnGuardar.disabled=false;btnGuardar.style.opacity='';}
+      });
+      return;
+    }
+  }
+  window._qsofaGateScore=0;window._sofaGateScore=0;
   try{
     if(editId){await updateDoc(doc(db,..._pacPath(),editId),data);}
     else{const r=await addDoc(collection(db,..._pacPath()),data);editId=r.id;}
@@ -1764,6 +1793,25 @@ window.guardar=async()=>{
       toast(prev?'Actualizado ✓':'Agregado ✓');
     }
     cerrarModal();editId=null;
+    // ── Alerta 24h: servicios de alto riesgo ──
+    const SERVICIOS_24H=['uci','terapia intensiva','intensivo','cuidados intermedios','intermedio','unidad cardiovascular','cardiovascular','hemodiálisis','hemodialisis','trasplante'];
+    const svcGuardado=(data.servicio||'').toLowerCase();
+    const es24hServicio=SERVICIOS_24H.some(s=>svcGuardado.includes(s));
+    const tieneAmplioEspData=(data.atbList||[]).some(a=>BROAD_URGENCIAS.some(b=>(a.nombre||'').toLowerCase().includes(b)));
+    if(es24hServicio&&tieneAmplioEspData&&!prev){
+      try{
+        await addDoc(collection(db,'hospitals',HOSP,'alertas24h'),{
+          patientId:_savedPid,patientName:nom,
+          servicio:data.servicio,
+          atbs:(data.atbList||[]).map(a=>a.nombre).filter(Boolean).join(', '),
+          createdAt:serverTimestamp(),createdBy:U.email,
+          status:'pendiente',
+          esFindeSemana:[0,6].includes(new Date().getDay()),
+          notas:''
+        });
+        toast('🔔 Alerta PROA 24h registrada — '+data.servicio,'am');
+      }catch(e){console.warn('[24h alert]',e);}
+    }
     // ── Alerta de bloqueo farmacia ──
     // Si el ATB prescrito está bloqueado por farmacia Y no tiene solicitud liberada activa,
     // mostrar aviso y ofrecer crear solicitud de autorización.
@@ -1924,9 +1972,10 @@ function renderConts(){
 
 function actualizarSelectsWA(){
   // Usamos id de paciente/contacto (no índice) para evitar race con onSnapshot
-  ['wa-pac-rest','wa-pac-med'].forEach(sid=>{
+  const pacOpts='<option value="">Seleccionar paciente…</option>'+PACS.map(p=>'<option value="'+escHtml(p.id)+'">'+escHtml(p.nombre)+' · '+escHtml(p.servicio||'')+' '+escHtml(p.cama||'')+'</option>').join('');
+  ['wa-pac-rest','wa-pac-med','wah-farm-pac','wah-micro-pac','wah-alm-pac'].forEach(sid=>{
     const el=document.getElementById(sid);if(!el)return;
-    el.innerHTML='<option value="">Seleccionar paciente…</option>'+PACS.map(p=>'<option value="'+escHtml(p.id)+'">'+escHtml(p.nombre)+' · '+escHtml(p.servicio||'')+' '+escHtml(p.cama||'')+'</option>').join('');
+    el.innerHTML=pacOpts;
   });
   const dest=document.getElementById('wa-dest');
   if(dest)dest.innerHTML='<option value="">Destinatario…</option>'+CONTS.filter(c=>['Farmacia','Almacén','Grupo WA (todos)'].includes(c.rol)||c.grupo).map(c=>'<option value="'+escHtml(c.id||'')+'">'+escHtml(c.nombre)+'</option>').join('');
@@ -2689,7 +2738,28 @@ function abrirFormPaciente(p){
 
   let html='';
   // Tab bar
-  html+='<div class="form-tabs"><button class="ftab active" onclick="swFTab(this,\'ft-datos\')">Paciente</button><button class="ftab" onclick="swFTab(this,\'ft-atb\')">Antimicrobianos</button><button class="ftab" onclick="swFTab(this,\'ft-micro\')">Microbiología</button><button class="ftab" onclick="swFTab(this,\'ft-abg\')">Antibiograma</button><button class="ftab" onclick="swFTab(this,\'ft-proa\')">Decisión PROA</button></div>';
+  html+='<div class="form-tabs"><button class="ftab active" onclick="swFTab(this,\'ft-datos\')">Paciente</button><button class="ftab" onclick="swFTab(this,\'ft-atb\')">Antimicrobianos</button><button class="ftab" onclick="swFTab(this,\'ft-micro\')">Microbiología</button><button class="ftab" onclick="swFTab(this,\'ft-abg\')">Antibiograma</button><button class="ftab" onclick="swFTab(this,\'ft-proa\')">Decisión PROA</button><button class="ftab" onclick="swFTab(this,\'ft-ic\')">🔄 Interconsulta</button></div>';
+
+  // ── TIPO DE VISITA (aparece siempre, encima de todo) ──
+  const tvActual=p.tipoVisita||'seguimiento';
+  const tvOpts=[
+    {v:'seguimiento',icon:'📋',label:'Seguimiento diario',color:'var(--teal)',bg:'rgba(0,212,168,.12)',brd:'rgba(0,212,168,.4)'},
+    {v:'interconsulta',icon:'🔄',label:'Interconsulta',color:'var(--blue)',bg:'rgba(61,155,255,.12)',brd:'rgba(61,155,255,.4)'},
+    {v:'urgente',icon:'🚨',label:'Urgente / Nuevo',color:'var(--red)',bg:'rgba(255,77,109,.12)',brd:'rgba(255,77,109,.4)'},
+    {v:'trasplante',icon:'🫀',label:'Trasplante / Hemato',color:'var(--purple)',bg:'rgba(167,139,250,.12)',brd:'rgba(167,139,250,.4)'},
+  ];
+  html+='<div class="fsec-t">🏥 Tipo de Visita</div>';
+  html+='<div class="frow2" style="margin-bottom:4px;"><div class="fg" style="grid-column:1/-1;">';
+  html+='<label>Tipo de valoración</label>';
+  html+='<input type="hidden" id="f-tipo-visita" value="'+escHtml(tvActual)+'">';
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:6px;" id="tipo-visita-grid">';
+  tvOpts.forEach(o=>{
+    const isActive=tvActual===o.v;
+    html+=`<button type="button" data-tv="${o.v}" onclick="selTipoVisita('${o.v}')" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:6px;border:1px solid ${isActive?o.brd:'var(--brd)'};background:${isActive?o.bg:'transparent'};color:${isActive?o.color:'var(--t2)'};cursor:pointer;font-size:12px;font-weight:${isActive?'700':'400'};transition:all .15s;text-align:left;">
+      <span style="font-size:18px;">${o.icon}</span><span>${o.label}</span>
+    </button>`;
+  });
+  html+='</div></div></div>';
 
   // TAB DATOS
   html+='<div class="ftab-c active" id="ft-datos">';
@@ -2722,6 +2792,9 @@ function abrirFormPaciente(p){
   html+='<div class="fg" id="cdi-sev-wrap" style="'+(p.cdi?'':'display:none;')+'"><label>Severidad CDI</label><select id="f-cdi-sev">'+['leve-moderada','grave','grave-complicada'].map(v2=>'<option value="'+v2+'"'+(p.cdiSeveridad===v2?' selected':'')+'>'+v2+'</option>').join('')+'</select></div>';
   html+='<div class="fg" id="cdi-recur-wrap" style="'+(p.cdi?'':'display:none;')+'"><label>Recurrencia</label><select id="f-cdi-recur">'+['primera vez','1ª recurrencia','≥2ª recurrencia'].map(v2=>'<option value="'+v2+'"'+(p.cdiRecurrencia===v2?' selected':'')+'>'+v2+'</option>').join('')+'</select></div>';
   html+='</div></div>';
+  // Hidden inputs para Urgencias Sepsis Gate
+  html+='<input type="hidden" id="f-urgencias-qsofa" value="'+escHtml(String(p.urgenciasQsofa||0))+'">';
+  html+='<input type="hidden" id="f-urgencias-sofa" value="'+escHtml(String(p.urgenciasSofa||0))+'">';
 
   // TAB ATB — MULTI-ANTIBIÓTICO CON DOSIS PK/PD
   html+='<div class="ftab-c" id="ft-atb">';
@@ -2887,6 +2960,35 @@ function abrirFormPaciente(p){
   html+='<div class="fg" style="grid-column:1/-1;"><label>Notas</label><textarea id="f-notas" style="height:70px;width:100%;resize:none;">'+escHtml(p.notas||'')+'</textarea></div>';
   html+='</div></div>';
 
+  // TAB INTERCONSULTA
+  html+='<div class="ftab-c" id="ft-ic">';
+  html+='<div class="fsec-t">🔄 Motivo de Interconsulta</div>';
+  html+='<div class="frow2">';
+  html+='<div class="fg"><label>Motivo</label><select id="f-ic-motivo">'+['ATB ya iniciado sin valoración','Fiebre sin foco','Sospecha infección nosocomial','Falla terapéutica','Profilaxis quirúrgica','Otro'].map(v=>'<option value="'+v+'"'+(p.icMotivo===v?' selected':'')+'>'+v+'</option>').join('')+'</select></div>';
+  html+='<div class="fg"><label>Urgencia</label><select id="f-ic-urgencia">'+['rutinaria','prioritaria','urgente'].map(v=>'<option value="'+v+'"'+(p.icUrgencia===v?' selected':'')+'>'+v+'</option>').join('')+'</select></div>';
+  html+='<div class="fg"><label>Servicio solicitante</label><input id="f-ic-servicio" value="'+escHtml(p.icServicio||'')+'" placeholder="ej. Medicina Interna 3"></div>';
+  html+='<div class="fg" style="grid-column:1/-1;"><label>Pregunta clínica</label><textarea id="f-ic-pregunta" style="height:60px;width:100%;resize:none;" placeholder="Escribe la pregunta clínica principal…">'+escHtml(p.icPregunta||'')+'</textarea></div>';
+  html+='</div>';
+
+  html+='<div class="fsec-t" style="margin-top:14px;">💊 ATBs Pre-existentes (indicados por otro servicio)</div>';
+  html+='<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">ATBs NO indicados por PROA — evalúa cada uno y documenta tu decisión</div>';
+  html+='<div id="atb-previos-list">';
+  const atbPreviosExist=p.atbPrevios||[];
+  if(atbPreviosExist.length>0){
+    atbPreviosExist.forEach((ap,idx)=>{html+=buildAtbPrevioRow(idx,ap);});
+  } else {
+    html+=buildAtbPrevioRow(0,{});
+  }
+  html+='</div>';
+  html+='<button type="button" onclick="addAtbPrevioRow()" style="margin-top:8px;width:100%;font-family:var(--mono);font-size:10px;padding:8px;border:1px dashed rgba(61,155,255,.4);background:rgba(61,155,255,.06);color:var(--blue);border-radius:3px;cursor:pointer;">+ Agregar ATB previo</button>';
+
+  html+='<div class="fsec-t" style="margin-top:14px;">📱 Comunicación al Servicio Solicitante</div>';
+  html+='<div style="padding:12px;background:rgba(37,211,102,.04);border:1px solid rgba(37,211,102,.18);border-radius:6px;margin-top:8px;">';
+  html+='<div style="font-size:11px;color:var(--t2);margin-bottom:10px;">Envía la respuesta de la interconsulta directamente por WhatsApp al servicio que la solicitó.</div>';
+  html+='<button type="button" onclick="enviarRespuestaIC()" style="background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.3);color:#25D366;border-radius:6px;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">📱 Enviar respuesta a interconsulta por WA</button>';
+  html+='</div>';
+  html+='</div>'; // end ft-ic
+
   // Botones
   html+='<div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--brd2);">';
   html+='<button class="btn-main btn-teal" onclick="guardar()">💾 Guardar</button>';
@@ -2900,6 +3002,193 @@ function abrirFormPaciente(p){
   // Auto-calculate TFG when editing existing patient
   if(editId&&p.creat)setTimeout(()=>calcTFG(),50);
 }
+
+// ── Helpers: Tipo de Visita ──
+window.selTipoVisita=function(v){
+  document.getElementById('f-tipo-visita').value=v;
+  const tvOpts=[
+    {v:'seguimiento',color:'var(--teal)',bg:'rgba(0,212,168,.12)',brd:'rgba(0,212,168,.4)'},
+    {v:'interconsulta',color:'var(--blue)',bg:'rgba(61,155,255,.12)',brd:'rgba(61,155,255,.4)'},
+    {v:'urgente',color:'var(--red)',bg:'rgba(255,77,109,.12)',brd:'rgba(255,77,109,.4)'},
+    {v:'trasplante',color:'var(--purple)',bg:'rgba(167,139,250,.12)',brd:'rgba(167,139,250,.4)'},
+  ];
+  document.querySelectorAll('#tipo-visita-grid button').forEach(btn=>{
+    const bv=btn.dataset.tv;
+    const cfg=tvOpts.find(o=>o.v===bv)||{color:'var(--t2)',bg:'transparent',brd:'var(--brd)'};
+    const isActive=bv===v;
+    btn.style.border='1px solid '+(isActive?cfg.brd:'var(--brd)');
+    btn.style.background=isActive?cfg.bg:'transparent';
+    btn.style.color=isActive?cfg.color:'var(--t2)';
+    btn.style.fontWeight=isActive?'700':'400';
+  });
+};
+
+// ── Helpers: ATBs Previos (interconsulta) ──
+function buildAtbPrevioRow(idx,ap){
+  ap=ap||{};
+  const decOpts=['✅ Continuar','🔄 Modificar','⛔ Suspender','💊 Ajustar dosis'];
+  let r=`<div class="atb-previo-row" id="atb-prev-${idx}" style="background:var(--s1);border:1px solid var(--brd2);border-radius:6px;padding:10px 12px;margin-bottom:8px;position:relative;">`;
+  r+=`<button type="button" onclick="rmAtbPrevioRow(${idx})" style="position:absolute;top:6px;right:8px;background:none;border:none;color:var(--t3);cursor:pointer;font-size:14px;">✕</button>`;
+  r+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">`;
+  r+=`<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;">ATB nombre</label><input id="atbp-${idx}-nom" value="${escHtml(ap.nombre||'')}" placeholder="ej. Ceftriaxona" style="width:100%;"></div>`;
+  r+=`<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;">Dosis / Frecuencia</label><input id="atbp-${idx}-dosis" value="${escHtml(ap.dosis||'')}" placeholder="ej. 1g c/24h IV" style="width:100%;"></div>`;
+  r+=`<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;">Fecha inicio</label><input type="date" id="atbp-${idx}-fecha" value="${escHtml(ap.fecha||'')}" oninput="calcDiasAtbPrev(${idx})" style="width:100%;"></div>`;
+  r+=`<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;">Días transcurridos</label><input id="atbp-${idx}-dias" value="${ap.dias||''}" readonly style="width:100%;background:var(--s2);color:var(--teal);font-family:var(--mono);font-weight:700;"></div>`;
+  r+=`</div>`;
+  r+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">`;
+  r+=`<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;">Decisión PROA</label><select id="atbp-${idx}-dec" style="width:100%;">`;
+  decOpts.forEach(d=>{r+=`<option value="${d}"${ap.decision===d?' selected':''}>${d}</option>`;});
+  r+=`</select></div>`;
+  r+=`<div><label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;">Justificación</label><input id="atbp-${idx}-just" value="${escHtml(ap.justificacion||'')}" placeholder="Ej: sensible, espectro adecuado" style="width:100%;"></div>`;
+  r+=`</div></div>`;
+  return r;
+}
+window.addAtbPrevioRow=function(){
+  const list=document.getElementById('atb-previos-list');
+  if(!list)return;
+  const idx=list.querySelectorAll('.atb-previo-row').length;
+  const div=document.createElement('div');
+  div.innerHTML=buildAtbPrevioRow(idx,{});
+  list.appendChild(div.firstChild||div);
+};
+window.rmAtbPrevioRow=function(idx){
+  const row=document.getElementById('atb-prev-'+idx);
+  if(row)row.remove();
+};
+window.calcDiasAtbPrev=function(idx){
+  const fechaEl=document.getElementById('atbp-'+idx+'-fecha');
+  const diasEl=document.getElementById('atbp-'+idx+'-dias');
+  if(!fechaEl||!diasEl||!fechaEl.value)return;
+  const inicio=new Date(fechaEl.value+'T00:00:00');
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const d=Math.max(0,Math.floor((hoy-inicio)/86400000))+1;
+  diasEl.value='Día '+d;
+};
+window.getAtbPrevios=function(){
+  const rows=document.querySelectorAll('#atb-previos-list .atb-previo-row');
+  const result=[];
+  rows.forEach((row,i)=>{
+    const idx=row.id.replace('atb-prev-','');
+    const nombre=(document.getElementById('atbp-'+idx+'-nom')?.value||'').trim();
+    if(!nombre)return;
+    result.push({
+      nombre,
+      dosis:(document.getElementById('atbp-'+idx+'-dosis')?.value||'').trim(),
+      fecha:(document.getElementById('atbp-'+idx+'-fecha')?.value||''),
+      dias:(document.getElementById('atbp-'+idx+'-dias')?.value||''),
+      decision:(document.getElementById('atbp-'+idx+'-dec')?.value||'✅ Continuar'),
+      justificacion:(document.getElementById('atbp-'+idx+'-just')?.value||'').trim(),
+    });
+  });
+  return result;
+};
+
+// ── Enviar respuesta de interconsulta por WA ──
+window.enviarRespuestaIC=function(){
+  const nom=(gv('f-nom')||'').trim();
+  const svc=gv('f-svc')||'—';
+  const motivo=gv('f-ic-motivo')||'—';
+  const pregunta=gv('f-ic-pregunta')||'—';
+  const svcSol=gv('f-ic-servicio')||'—';
+  const urgencia=gv('f-ic-urgencia')||'rutinaria';
+  const atbPrev=getAtbPrevios();
+  const atbActual=gv('f-atb')||'—';
+  const accion=gv('f-accion')||'—';
+  const notas=gv('f-notas')||'';
+  const firmaTel=window._userTel||HInfo.proaWA||'';
+  const firma='— '+proaLider()+(firmaTel?' 📱 '+firmaTel:'')+' · PROA · '+(HInfo.nombre||HOSP);
+  let msg='*PROA — Respuesta de Interconsulta*\n';
+  msg+='Servicio solicitante: '+svcSol+' · Urgencia: '+urgencia+'\n\n';
+  msg+='Paciente: '+nom+'\n';
+  msg+='Servicio/Cama: '+svc+' · '+(gv('f-cama')||'—')+'\n';
+  msg+='Motivo: '+motivo+'\n';
+  msg+='Pregunta clínica: '+pregunta+'\n\n';
+  if(atbPrev.length>0){
+    msg+='*ATBs pre-existentes evaluados:*\n';
+    atbPrev.forEach(a=>{msg+='  • '+a.nombre+' ('+a.dosis+'): '+a.decision+' — '+a.justificacion+'\n';});
+    msg+='\n';
+  }
+  msg+='*ATB recomendado por PROA:* '+atbActual+'\n';
+  msg+='*Acción:* '+accion+'\n';
+  if(notas)msg+='Notas: '+notas+'\n';
+  msg+='\n'+firma;
+  window._waPanelMsg=msg;
+  window._waPanelUrl='https://wa.me?text='+encodeURIComponent(msg);
+  window._waPanelTel='';
+  window._waPanelMedico=svcSol;
+  _mostrarPanelWA();
+};
+
+// ── Urgencias Sepsis Gate ──
+window._mostrarGateSepsis=function(callback){
+  const html=`
+    <div style="text-align:center;padding:10px 0 16px;">
+      <div style="font-size:40px;margin-bottom:8px;">⛔</div>
+      <div style="font-size:15px;font-weight:700;color:var(--red);margin-bottom:6px;">ATB de Amplio Espectro en Urgencias</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:16px;">Antes de prescribir ATBs de amplio espectro en Urgencias,<br>documenta criterios de sepsis (qSOFA ≥ 2).</div>
+    </div>
+    <div style="background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.2);border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:10px;">qSOFA — Criterios (marcar presentes)</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${[
+          {id:'qsofa-resp',label:'FR &gt; 22 rpm'},
+          {id:'qsofa-sensorium',label:'Alteración del estado mental (GCS &lt;15)'},
+          {id:'qsofa-ta',label:'TAS ≤ 100 mmHg'},
+        ].map(c=>`<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:12px;color:var(--t2);">
+          <input type="checkbox" id="${c.id}" onchange="calcQsofaGate()" style="width:16px;height:16px;accent-color:var(--red);">
+          <span>${c.label}</span>
+        </label>`).join('')}
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px;">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--t3);">Score qSOFA:</span>
+        <span id="qsofa-score" style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--t2);">0</span>
+        <span id="qsofa-label" style="font-size:11px;color:var(--t3);"></span>
+      </div>
+    </div>
+    <div style="background:var(--s1);border:1px solid var(--brd2);border-radius:6px;padding:12px 14px;margin-bottom:16px;font-size:11px;color:var(--t3);line-height:1.7;">
+      <b style="color:var(--t2);">SIRS vs Sepsis:</b> SIRS = 2+ criterios (fiebre/hipotermia, taquicardia, taquipnea, leucocitosis).
+      Sepsis = SIRS + sospecha de infección + disfunción orgánica (qSOFA ≥ 2 o SOFA ≥ 2).
+      <b style="color:var(--amber);">Sepsis requiere ATB en la primera hora.</b>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button id="gate-confirmar-btn" disabled onclick="confirmarGateSepsis()" style="flex:1;background:rgba(255,77,109,.15);border:1px solid rgba(255,77,109,.3);color:var(--red);border-radius:6px;padding:10px;font-size:13px;font-weight:700;cursor:not-allowed;opacity:0.5;transition:.2s;">Confirmar e indicar ATB</button>
+      <button onclick="cerrarModal();window._gateSepsisCallback=null;" style="flex:1;background:none;border:1px solid var(--brd);color:var(--t3);border-radius:6px;padding:10px;font-size:13px;cursor:pointer;">Cancelar</button>
+    </div>`;
+  window._gateSepsisCallback=callback;
+  document.getElementById('modal-title').textContent='⛔ Verificación Sepsis — Urgencias';
+  document.getElementById('modal-bdy').innerHTML=html;
+  abrirModal();
+};
+window.calcQsofaGate=function(){
+  const score=['qsofa-resp','qsofa-sensorium','qsofa-ta'].filter(id=>document.getElementById(id)?.checked).length;
+  const scoreEl=document.getElementById('qsofa-score');
+  const labelEl=document.getElementById('qsofa-label');
+  const btnEl=document.getElementById('gate-confirmar-btn');
+  if(scoreEl)scoreEl.textContent=score;
+  if(scoreEl)scoreEl.style.color=score>=2?'var(--red)':score===1?'var(--amber)':'var(--t2)';
+  if(labelEl)labelEl.textContent=score>=2?'— SEPSIS probable ✓':score===1?'— Bajo riesgo (observar)':'— Sin criterios';
+  if(btnEl){
+    const habilitado=score>=2;
+    btnEl.disabled=!habilitado;
+    btnEl.style.opacity=habilitado?'1':'0.5';
+    btnEl.style.cursor=habilitado?'pointer':'not-allowed';
+    btnEl.style.background=habilitado?'rgba(255,77,109,.25)':'rgba(255,77,109,.15)';
+  }
+};
+window.confirmarGateSepsis=function(){
+  const score=['qsofa-resp','qsofa-sensorium','qsofa-ta'].filter(id=>document.getElementById(id)?.checked).length;
+  if(score<2)return;
+  // Store scores in hidden form fields (they were already rendered before gate opened)
+  // We keep them in window vars and apply after modal re-opens
+  window._qsofaGateScore=score;
+  window._sofaGateScore=0;
+  cerrarModal();
+  // Trigger the stored callback (which re-runs guardar)
+  setTimeout(()=>{
+    if(window._gateSepsisCallback)window._gateSepsisCallback();
+    window._gateSepsisCallback=null;
+  },100);
+};
 
 // ══════════════════════════════════════════════════════
 // BASE DE DATOS DE ANTIBIÓTICOS CON DOSIS PK/PD
@@ -5354,6 +5643,86 @@ window.copiarWA=tipo=>{
   _clipboardWrite(msg);
 };
 
+// ══ WA Communication Hub ══
+window.swWAHTab=function(tab){
+  ['medico','farmacia','micro','almacen'].forEach(t=>{
+    const sec=document.getElementById('wahsec-'+t);
+    const btn=document.getElementById('wahtab-'+t);
+    if(sec)sec.style.display=t===tab?'':'none';
+    if(btn){
+      const isActive=t===tab;
+      btn.style.border='1px solid '+(isActive?'var(--teal)':'var(--brd)');
+      btn.style.background=isActive?'rgba(0,212,168,.12)':'transparent';
+      btn.style.color=isActive?'var(--teal)':'var(--t2)';
+      btn.style.fontWeight=isActive?'700':'400';
+    }
+  });
+};
+// Farmacia templates
+window._wahFarmTpl='liberacion';
+window.wahSelFarmTpl=function(tpl){window._wahFarmTpl=tpl;wahGenFarmacia();};
+window.wahGenFarmacia=function(){
+  const pid=document.getElementById('wah-farm-pac')?.value||'';
+  const p=pid?PACS.find(x=>x.id===pid):null;
+  const msgEl=document.getElementById('wah-farm-msg');if(!msgEl)return;
+  const atb=p?(p.atbList?.map(a=>a.nombre).filter(Boolean).join(' + ')||p.atb||'—'):'[ATB]';
+  const nom=p?.nombre||'[paciente]';
+  const svc=p?.servicio||'[servicio]';
+  const medico=p?.medico||'[médico]';
+  const firma=proaLider()+' · PROA · '+(HInfo.nombre||HOSP);
+  const tpls={
+    liberacion:`*PROA — Solicitud de liberación de ATB restringido*\n\nSolicitante: ${firma}\nPaciente: ${nom}\nServicio: ${svc}\nMédico tratante: ${medico}\n\nATB solicitado: ${atb}\n\nJustificación clínica: [sepsis/infección grave/resistencia documentada]\nFecha de inicio propuesta: ${new Date().toLocaleDateString('es-MX')}\n\nFavor de liberar en farmacia. Gracias.`,
+    suspension:`*PROA — Notificación de suspensión de ATB*\n\nPaciente: ${nom}\nServicio: ${svc}\n\nATB a suspender: ${atb}\nFecha de suspensión: ${new Date().toLocaleDateString('es-MX')}\nMotivo: [desescalada / alta / completó ciclo / evento adverso]\n\n${firma}`,
+    disponibilidad:`*PROA — Solicitud de información de disponibilidad*\n\nATB: ${atb}\nCantidad estimada: [dosis × días]\nPaciente: ${nom} · ${svc}\n\n¿Está disponible en farmacia? ¿Stock actual?\n\n${firma}`,
+  };
+  msgEl.textContent=tpls[window._wahFarmTpl||'liberacion']||'';
+};
+window._wahMicroTpl='cultivo';
+window.wahSelMicroTpl=function(tpl){window._wahMicroTpl=tpl;wahGenMicro();};
+window.wahGenMicro=function(){
+  const pid=document.getElementById('wah-micro-pac')?.value||'';
+  const p=pid?PACS.find(x=>x.id===pid):null;
+  const msgEl=document.getElementById('wah-micro-msg');if(!msgEl)return;
+  const nom=p?.nombre||'[paciente]';
+  const svc=p?.servicio||'[servicio]';
+  const org=p?.organismo||'[organismo pendiente]';
+  const feno=p?.fenotipo||'[fenotipo]';
+  const atb=p?(p.atbList?.map(a=>a.nombre).filter(Boolean).join(' + ')||p.atb||'—'):'[ATB]';
+  const firma=proaLider()+' · PROA · '+(HInfo.nombre||HOSP);
+  const tpls={
+    cultivo:`*PROA — Solicitud de cultivo urgente*\n\nPaciente: ${nom}\nServicio: ${svc}\nContexto clínico: [sepsis / fiebre sin foco / sospecha infección nosocomial]\nTipo de muestra: [hemocultivo × 2 / urocultivo / BAL / LCR]\nOrganismo sospechado: [${p?.dx||'—'}]\n\nFavor de procesar con prioridad.\n\n${firma}`,
+    interpretacion:`*PROA — Solicitud de interpretación de resultado*\n\nPaciente: ${nom} · ${svc}\nOrganismo: ${org}\nFenotipo: ${feno}\nATB actual: ${atb}\n\nRecomendación PROA basada en antibiograma: [adecuado / desescalada posible / resistencia documentada]\n\n¿Confirmas el fenotipo? ¿Requiere confirmación CMI?\n\n${firma}`,
+    molecular:`*PROA — Solicitud de prueba molecular / MALDI-TOF*\n\nPaciente: ${nom} · ${svc}\nEstudio solicitado: [MALDI-TOF / PCR FilmArray / PCR específica]\nMotivo: [fallo terapéutico / sospecha de cepa inusual / resistencia no explicada]\n\nContexto: ${p?.dx||'—'}\n\n${firma}`,
+  };
+  msgEl.textContent=tpls[window._wahMicroTpl||'cultivo']||'';
+};
+window._wahAlmTpl='verificacion';
+window.wahSelAlmTpl=function(tpl){window._wahAlmTpl=tpl;wahGenAlmacen();};
+window.wahGenAlmacen=function(){
+  const pid=document.getElementById('wah-alm-pac')?.value||'';
+  const p=pid?PACS.find(x=>x.id===pid):null;
+  const msgEl=document.getElementById('wah-alm-msg');if(!msgEl)return;
+  const atb=p?(p.atbList?.map(a=>a.nombre).filter(Boolean).join(' + ')||p.atb||'—'):'[ATB]';
+  const nom=p?.nombre||'[paciente]';
+  const firma=proaLider()+' · PROA · '+(HInfo.nombre||HOSP);
+  const tpls={
+    verificacion:`*PROA — Verificación de disponibilidad ATB*\n\nATB: ${atb}\nDosis: [dosis y frecuencia]\nCantidad estimada: [cantidad para X días]\nPaciente: ${nom}\n\n¿Confirmas disponibilidad en almacén?\n\n${firma}`,
+    urgente:`*PROA — Solicitud urgente de ATB no formulario*\n\nATB: ${atb}\nPaciente: ${nom}\nJustificación: [infección por organismo MDR / fallo terapéutico / sin alternativa en formulario]\nAutorización de referencia: [No. de autorización / nombre que autoriza]\n\nSe requiere con urgencia.\n\n${firma}`,
+  };
+  msgEl.textContent=tpls[window._wahAlmTpl||'verificacion']||'';
+};
+window.wahEnviar=function(tipo){
+  const ids={farm:'wah-farm-msg',micro:'wah-micro-msg',alm:'wah-alm-msg'};
+  const msg=document.getElementById(ids[tipo])?.textContent||'';
+  if(!msg){toast('Genera un mensaje primero','am');return;}
+  window.open('https://wa.me?text='+encodeURIComponent(msg),'_blank');
+};
+window.wahCopiar=function(tipo){
+  const ids={farm:'wah-farm-msg',micro:'wah-micro-msg',alm:'wah-alm-msg'};
+  const msg=document.getElementById(ids[tipo])?.textContent||'';
+  _clipboardWrite(msg);
+};
+
 // ── Reporte ──
 window.renderCumAbg=async()=>{
   const out=document.getElementById('cum-abg-content');
@@ -5636,7 +6005,7 @@ window.showView=(v2,btn)=>{currentView=v2;document.querySelectorAll('.view').for
   // Mostrar panel de proxy SOLO al super-admin y reflejar estado actual
   const px=document.getElementById('proxy-config');if(px)px.style.display=(U?.email===SUPER_ADMIN)?'':'none';
   const pxc=document.getElementById('proxy-current');if(pxc)pxc.innerHTML=window._anthropicProxyURL?'🔒 Activo: <span style="color:var(--teal);">'+escHtml(window._anthropicProxyURL)+'</span>':'⚠ No configurado — la API key viaja al navegador.';
-  }if(v2==='farmacia'){_farmFiltro='todos';_farmTab='solicitudes';renderSolicitudesFarmacia();renderBloqueosATB();}if(v2==='atb')renderSolicitudesPROA();if(v2==='plataforma')cargarPlataforma();if(v2==='guias')renderGuias();if(v2==='analytics')renderAnalytica();
+  }if(v2==='farmacia'){_farmFiltro='todos';_farmTab='solicitudes';renderSolicitudesFarmacia();renderBloqueosATB();}if(v2==='atb')renderSolicitudesPROA();if(v2==='plataforma')cargarPlataforma();if(v2==='guias')renderGuias();if(v2==='analytics')renderAnalytica();if(v2==='alertas24h')renderAlertas24h();if(v2==='flujograma')renderFlujograma();if(v2==='trasplante')renderTrasplante();
   // sync mobile bottom nav
   document.querySelectorAll('.mob-nav-btn').forEach(b=>b.classList.remove('active'));
   const mBtn=document.querySelector('.mob-nav-btn[onclick*="\''+v2+'\'"]')||document.querySelector('.mob-nav-btn[id="mnb-'+v2+'"]');
@@ -5667,6 +6036,9 @@ window.abrirMobMas=function(btn){
     {icon:'💊',label:'DDD/ATC',view:'ddd',always:true},
     {icon:'🔪',label:'Profilaxis',view:'profilaxis',always:true},
     {icon:'📊',label:'Analítica',view:'analytics',plan:true},
+    {icon:'🔔',label:'Alertas 24h',view:'alertas24h',admin:true},
+    {icon:'🔀',label:'Flujograma',view:'flujograma',always:true},
+    {icon:'🫀',label:'Trasplante',view:'trasplante',always:true},
     {icon:'🧪',label:'Farmacia',view:'farmacia',farm:true},
     {icon:'🔴',label:'Aut. ATB',view:'atb',atb:true},
     {icon:'👥',label:'Usuarios',view:'usuarios',admin:true},
@@ -11471,6 +11843,409 @@ const haptic={
 };
 window.haptic=haptic;
 
+// ══════════════════════════════════════════════════════
+// ALERTAS 24H
+// ══════════════════════════════════════════════════════
+window.renderAlertas24h=async function(){
+  const cont=document.getElementById('alertas24h-content');
+  if(!cont||!HOSP||HOSP===PLATFORM_SENTINEL)return;
+  cont.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3);">Cargando…</div>';
+  try{
+    const snap=await getDocs(query(collection(db,'hospitals',HOSP,'alertas24h'),orderBy('createdAt','desc')));
+    const alertas=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!alertas.length){cont.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3);font-size:14px;">Sin alertas activas 🎉<br><span style="font-size:11px;">Cuando se agregue un paciente con ATB de amplio espectro en UCI/intermedios, aparecerá aquí.</span></div>';return;}
+    const pendientes=alertas.filter(a=>a.status==='pendiente');
+    const badge=document.getElementById('alertas24h-badge');
+    if(badge){badge.textContent=pendientes.length;badge.style.display=pendientes.length?'flex':'none';}
+    let html='';
+    alertas.forEach(a=>{
+      const cAt=a.createdAt?.toDate?a.createdAt.toDate():new Date();
+      const horasEl=Math.round((Date.now()-cAt.getTime())/3600000);
+      const color=a.status==='valorado'?'var(--teal)':a.status==='excluido'?'var(--t3)':horasEl>24?'var(--red)':'var(--amber)';
+      const brd=a.status==='valorado'?'rgba(0,212,168,.3)':a.status==='excluido'?'var(--brd2)':horasEl>24?'rgba(255,77,109,.3)':'rgba(245,166,35,.3)';
+      html+=`<div style="background:var(--s1);border:1px solid ${brd};border-radius:8px;padding:14px 16px;margin-bottom:12px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--tx);">${escHtml(a.patientName||'—')}</div>
+            <div style="font-size:11px;color:var(--t2);margin-top:3px;">Servicio: <b>${escHtml(a.servicio||'—')}</b> · ATBs: <b style="color:var(--amber);">${escHtml(a.atbs||'—')}</b></div>
+            <div style="font-size:10px;color:var(--t3);margin-top:2px;font-family:var(--mono);">Creado: ${cAt.toLocaleDateString('es-MX')} ${cAt.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})} · <span style="color:${color};font-weight:700;">${horasEl}h transcurridas</span>${a.esFindeSemana?' · 📅 Fin de semana':''}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <span style="font-size:10px;padding:3px 8px;border-radius:20px;font-family:var(--mono);font-weight:700;background:${brd};color:${color};">${a.status==='valorado'?'✓ Valorado':a.status==='excluido'?'Excluido':'⏱ Pendiente'}</span>
+            ${a.status==='pendiente'?`
+              <button onclick="marcarAlerta24h('${a.id}','valorado')" style="font-size:11px;padding:5px 10px;border-radius:4px;border:1px solid rgba(0,212,168,.3);background:rgba(0,212,168,.08);color:var(--teal);cursor:pointer;">✓ Valorado</button>
+              <button onclick="marcarAlerta24h('${a.id}','excluido')" style="font-size:11px;padding:5px 10px;border-radius:4px;border:1px solid var(--brd);background:none;color:var(--t3);cursor:pointer;">🗑 Excluir</button>
+              ${a.esFindeSemana?`<button onclick="notifAlerta24hLunes('${a.id}','${escJs(a.patientName||'')}','${escJs(a.servicio||'')}','${escJs(a.atbs||'')}');" style="font-size:11px;padding:5px 10px;border-radius:4px;border:1px solid rgba(61,155,255,.3);background:rgba(61,155,255,.08);color:var(--blue);cursor:pointer;">📅 Confirmar cobertura lunes</button>`:''}
+            `:''}
+          </div>
+        </div>
+      </div>`;
+    });
+    cont.innerHTML=html;
+  }catch(e){cont.innerHTML='<div style="color:var(--red);padding:20px;">Error: '+escHtml(e.message)+'</div>';}
+};
+window.marcarAlerta24h=async function(alertaId,status){
+  if(!HOSP||!alertaId)return;
+  try{
+    await updateDoc(doc(db,'hospitals',HOSP,'alertas24h',alertaId),{status,updatedAt:new Date().toISOString(),updatedBy:U?.email||''});
+    toast(status==='valorado'?'✓ Marcado como valorado':'Alerta excluida');
+    renderAlertas24h();
+  }catch(e){toast('Error: '+e.message,'rd');}
+};
+window.notifAlerta24hLunes=function(alertaId,nombre,servicio,atbs){
+  const msg=`*PROA — Cobertura Fin de Semana*\n\nPaciente: ${nombre}\nServicio: ${servicio}\nATBs amplio espectro: ${atbs}\n\nEl residente de Medicina Interna cubrió la visita de fin de semana.\nSe requiere valoración PROA el lunes.\n\n— Residente MI · ${HInfo.nombre||HOSP}`;
+  window.open('https://wa.me?text='+encodeURIComponent(msg),'_blank');
+};
+
+// ══════════════════════════════════════════════════════
+// FLUJOGRAMA PROA
+// ══════════════════════════════════════════════════════
+const _FLU_DATA=[
+  {id:'urgencias',label:'Urgencias',color:'var(--red)',
+   pasos:[
+    {tipo:'inicio',txt:'Paciente llega a Urgencias con sospecha de infección'},
+    {tipo:'decision',txt:'¿Criterios de Sepsis? (qSOFA ≥ 2 o SOFA ≥ 2)',si:'sepsis',no:'nosepsis'},
+    {tipo:'proceso',id:'sepsis',color:'var(--red)',txt:'SEPSIS — Iniciar ATB en la primera hora'},
+    {tipo:'sub',txt:'• Tomar hemocultivos (× 2) ANTES del ATB'},
+    {tipo:'sub',txt:'• ATB empírico de amplio espectro (meropenem / pip-tazo / vancomicina según foco)'},
+    {tipo:'sub',txt:'• Notificar a PROA'},
+    {tipo:'sub',txt:'• Revaloración PROA ≤ 24h · Desescalada si cultivo disponible'},
+    {tipo:'proceso',id:'nosepsis',color:'var(--teal)',txt:'SIN SEPSIS — NO iniciar ATB de amplio espectro'},
+    {tipo:'sub',txt:'• Tomar cultivos si corresponde'},
+    {tipo:'sub',txt:'• Observar 24-48h · ATB dirigido si cultivo +'},
+    {tipo:'sub',txt:'• Si duda clínica: valoración por PROA antes de iniciar'},
+    {tipo:'fin',txt:'Documentar decisión en expediente · NOM-045'},
+  ]},
+  {id:'piso',label:'Piso General',color:'var(--teal)',
+   pasos:[
+    {tipo:'inicio',txt:'Admisión a piso con ATB'},
+    {tipo:'proceso',color:'var(--teal)',txt:'Día 1–2: Registro en censo PROA'},
+    {tipo:'proceso',color:'var(--amber)',txt:'Día 3: Revisión PROA (¿ATB adecuado?)'},
+    {tipo:'decision',txt:'¿Cultivo disponible?',si:'cultivo_si',no:'cultivo_no'},
+    {tipo:'proceso',id:'cultivo_si',color:'var(--teal)',txt:'Adecuación a cultivo → Desescalada'},
+    {tipo:'proceso',id:'cultivo_no',color:'var(--amber)',txt:'Continuar empírico — reclasificar D5 y D7'},
+    {tipo:'proceso',color:'var(--teal)',txt:'Día 5: IV→VO si tolera, clínica mejora, afebrile'},
+    {tipo:'proceso',color:'var(--amber)',txt:'Día 7: Revisión de suspensión o duración definida'},
+    {tipo:'fin',txt:'Alta con ATB VO si aplica · Documentar en expediente'},
+  ]},
+  {id:'intermedios',label:'Cuidados Intermedios',color:'var(--blue)',
+   pasos:[
+    {tipo:'inicio',txt:'Ingreso a Cuidados Intermedios'},
+    {tipo:'proceso',color:'var(--amber)',txt:'Alerta PROA 24h automática → revisión ≤ 24h'},
+    {tipo:'decision',txt:'¿ATB amplio espectro indicado?',si:'amp_si',no:'amp_no'},
+    {tipo:'proceso',id:'amp_si',color:'var(--red)',txt:'Documentar justificación (qSOFA, sepsis, MDR)'},
+    {tipo:'sub',txt:'• Cultivos tomados antes del ATB'},
+    {tipo:'sub',txt:'• Plan de desescalada D3, D5, D7'},
+    {tipo:'proceso',id:'amp_no',color:'var(--teal)',txt:'ATB espectro reducido o ninguno → Observar'},
+    {tipo:'proceso',color:'var(--teal)',txt:'PROA: Desescalada al disponer de cultivo'},
+    {tipo:'fin',txt:'Documentar en expediente · Revisión semanal mínimo'},
+  ]},
+  {id:'uci',label:'Terapia Intensiva',color:'var(--purple)',
+   pasos:[
+    {tipo:'inicio',txt:'Ingreso a UCI / Terapia Intensiva'},
+    {tipo:'proceso',color:'var(--amber)',txt:'SOFA score al ingreso · Alerta PROA 24h automática'},
+    {tipo:'decision',txt:'¿ATB amplio espectro en uso?',si:'uci_atb',no:'uci_noatb'},
+    {tipo:'proceso',id:'uci_atb',color:'var(--red)',txt:'PROA: Revisión ≤ 24h obligatoria'},
+    {tipo:'sub',txt:'• Revisar cultivos diariamente'},
+    {tipo:'sub',txt:'• SOFA D3, D5, D7 para guiar suspensión'},
+    {tipo:'sub',txt:'• PK/PD: dosis extendidas, CMI, PCT'},
+    {tipo:'proceso',id:'uci_noatb',color:'var(--teal)',txt:'Sin ATB: Vigilancia de infección asociada a dispositivo'},
+    {tipo:'proceso',color:'var(--teal)',txt:'Desescalada dirigida por cultivo'},
+    {tipo:'fin',txt:'Registro PROA diario · Reporte semanal indicadores'},
+  ]},
+  {id:'cardiovascular',label:'Unidad Cardiovascular',color:'var(--amber)',
+   pasos:[
+    {tipo:'inicio',txt:'Paciente cardiovascular con procedimiento quirúrgico'},
+    {tipo:'proceso',color:'var(--teal)',txt:'Profilaxis quirúrgica: cefazolina 2g IV 30–60 min antes de incisión'},
+    {tipo:'decision',txt:'¿Duración profilaxis > 24h?',si:'prol_si',no:'prol_no'},
+    {tipo:'proceso',id:'prol_si',color:'var(--red)',txt:'PROA: Revisar justificación · Suspender si no hay infección'},
+    {tipo:'proceso',id:'prol_no',color:'var(--teal)',txt:'Suspender profilaxis a las 24h post-cirugía'},
+    {tipo:'proceso',color:'var(--amber)',txt:'ATBs restringidos (carbapenémicos, vancomicina): requieren autorización previa PROA'},
+    {tipo:'fin',txt:'Seguimiento D3, D7 · Reporte infecciones del sitio quirúrgico'},
+  ]},
+  {id:'hemodialisis',label:'Hemodiálisis',color:'var(--teal)',
+   pasos:[
+    {tipo:'inicio',txt:'Paciente en programa de hemodiálisis con infección'},
+    {tipo:'proceso',color:'var(--amber)',txt:'Ajuste de dosis renal: consultar tabla TFG / HD'},
+    {tipo:'sub',txt:'• Vancomicina: post-HD, control de niveles (troughs)'},
+    {tipo:'sub',txt:'• Meropenem: ajuste por TFG, post-HD si TFG<10'},
+    {tipo:'sub',txt:'• Aminoglucósidos: evitar o dosis única post-HD'},
+    {tipo:'proceso',color:'var(--teal)',txt:'Preferir ATBs con eliminación no renal si disponible'},
+    {tipo:'decision',txt:'¿Cultivo disponible?',si:'hd_cult',no:'hd_nocult'},
+    {tipo:'proceso',id:'hd_cult',color:'var(--teal)',txt:'Ajustar a sensibilidad · Duración mínima efectiva'},
+    {tipo:'proceso',id:'hd_nocult',color:'var(--amber)',txt:'Empírico dirigido a foco · Revisión semanal PROA'},
+    {tipo:'fin',txt:'PROA: Revisión semanal · Niveles séricos si disponible'},
+  ]},
+  {id:'trasplante',label:'Trasplantes',color:'var(--purple)',
+   pasos:[
+    {tipo:'inicio',txt:'Paciente con trasplante o en espera de trasplante'},
+    {tipo:'proceso',color:'var(--purple)',txt:'Ver módulo completo: Flujograma → Trasplante / Hemato'},
+    {tipo:'proceso',color:'var(--amber)',txt:'Protocolo 24h aplicable: ver pestaña 🫀 Trasplante'},
+    {tipo:'fin',txt:'PROA + Infectología: co-manejo obligatorio en inmunocomprometido'},
+  ]},
+];
+window.renderFlujograma=function(){
+  const tabsCont=document.getElementById('flujograma-tabs');
+  const cont=document.getElementById('flujograma-content');
+  if(!tabsCont||!cont)return;
+  if(!window._fluActivo)window._fluActivo='urgencias';
+  tabsCont.innerHTML=_FLU_DATA.map(f=>`<button onclick="window._fluActivo='${f.id}';renderFlujograma();" style="padding:7px 13px;border-radius:20px;border:1px solid ${window._fluActivo===f.id?f.color:'var(--brd)'};background:${window._fluActivo===f.id?'rgba(0,0,0,.2)':'transparent'};color:${window._fluActivo===f.id?f.color:'var(--t2)'};cursor:pointer;font-size:12px;font-weight:${window._fluActivo===f.id?'700':'400'};transition:.15s;">${f.label}</button>`).join('');
+  const flu=_FLU_DATA.find(f=>f.id===window._fluActivo)||_FLU_DATA[0];
+  let html=`<div style="max-width:600px;margin:0 auto;">`;
+  flu.pasos.forEach((p,i)=>{
+    if(p.tipo==='inicio'){
+      html+=`<div style="text-align:center;margin-bottom:12px;">
+        <div style="display:inline-block;background:var(--s2);border:2px solid ${flu.color};border-radius:30px;padding:10px 24px;font-size:13px;font-weight:700;color:${flu.color};">${escHtml(p.txt)}</div>
+      </div><div style="text-align:center;color:var(--t3);font-size:18px;line-height:1;">↓</div>`;
+    } else if(p.tipo==='decision'){
+      html+=`<div style="text-align:center;margin:8px 0;">
+        <div style="display:inline-block;background:rgba(245,166,35,.1);border:2px solid var(--amber);transform:rotate(0deg);padding:10px 20px;font-size:12px;font-weight:700;color:var(--amber);clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);width:200px;height:80px;display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1.3;">
+          ${escHtml(p.txt)}
+        </div>
+        <div style="display:flex;gap:20px;justify-content:center;margin-top:4px;">
+          <span style="font-size:10px;color:var(--teal);">← NO</span>
+          <span style="font-size:10px;color:var(--red);">SÍ →</span>
+        </div>
+      </div><div style="text-align:center;color:var(--t3);font-size:18px;">↓</div>`;
+    } else if(p.tipo==='proceso'){
+      const c=p.color||flu.color;
+      html+=`<div style="text-align:center;margin:8px 0;">
+        <div style="display:inline-block;background:${c.replace(')','')+',0.08)'.replace('var(','rgba(')};border:1px solid ${c};border-radius:6px;padding:10px 20px;font-size:12px;color:${c};font-weight:600;max-width:400px;">${escHtml(p.txt)}</div>
+      </div>`;
+      if(i<flu.pasos.length-1&&flu.pasos[i+1].tipo!=='fin')html+=`<div style="text-align:center;color:var(--t3);font-size:18px;">↓</div>`;
+    } else if(p.tipo==='sub'){
+      html+=`<div style="text-align:center;margin:3px 0;"><div style="display:inline-block;font-size:11px;color:var(--t2);max-width:380px;text-align:left;padding-left:16px;">${escHtml(p.txt)}</div></div>`;
+    } else if(p.tipo==='fin'){
+      html+=`<div style="text-align:center;margin-top:12px;">
+        <div style="display:inline-block;background:rgba(0,212,168,.08);border:2px solid var(--teal);border-radius:6px;padding:10px 24px;font-size:12px;font-weight:700;color:var(--teal);">🏁 ${escHtml(p.txt)}</div>
+      </div>`;
+    }
+  });
+  html+=`</div>`;
+  cont.innerHTML=html;
+};
+
+// ══════════════════════════════════════════════════════
+// MÓDULO TRASPLANTE / HEMATOLOGÍA
+// ══════════════════════════════════════════════════════
+const _TX_SUBTABS=[
+  {id:'tx-tipo',label:'🫀 Tipo y Fase'},
+  {id:'tx-profilaxis',label:'💊 Profilaxis'},
+  {id:'tx-patogenos',label:'🦠 Patógenos por Fase'},
+  {id:'tx-cmv',label:'🔬 CMV Monitor'},
+  {id:'tx-pretx',label:'📋 Pre-Trasplante'},
+  {id:'tx-24h',label:'🚨 Protocolo 24h'},
+];
+window.renderTrasplante=function(){
+  // Poblar selector de pacientes
+  const sel=document.getElementById('tx-pac-sel');
+  if(sel){
+    const opciones=PACS.filter(p=>p.inmuno==='trasplante'||p.tipoVisita==='trasplante');
+    sel.innerHTML='<option value="">— Seleccionar paciente —</option>'+opciones.map(p=>`<option value="${p.id}">${escHtml(p.nombre||'—')} · ${escHtml(p.servicio||'')}</option>`).join('');
+  }
+  // Render sub-tabs
+  const subCont=document.getElementById('trasplante-subtabs');
+  if(subCont){
+    if(!window._txSubTab)window._txSubTab='tx-tipo';
+    subCont.innerHTML=_TX_SUBTABS.map(t=>`<button onclick="window._txSubTab='${t.id}';renderTrasplantePac(document.getElementById('tx-pac-sel')?.value||'');" style="padding:7px 13px;border-radius:20px;border:1px solid ${window._txSubTab===t.id?'var(--purple)':'var(--brd)'};background:${window._txSubTab===t.id?'rgba(167,139,250,.12)':'transparent'};color:${window._txSubTab===t.id?'var(--purple)':'var(--t2)'};cursor:pointer;font-size:12px;font-weight:${window._txSubTab===t.id?'700':'400'};transition:.15s;">${t.label}</button>`).join('');
+  }
+  renderTrasplantePac('');
+};
+window.renderTrasplantePac=function(pid){
+  const cont=document.getElementById('trasplante-content');
+  if(!cont)return;
+  if(!window._txSubTab)window._txSubTab='tx-tipo';
+  const p=pid?PACS.find(x=>x.id===pid):null;
+  const sub=window._txSubTab;
+  // Re-render subtabs with updated active state
+  const subCont=document.getElementById('trasplante-subtabs');
+  if(subCont){
+    subCont.innerHTML=_TX_SUBTABS.map(t=>`<button onclick="window._txSubTab='${t.id}';renderTrasplantePac('${pid}');" style="padding:7px 13px;border-radius:20px;border:1px solid ${window._txSubTab===t.id?'var(--purple)':'var(--brd)'};background:${window._txSubTab===t.id?'rgba(167,139,250,.12)':'transparent'};color:${window._txSubTab===t.id?'var(--purple)':'var(--t2)'};cursor:pointer;font-size:12px;font-weight:${window._txSubTab===t.id?'700':'400'};transition:.15s;">${t.label}</button>`).join('');
+  }
+  if(sub==='tx-tipo')cont.innerHTML=_renderTxTipo(p);
+  else if(sub==='tx-profilaxis')cont.innerHTML=_renderTxProfilaxis(p);
+  else if(sub==='tx-patogenos')cont.innerHTML=_renderTxPatogenos(p);
+  else if(sub==='tx-cmv')cont.innerHTML=_renderTxCMV(p);
+  else if(sub==='tx-pretx')cont.innerHTML=_renderTxPreTx(p);
+  else if(sub==='tx-24h')cont.innerHTML=_renderTxProtocolo24h(p);
+};
+
+function _txCard(titulo,contenido,color){
+  color=color||'var(--teal)';
+  return `<div style="background:var(--s1);border:1px solid var(--brd2);border-radius:8px;padding:16px 18px;margin-bottom:14px;">
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:${color};margin-bottom:10px;">${titulo}</div>
+    ${contenido}
+  </div>`;
+}
+
+function _renderTxTipo(p){
+  const tipoSOT=['Riñón','Hígado','Corazón','Pulmón','Páncreas','Intestino','Multivisceral'];
+  const tipoTCMH=['TCMH Autólogo','TCMH Alogénico (relacionado HLA)','TCMH Alogénico (no relacionado)','TCMH Alogénico (haploidéntico)'];
+  const fases=['<30 días post-TX','30–100 días post-TX','>100 días post-TX','En espera (pre-TX)'];
+  const inmunoOpts=['Tacrolimus','Ciclosporina','Micofenolato (MMF)','Prednisona','Sirolimus','Everolimus','Azatioprina','Basiliximab','Timoglobulina','Rituximab','Bortezomib'];
+  let html=_txCard('🫀 Clasificar Paciente Trasplantado',`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+      <div>
+        <div style="font-size:11px;color:var(--t3);margin-bottom:6px;">Tipo de trasplante SOT</div>
+        ${tipoSOT.map(t=>`<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;font-size:12px;color:var(--t2);"><input type="radio" name="tx-tipo-r" value="${t}" style="accent-color:var(--purple);"> ${t}</label>`).join('')}
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--t3);margin-bottom:6px;">Tipo TCMH (si aplica)</div>
+        ${tipoTCMH.map(t=>`<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;font-size:12px;color:var(--t2);"><input type="radio" name="tx-tipo-r" value="${t}" style="accent-color:var(--purple);"> ${t}</label>`).join('')}
+      </div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--t3);margin-bottom:6px;">Fase post-trasplante</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${fases.map(f=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--t2);padding:6px 10px;border:1px solid var(--brd2);border-radius:4px;"><input type="radio" name="tx-fase-r" value="${f}" style="accent-color:var(--purple);"> ${f}</label>`).join('')}
+      </div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--t3);margin-bottom:6px;">Inmunosupresión activa (seleccionar todos)</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:5px;">
+        ${inmunoOpts.map(t=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--t2);"><input type="checkbox" style="accent-color:var(--purple);"> ${t}</label>`).join('')}
+      </div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--t3);margin-bottom:6px;">GVHD (TCMH)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${['No aplica / No hay GVHD','GVHD Aguda (grado I–IV)','GVHD Crónica (limitada/extensa)'].map(f=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--t2);padding:5px 10px;border:1px solid var(--brd2);border-radius:4px;"><input type="radio" name="tx-gvhd-r" value="${f}" style="accent-color:var(--purple);"> ${f}</label>`).join('')}
+      </div>
+    </div>
+  `,'var(--purple)');
+  return html;
+}
+
+function _renderTxProfilaxis(p){
+  const perfilesSOT=[
+    {titulo:'SOT — Bacterial (Post-operatorio)',items:[
+      {atb:'Cefazolina',indicacion:'Profilaxis quirúrgica · dosis única 2g IV 30–60 min pre-incisión',evidencia:'ASHP/IDSA · Nivel I',color:'var(--teal)'},
+      {atb:'TMP-SMX',indicacion:'Profilaxis PCP: 1 tab SS c/24h VO · inicio al 1–3 mes · duración 6–12 meses',evidencia:'IDSA 2013 SOT · Nivel I',color:'var(--teal)'},
+    ]},
+    {titulo:'SOT — Antifúngica (<30 días)',items:[
+      {atb:'Fluconazol',indicacion:'Riñón/hígado: 200–400mg c/24h VO/IV · 4–8 semanas',evidencia:'IDSA Candidiasis 2016 · Nivel II',color:'var(--amber)'},
+      {atb:'Micafungina',indicacion:'Si fluconazol resistente o Candida krusei/glabrata: 150mg c/24h IV',evidencia:'ECMM 2020 · Nivel II',color:'var(--amber)'},
+    ]},
+    {titulo:'SOT — Antiviral (CMV)',items:[
+      {atb:'Valganciclovir',indicacion:'D+/R-: 900mg c/24h VO · 3–6 meses (profilaxis universal)\nD+/R+ o D-/R+: 900mg c/24h VO · 3 meses o estrategia pre-emptiva',evidencia:'IDSA CMV 2013 · AST 2019 · Nivel I',color:'var(--blue)'},
+      {atb:'Aciclovir',indicacion:'HSV/VZV: 200mg c/8h VO o valganciclovir · mínimo 30 días post-TX',evidencia:'IDSA SOT · Nivel I',color:'var(--blue)'},
+    ]},
+    {titulo:'TCMH — Bacterial (pre-engraftment)',items:[
+      {atb:'Levofloxacino',indicacion:'Profilaxis en neutropenia prolongada: 500mg c/24h VO · desde día 0 hasta engraftment',evidencia:'IDSA Neutropenia 2010 · EBMT 2022 · Nivel I',color:'var(--teal)'},
+    ]},
+    {titulo:'TCMH — Antifúngica',items:[
+      {atb:'Fluconazol',indicacion:'Pre-engraftment: 400mg c/24h VO/IV (cobertura Candida)',evidencia:'ECMM · Nivel I',color:'var(--amber)'},
+      {atb:'Micafungina',indicacion:'Alternativa o si fluconazol R: 150mg c/24h IV',evidencia:'ECMM 2020 · Nivel I',color:'var(--amber)'},
+      {atb:'Posaconazol',indicacion:'Post-engraftment TCMH alogénico + GVHD: 300mg c/24h VO (cobija Aspergillus)',evidencia:'IDSA Aspergilosis 2016 · EBMT 2022 · Nivel I',color:'var(--red)'},
+    ]},
+    {titulo:'TCMH — Antiviral',items:[
+      {atb:'Aciclovir / Valaciclovir',indicacion:'HSV: aciclovir 250mg c/12h IV o valaciclovir 500mg c/12h VO · desde acondicionamiento hasta engraftment',evidencia:'IDSA · EBMT · Nivel I',color:'var(--blue)'},
+      {atb:'TMP-SMX',indicacion:'PCP: 1 tab DS 3×/semana VO · inicio post-engraftment · duración ≥6 meses',evidencia:'IDSA · EBMT · Nivel I',color:'var(--teal)'},
+    ]},
+  ];
+  let html='';
+  perfilesSOT.forEach(perfil=>{
+    html+=_txCard(perfil.titulo,perfil.items.map(item=>`
+      <div style="background:var(--s2);border-radius:5px;padding:10px 12px;margin-bottom:8px;border-left:3px solid ${item.color};">
+        <div style="font-size:12px;font-weight:700;color:${item.color};margin-bottom:4px;">${item.atb}</div>
+        <div style="font-size:11px;color:var(--t2);line-height:1.6;">${escHtml(item.indicacion)}</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--mono);">📚 ${item.evidencia}</div>
+      </div>`).join(''),'var(--amber)');
+  });
+  return html;
+}
+
+function _renderTxPatogenos(p){
+  const lineas=[
+    {titulo:'SOT — <1 mes post-trasplante',color:'var(--red)',items:['Infecciones quirúrgicas (sitio operatorio, peritonitis, biloma)','Bacteriemia por Gram negativos (E. coli, K. pneumoniae, Pseudomonas)','Clostridioides difficile','Candida spp. (especialmente hepático/renal)','Herpes simplex (HSV-1/2) — reactivación','Virus donante transmitidos (raros)']},
+    {titulo:'SOT — 1–6 meses post-trasplante',color:'var(--amber)',items:['CMV — infección/enfermedad (vigilar post-profilaxis)','EBV — riesgo de PTLD (linfoma post-trasplante)','VZV — reactivación / varicela primaria si seronegativo','Pneumocystis jirovecii (PCP) — especialmente meses 2–4','Aspergillus spp. — invasión pulmonar si inmunosupresión alta','Nocardia spp. — pulmón, SNC, tejido subcutáneo','Listeria monocytogenes — SNC, bacteriemia']},
+    {titulo:'SOT — >6 meses post-trasplante',color:'var(--teal)',items:['VZV — zóster diseminado','Infecciones comunitarias usuales (influenza, NAC)','Criptococosis (si inmunosupresión aumentada / pulso de esteroides)','Leishmania (zona endémica)','BK virus / poliomavirus (nefropatía en renal)']},
+    {titulo:'TCMH — Pre-engraftment (<30 días)',color:'var(--red)',items:['Gram negativos (enterobacterias, Pseudomonas) en neutropenia','Gram positivos (Streptococcus viridans, S. epidermidis — CVC)','Candida spp. (especialmente C. tropicalis, C. krusei en TCMH)','Herpes simplex (HSV) — mucositis']},
+    {titulo:'TCMH — Post-engraftment (30–100 días)',color:'var(--amber)',items:['CMV — principal causa de mortalidad en este período','Aspergillus spp. — API (invasiva pulmonar/sinusal)','RSV, parainfluenza, metapneumovirus (alta mortalidad)','Pneumocystis jirovecii','EBV — PTLD en TCMH alogénico']},
+    {titulo:'TCMH — Tardío (>100 días)',color:'var(--teal)',items:['VZV — frecuente, puede diseminarse','Streptococcus pneumoniae, H. influenzae, meningococo (asplenia funcional)','Criptococosis (GVHD activa + alta inmunosupresión)','Toxoplasma gondii (TCMH alogénico en seropositivoR)']},
+  ];
+  let html='';
+  lineas.forEach(l=>{
+    html+=_txCard(l.titulo,`<ul style="margin:0;padding-left:18px;">${l.items.map(i=>`<li style="font-size:11px;color:var(--t2);margin-bottom:4px;line-height:1.5;">${escHtml(i)}</li>`).join('')}</ul>`,l.color);
+  });
+  return html;
+}
+
+function _renderTxCMV(p){
+  return _txCard('🔬 Protocolo CMV — Vigilancia y Tratamiento',`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+      ${[
+        {riesgo:'Alto',def:'D+/R-',color:'var(--red)',estrategia:'Profilaxis universal: Valganciclovir 900mg c/24h VO · 3–6 meses'},
+        {riesgo:'Moderado',def:'D+/R+ o D-/R+',color:'var(--amber)',estrategia:'Profilaxis o estrategia pre-emptiva: PCR semanal · tratar si >1000 UI/mL'},
+        {riesgo:'Bajo',def:'D-/R-',color:'var(--teal)',estrategia:'Solo aciclovir para HSV · Sin profilaxis CMV'},
+      ].map(r=>`<div style="background:var(--s2);border-radius:6px;padding:10px;border-top:3px solid ${r.color};">
+        <div style="font-size:11px;font-weight:700;color:${r.color};margin-bottom:4px;">Riesgo ${r.riesgo}</div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:6px;">(${r.def})</div>
+        <div style="font-size:11px;color:var(--t2);line-height:1.5;">${r.estrategia}</div>
+      </div>`).join('')}
+    </div>
+    <div style="background:rgba(61,155,255,.06);border:1px solid rgba(61,155,255,.2);border-radius:6px;padding:12px;margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:8px;">Frecuencia de monitoreo PCR-CMV (estrategia pre-emptiva)</div>
+      <ul style="margin:0;padding-left:16px;">
+        <li style="font-size:11px;color:var(--t2);margin-bottom:4px;">Meses 1–3: PCR semanal</li>
+        <li style="font-size:11px;color:var(--t2);margin-bottom:4px;">Meses 3–6: PCR c/2 semanas</li>
+        <li style="font-size:11px;color:var(--t2);">Meses 6–12: PCR mensual (alto riesgo)</li>
+      </ul>
+    </div>
+    <div style="background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.2);border-radius:6px;padding:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:8px;">Tratamiento CMV</div>
+      <ul style="margin:0;padding-left:16px;">
+        <li style="font-size:11px;color:var(--t2);margin-bottom:4px;"><b>Ganciclovir IV:</b> 5mg/kg c/12h · 14–21 días (enfermedad grave / SNC)</li>
+        <li style="font-size:11px;color:var(--t2);margin-bottom:4px;"><b>Valganciclovir VO:</b> 900mg c/12h · cuando tolera VO y viremia disminuye</li>
+        <li style="font-size:11px;color:var(--t2);margin-bottom:4px;"><b>Duración:</b> Mínimo 2 semanas DESPUÉS de PCR indetectable</li>
+        <li style="font-size:11px;color:var(--t2);"><b>Resistencia (UL97/UL54):</b> Foscarnet o Cidofovir — PROA + Infectología</li>
+      </ul>
+      <div style="font-size:10px;color:var(--t3);margin-top:8px;font-family:var(--mono);">📚 IDSA CMV 2013 · AST 2019 · ECMM 2020</div>
+    </div>
+  `,'var(--blue)');
+}
+
+function _renderTxPreTx(p){
+  const serologias=[
+    {g:'Virales',items:['CMV IgG (receptor y donante)','EBV IgG/IgM','HSV-1/2 IgG','VZV IgG','Hepatitis B (HBsAg, Anti-HBc, Anti-HBs)','Hepatitis C (Anti-VHC + PCR)','HIV 1/2','HTLV-1/2 (TCMH)']},
+    {g:'Parasitarias y bacterianas',items:['Toxoplasma gondii IgG (donante y receptor)','Chagas (Trypanosoma cruzi) — zona endémica MX','VDRL/RPR (sífilis)','QFT-Gold o PPD + Rx tórax (TB latente)','Coccidioides IgG (zona endémica — norte MX/suroeste EUA)']},
+    {g:'Colonización / Infección activa',items:['Urocultivo','MRSA screening nasal (hisopado)','HBV PCR si Anti-HBc positivo','CMV PCR cuantitativo basal','Frotis e IFD si fiebre activa']},
+  ];
+  const vacunas=['Influenza anual','Neumococo (PCV15 o PCV20 + PPSV23)','Hepatitis B (si Anti-HBs < 10 UI/L)','VZV / Varicela (si seronegativo — viva, dar ≥4 sem antes del TX)','HPV (si aplica por edad)','Tdap (tétanos-difteria-pertussis)','NO dar vacunas vivas después del trasplante'];
+  let html=_txCard('🩸 Serología Pre-Trasplante',serologias.map(sg=>`
+    <div style="margin-bottom:10px;">
+      <div style="font-size:10px;font-family:var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:5px;">${sg.g}</div>
+      ${sg.items.map(item=>`<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;font-size:11px;color:var(--t2);">
+        <input type="checkbox" style="accent-color:var(--purple);width:14px;height:14px;"> ${escHtml(item)}
+      </label>`).join('')}
+    </div>`).join(''),'var(--purple)');
+  html+=_txCard('💉 Vacunas Pre-Trasplante (completar ≥4 semanas antes)',vacunas.map(v=>`<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;font-size:11px;color:var(--t2);"><input type="checkbox" style="accent-color:var(--purple);width:14px;height:14px;"> ${escHtml(v)}</label>`).join(''),'var(--teal)');
+  html+=_txCard('🦷 Clearance Dental','<p style="font-size:11px;color:var(--t2);line-height:1.6;margin:0;">Realizar evaluación dental completa y tratar focos infecciosos orales ≥4–6 semanas antes del trasplante. Especialmente crítico en SOT cardíaco y pulmonar.</p>','var(--amber)');
+  return html;
+}
+
+function _renderTxProtocolo24h(p){
+  const nomPac=p?.nombre||'—';
+  const svcPac=p?.servicio||'—';
+  return _txCard('🚨 Protocolo 24h — ATB Amplio Espectro en Trasplante',`
+    <div style="background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.2);border-radius:6px;padding:12px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px;">Regla de oro: ATBs de amplio espectro en paciente trasplantado</div>
+      <ul style="margin:0;padding-left:16px;">
+        <li style="font-size:11px;color:var(--t2);margin-bottom:5px;"><b>24h libres</b> → requiere firma de solicitud a PROA/Infectología</li>
+        <li style="font-size:11px;color:var(--t2);margin-bottom:5px;">Si <b>fin de semana</b>: residente de MI avala con nombre y firma</li>
+        <li style="font-size:11px;color:var(--t2);">Lunes: <b>alerta urgente</b> al infectólogo + valoración formal ≤ 8h</li>
+      </ul>
+    </div>
+    <div style="background:var(--s2);border-radius:6px;padding:12px;margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px;">📋 Checklist — Residente de guardia (fin de semana)</div>
+      ${['Documentar signosde sepsis en expediente (qSOFA, SOFA)','Tomar hemocultivos × 2 ANTES de iniciar ATB','Anotar nombre, firma y matrícula del residente que avala','Registrar el ATB, dosis, vía y fecha de inicio','Notificar al infectólogo por WA (mensaje queda como registro)','Si GVHD activa o neutropenia: documentar de forma explícita'].map(item=>`<label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;cursor:pointer;font-size:11px;color:var(--t2);">
+        <input type="checkbox" style="accent-color:var(--red);width:14px;height:14px;flex-shrink:0;margin-top:1px;"> ${escHtml(item)}
+      </label>`).join('')}
+    </div>
+    <button onclick="(function(){const msg='*PROA — Notificación Urgente Trasplante*\\n\\nPaciente: ${escJs(nomPac)}\\nServicio: ${escJs(svcPac)}\\n\\nSe inició ATB de amplio espectro en paciente trasplantado.\\nRequiere valoración por infectología.\\n\\nCubierto por residente de guardia.\\n\\n— '+('${escJs(HInfo.nombre||'')}');window.open('https://wa.me?text='+encodeURIComponent(msg),'_blank');})()" style="width:100%;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.3);color:#25D366;border-radius:6px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">📱 Notificar al infectólogo por WhatsApp</button>
+  `,'var(--red)');
+}
+
 // ── 2. WEB AUDIO SOUND SYSTEM (subtle UI feedback) ──
 const sfx=(()=>{
   let ctx=null;
@@ -12802,6 +13577,11 @@ input:focus,select:focus,textarea:focus{
       <button class="tab-btn" onclick="showView('analytics',this)" id="tab-analytics" style="display:none;color:var(--blue);position:relative;">📊 Analítica
         <span id="analytics-badge" style="position:absolute;top:-2px;right:-2px;background:var(--blue);color:#fff;font-size:8px;width:16px;height:16px;border-radius:50%;display:none;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;">PRO</span>
       </button>
+      <button class="tab-btn" onclick="showView('alertas24h',this)" id="tab-alertas24h" style="display:none;color:var(--amber);position:relative;">🔔 Alertas 24h
+        <span id="alertas24h-badge" style="position:absolute;top:-2px;right:-2px;background:var(--amber);color:#040b12;font-size:8px;width:16px;height:16px;border-radius:50%;display:none;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;">0</span>
+      </button>
+      <button class="tab-btn" onclick="showView('flujograma',this)" style="color:var(--teal);">🔀 Flujograma</button>
+      <button class="tab-btn" onclick="showView('trasplante',this)" style="color:var(--purple);">🫀 Trasplante</button>
       <button class="tab-btn" onclick="abrirActaForm()" style="color:var(--purple);">📄 Acta</button>
       <div class="tab-sep"></div>
       <button class="tab-btn" onclick="showView('farmacia',this)" id="tab-farmacia" style="display:none;color:var(--teal);position:relative;">🧪 Farmacia
@@ -12897,10 +13677,20 @@ input:focus,select:focus,textarea:focus{
     <div class="camas-grid" id="camas-grid"></div>
   </div></div>
   <div class="view" id="view-whatsapp"><div class="wa-view">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <div><div style="font-size:16px;font-weight:700;">Notificaciones PROA</div></div>
       <button class="btn-sm btn-sm-teal" onclick="abrirContactoForm()">+ Contacto</button>
     </div>
+    <!-- Hub de comunicación tabs -->
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;border-bottom:1px solid var(--brd2);padding-bottom:10px;">
+      <button id="wahtab-medico" onclick="swWAHTab('medico')" style="padding:7px 13px;border-radius:4px;border:1px solid var(--teal);background:rgba(0,212,168,.12);color:var(--teal);cursor:pointer;font-size:12px;font-weight:700;">👨‍⚕️ Médico Tratante</button>
+      <button id="wahtab-farmacia" onclick="swWAHTab('farmacia')" style="padding:7px 13px;border-radius:4px;border:1px solid var(--brd);background:transparent;color:var(--t2);cursor:pointer;font-size:12px;">💊 Farmacia</button>
+      <button id="wahtab-micro" onclick="swWAHTab('micro')" style="padding:7px 13px;border-radius:4px;border:1px solid var(--brd);background:transparent;color:var(--t2);cursor:pointer;font-size:12px;">🔬 Microbiología</button>
+      <button id="wahtab-almacen" onclick="swWAHTab('almacen')" style="padding:7px 13px;border-radius:4px;border:1px solid var(--brd);background:transparent;color:var(--t2);cursor:pointer;font-size:12px;">📦 Almacén</button>
+    </div>
+
+    <!-- TAB MEDICO TRATANTE -->
+    <div id="wahsec-medico">
     <div class="wa-grid">
       <div style="display:flex;flex-direction:column;gap:14px;">
         <div class="wa-card"><div class="wa-ch"><span class="wa-ct">📋 Directorio</span></div><div class="wa-cb"><div id="conts-list"></div></div></div>
@@ -12925,6 +13715,43 @@ input:focus,select:focus,textarea:focus{
         </div></div>
       </div>
     </div>
+    </div>
+
+    <!-- TAB FARMACIA -->
+    <div id="wahsec-farmacia" style="display:none;">
+    <div style="margin-bottom:10px;"><select id="wah-farm-pac" class="wa-sel" onchange="wahGenFarmacia()" style="width:100%;"><option value="">Seleccionar paciente…</option></select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <button onclick="wahSelFarmTpl('liberacion')" style="padding:8px;border-radius:6px;border:1px solid var(--brd2);background:var(--s1);color:var(--t2);cursor:pointer;font-size:11px;text-align:left;">📤 Solicitud de liberación de ATB restringido</button>
+      <button onclick="wahSelFarmTpl('suspension')" style="padding:8px;border-radius:6px;border:1px solid var(--brd2);background:var(--s1);color:var(--t2);cursor:pointer;font-size:11px;text-align:left;">🚫 Notificación de suspensión de ATB</button>
+      <button onclick="wahSelFarmTpl('disponibilidad')" style="padding:8px;border-radius:6px;border:1px solid var(--brd2);background:var(--s1);color:var(--t2);cursor:pointer;font-size:11px;text-align:left;">❓ Solicitud de disponibilidad</button>
+    </div>
+    <div class="wa-msg" id="wah-farm-msg" style="min-height:80px;">Selecciona paciente y plantilla.</div>
+    <div class="wa-acts"><button class="btn-sm btn-sm-teal" onclick="wahEnviar('farm')">📱 Enviar WA</button><button class="btn-sm btn-sm-ghost" onclick="wahCopiar('farm')">📋 Copiar</button></div>
+    </div>
+
+    <!-- TAB MICROBIOLOGÍA -->
+    <div id="wahsec-micro" style="display:none;">
+    <div style="margin-bottom:10px;"><select id="wah-micro-pac" class="wa-sel" onchange="wahGenMicro()" style="width:100%;"><option value="">Seleccionar paciente…</option></select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <button onclick="wahSelMicroTpl('cultivo')" style="padding:8px;border-radius:6px;border:1px solid var(--brd2);background:var(--s1);color:var(--t2);cursor:pointer;font-size:11px;text-align:left;">🧫 Solicitud de cultivo urgente</button>
+      <button onclick="wahSelMicroTpl('interpretacion')" style="padding:8px;border-radius:6px;border:1px solid var(--brd2);background:var(--s1);color:var(--t2);cursor:pointer;font-size:11px;text-align:left;">🔬 Interpretación de resultado</button>
+      <button onclick="wahSelMicroTpl('molecular')" style="padding:8px;border-radius:6px;border:1px solid var(--brd2);background:var(--s1);color:var(--t2);cursor:pointer;font-size:11px;text-align:left;">🧬 Solicitud prueba molecular / MALDI-TOF</button>
+    </div>
+    <div class="wa-msg" id="wah-micro-msg" style="min-height:80px;">Selecciona paciente y plantilla.</div>
+    <div class="wa-acts"><button class="btn-sm btn-sm-teal" onclick="wahEnviar('micro')">📱 Enviar WA</button><button class="btn-sm btn-sm-ghost" onclick="wahCopiar('micro')">📋 Copiar</button></div>
+    </div>
+
+    <!-- TAB ALMACÉN -->
+    <div id="wahsec-almacen" style="display:none;">
+    <div style="margin-bottom:10px;"><select id="wah-alm-pac" class="wa-sel" onchange="wahGenAlmacen()" style="width:100%;"><option value="">Seleccionar paciente…</option></select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <button onclick="wahSelAlmTpl('verificacion')" style="padding:8px;border-radius:6px;border:1px solid var(--brd2);background:var(--s1);color:var(--t2);cursor:pointer;font-size:11px;text-align:left;">📦 Verificación de disponibilidad ATB</button>
+      <button onclick="wahSelAlmTpl('urgente')" style="padding:8px;border-radius:6px;border:1px solid var(--brd2);background:var(--s1);color:var(--t2);cursor:pointer;font-size:11px;text-align:left;">🚨 Solicitud urgente ATB no formulario</button>
+    </div>
+    <div class="wa-msg" id="wah-alm-msg" style="min-height:80px;">Selecciona paciente y plantilla.</div>
+    <div class="wa-acts"><button class="btn-sm btn-sm-teal" onclick="wahEnviar('alm')">📱 Enviar WA</button><button class="btn-sm btn-sm-ghost" onclick="wahCopiar('alm')">📋 Copiar</button></div>
+    </div>
+
   </div></div>
   <div class="view" id="view-reporte"><div class="reporte-view">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
@@ -13435,6 +14262,46 @@ input:focus,select:focus,textarea:focus{
     </div><!-- /analytics-content -->
   </div></div>
   <!-- /view-analytics -->
+
+  <!-- VIEW: Alertas 24h -->
+  <div class="view" id="view-alertas24h"><div style="flex:1;overflow:auto;padding:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:16px;font-weight:700;">🔔 Alertas PROA 24h</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px;">Pacientes con ATB de amplio espectro en servicios de alto riesgo — revisión obligatoria ≤ 24h</div>
+      </div>
+      <button class="btn-sm btn-sm-teal" onclick="renderAlertas24h()">↻ Actualizar</button>
+    </div>
+    <div id="alertas24h-content"><div style="text-align:center;padding:40px;color:var(--t3);">Cargando alertas…</div></div>
+  </div></div>
+
+  <!-- VIEW: Flujograma PROA -->
+  <div class="view" id="view-flujograma"><div style="flex:1;overflow:auto;padding:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:16px;font-weight:700;">🔀 Flujogramas PROA</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px;">Algoritmos de toma de decisiones por servicio hospitalario</div>
+      </div>
+    </div>
+    <div id="flujograma-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;"></div>
+    <div id="flujograma-content"></div>
+  </div></div>
+
+  <!-- VIEW: Trasplante / Hemato -->
+  <div class="view" id="view-trasplante"><div style="flex:1;overflow:auto;padding:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:16px;font-weight:700;">🫀 Módulo Trasplante / Hematología</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px;">Protocolos infecciosos IDSA · ECMM · EBMT · AST — paciente inmunocomprometido</div>
+      </div>
+      <select id="tx-pac-sel" onchange="renderTrasplantePac(this.value)" style="font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:4px;background:var(--s1);border:1px solid var(--brd2);color:var(--t2);">
+        <option value="">— Seleccionar paciente —</option>
+      </select>
+    </div>
+    <div id="trasplante-subtabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;"></div>
+    <div id="trasplante-content"></div>
+  </div></div>
+
   </main>
 
 </div>
