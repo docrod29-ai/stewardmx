@@ -11903,85 +11903,85 @@ window.notifAlerta24hLunes=function(alertaId,nombre,servicio,atbs){
 const _FLU_DATA=[
   {id:'urgencias',label:'Urgencias',color:'var(--red)',
    pasos:[
-    {tipo:'inicio',txt:'Paciente llega a Urgencias con sospecha de infección'},
-    {tipo:'decision',txt:'¿Criterios de Sepsis? (qSOFA ≥ 2 o SOFA ≥ 2)',si:'sepsis',no:'nosepsis'},
-    {tipo:'proceso',id:'sepsis',color:'var(--red)',txt:'SEPSIS — Iniciar ATB en la primera hora'},
-    {tipo:'sub',txt:'• Tomar hemocultivos (× 2) ANTES del ATB'},
-    {tipo:'sub',txt:'• ATB empírico de amplio espectro (meropenem / pip-tazo / vancomicina según foco)'},
-    {tipo:'sub',txt:'• Notificar a PROA'},
-    {tipo:'sub',txt:'• Revaloración PROA ≤ 24h · Desescalada si cultivo disponible'},
-    {tipo:'proceso',id:'nosepsis',color:'var(--teal)',txt:'SIN SEPSIS — NO iniciar ATB de amplio espectro'},
-    {tipo:'sub',txt:'• Tomar cultivos si corresponde'},
-    {tipo:'sub',txt:'• Observar 24-48h · ATB dirigido si cultivo +'},
-    {tipo:'sub',txt:'• Si duda clínica: valoración por PROA antes de iniciar'},
-    {tipo:'fin',txt:'Documentar decisión en expediente · NOM-045'},
+    {tipo:'inicio',txt:'Paciente llega a Urgencias con posible infección'},
+    {tipo:'proceso',color:'var(--red)',txt:'Evaluación inmediata: signos vitales, lactato, hemocultivos'},
+    {tipo:'decision',txt:'¿Signos de Sepsis? qSOFA ≥ 2 ó SOFA ≥ 2'},
+    {tipo:'branches',si:{color:'var(--red)',titulo:'SEPSIS CONFIRMADA',subs:['• Hemocultivos × 2 ANTES del primer ATB','• ATB empírico amplio espectro ≤ 1 hora del diagnóstico','• Reanimación con líquidos si lactato >2 mmol/L','• Notificar PROA — valoración ≤ 24h']},no:{color:'var(--teal)',titulo:'SIN SEPSIS — Evaluar foco',subs:['• NO prescribir carbapenémicos/vancomicina sin criterios','• Tomar cultivos dirigidos al foco clínico','• ATB oral o espectro reducido si aplica','• Observación 24-48h — reevaluar']}},
+    {tipo:'proceso',color:'var(--amber)',txt:'¿Sospecha de SIRS?'},
+    {tipo:'sub',txt:'SIRS ≠ Sepsis: fiebre + leucocitos + FC/FR elevados sin disfunción orgánica'},
+    {tipo:'sub',txt:'→ SIRS: buscar causa no infecciosa, NO iniciar ATB empírico automático'},
+    {tipo:'fin',txt:'Documentar criterios en expediente · NOM-045 · Revisión PROA ≤ 24h'},
   ]},
   {id:'piso',label:'Piso General',color:'var(--teal)',
    pasos:[
-    {tipo:'inicio',txt:'Admisión a piso con ATB'},
-    {tipo:'proceso',color:'var(--teal)',txt:'Día 1–2: Registro en censo PROA'},
-    {tipo:'proceso',color:'var(--amber)',txt:'Día 3: Revisión PROA (¿ATB adecuado?)'},
-    {tipo:'decision',txt:'¿Cultivo disponible?',si:'cultivo_si',no:'cultivo_no'},
-    {tipo:'proceso',id:'cultivo_si',color:'var(--teal)',txt:'Adecuación a cultivo → Desescalada'},
-    {tipo:'proceso',id:'cultivo_no',color:'var(--amber)',txt:'Continuar empírico — reclasificar D5 y D7'},
-    {tipo:'proceso',color:'var(--teal)',txt:'Día 5: IV→VO si tolera, clínica mejora, afebrile'},
-    {tipo:'proceso',color:'var(--amber)',txt:'Día 7: Revisión de suspensión o duración definida'},
-    {tipo:'fin',txt:'Alta con ATB VO si aplica · Documentar en expediente'},
+    {tipo:'inicio',txt:'Paciente ingresa a piso con sospecha/diagnóstico de infección'},
+    {tipo:'proceso',color:'var(--teal)',txt:'Día 1: Registro en censo PROA — diagnóstico, ATB, cultivos'},
+    {tipo:'proceso',color:'var(--amber)',txt:'Día 1-2: ¿Se tomaron hemocultivos antes del ATB?'},
+    {tipo:'sub',txt:'• 2 pares de hemocultivos (aerobio + anaerobio) si bacteriemia posible'},
+    {tipo:'sub',txt:'• Urocultivo antes del primer ATB en ITU'},
+    {tipo:'decision',txt:'Día 3: ¿Cultivo disponible?'},
+    {tipo:'branches',si:{color:'var(--teal)',titulo:'Adecuación dirigida a cultivo',subs:['• Desescalar si sensible a ATBs de menor espectro','• Suspender si cultivo negativo y clínica favorable']},no:{color:'var(--amber)',titulo:'Continuar empírico — reclasificar D5 y D7',subs:[]}},
+    {tipo:'proceso',color:'var(--teal)',txt:'Día 5: Evaluar IV→VO si: tolera VO, afebril 24-48h, leucocitos en descenso'},
+    {tipo:'proceso',color:'var(--amber)',txt:'Día 7: Definir duración o plan de alta'},
+    {tipo:'sub',txt:'• ITU: 5-7 días · NAC: 5 días · Bacteriemia: 7-14 días'},
+    {tipo:'sub',txt:'• Documentar fecha fin de ATB en expediente'},
+    {tipo:'fin',txt:'Alta: ATB VO si aplica · Seguimiento ambulatorio si necesario'},
   ]},
   {id:'intermedios',label:'Cuidados Intermedios',color:'var(--blue)',
    pasos:[
-    {tipo:'inicio',txt:'Ingreso a Cuidados Intermedios'},
-    {tipo:'proceso',color:'var(--amber)',txt:'Alerta PROA 24h automática → revisión ≤ 24h'},
-    {tipo:'decision',txt:'¿ATB amplio espectro indicado?',si:'amp_si',no:'amp_no'},
-    {tipo:'proceso',id:'amp_si',color:'var(--red)',txt:'Documentar justificación (qSOFA, sepsis, MDR)'},
-    {tipo:'sub',txt:'• Cultivos tomados antes del ATB'},
-    {tipo:'sub',txt:'• Plan de desescalada D3, D5, D7'},
-    {tipo:'proceso',id:'amp_no',color:'var(--teal)',txt:'ATB espectro reducido o ninguno → Observar'},
-    {tipo:'proceso',color:'var(--teal)',txt:'PROA: Desescalada al disponer de cultivo'},
-    {tipo:'fin',txt:'Documentar en expediente · Revisión semanal mínimo'},
+    {tipo:'inicio',txt:'Ingreso a Cuidados Intermedios (con o sin ATB)'},
+    {tipo:'proceso',color:'var(--red)',txt:'PROA: Alerta automática ≤ 24h al registrar en sistema'},
+    {tipo:'decision',txt:'¿ATB de amplio espectro ya prescrito?'},
+    {tipo:'branches',si:{color:'var(--red)',titulo:'Revisar criterios de indicación',subs:['• ¿Hay criterios de sepsis documentados?','• ¿Se tomaron cultivos antes del ATB?','• Plan de desescalada establecido: D3, D5, D7']},no:{color:'var(--teal)',titulo:'Vigilancia activa de infección asociada a dispositivo',subs:['• CLABSI, CAUTI, VAP — bundle de prevención','• No prescribir ATB profiláctico sin indicación']}},
+    {tipo:'proceso',color:'var(--teal)',txt:'Revisión PROA D3: ¿Clínica mejora + cultivo disponible?'},
+    {tipo:'proceso',color:'var(--teal)',txt:'Desescalada guiada por cultivo y PCT/procalcitonina'},
+    {tipo:'fin',txt:'Revisión semanal mínima · Indicadores PROA mensuales'},
   ]},
   {id:'uci',label:'Terapia Intensiva',color:'var(--purple)',
    pasos:[
     {tipo:'inicio',txt:'Ingreso a UCI / Terapia Intensiva'},
-    {tipo:'proceso',color:'var(--amber)',txt:'SOFA score al ingreso · Alerta PROA 24h automática'},
-    {tipo:'decision',txt:'¿ATB amplio espectro en uso?',si:'uci_atb',no:'uci_noatb'},
-    {tipo:'proceso',id:'uci_atb',color:'var(--red)',txt:'PROA: Revisión ≤ 24h obligatoria'},
-    {tipo:'sub',txt:'• Revisar cultivos diariamente'},
-    {tipo:'sub',txt:'• SOFA D3, D5, D7 para guiar suspensión'},
-    {tipo:'sub',txt:'• PK/PD: dosis extendidas, CMI, PCT'},
-    {tipo:'proceso',id:'uci_noatb',color:'var(--teal)',txt:'Sin ATB: Vigilancia de infección asociada a dispositivo'},
-    {tipo:'proceso',color:'var(--teal)',txt:'Desescalada dirigida por cultivo'},
-    {tipo:'fin',txt:'Registro PROA diario · Reporte semanal indicadores'},
+    {tipo:'proceso',color:'var(--amber)',txt:'SOFA score al ingreso y diario — PROA alerta automática ≤ 24h'},
+    {tipo:'proceso',color:'var(--red)',txt:'Si ATB amplio espectro: PROA valoración ≤ 24h OBLIGATORIA'},
+    {tipo:'decision',txt:'¿Infección documentada o presunción sólida?'},
+    {tipo:'branches',si:{color:'var(--red)',titulo:'ATB dirigido o empírico justificado',subs:['• 2 pares hemocultivos + cultivos de foco antes del ATB','• Optimización PK/PD: infusión extendida betalactámicos','• Vancomicina: monitoreo AUC/MIC (meta 400-600)','• PCT para guiar duración — descenso >80%: suspender']},no:{color:'var(--teal)',titulo:'Re-evaluar: ¿fiebre por causa no infecciosa?',subs:['• Trombosis, neoplasia, fármaco, injerto','• No escalar ATB sin nueva evidencia microbiológica']}},
+    {tipo:'proceso',color:'var(--amber)',txt:'D3/D5/D7: Revisar cultivos — desescalar sin dilación'},
+    {tipo:'proceso',color:'var(--teal)',txt:'SOFA estable/mejora: plan de salida de UCI → intermedios/piso'},
+    {tipo:'fin',txt:'Registro PROA diario · Reporte semanal de indicadores'},
   ]},
   {id:'cardiovascular',label:'Unidad Cardiovascular',color:'var(--amber)',
    pasos:[
-    {tipo:'inicio',txt:'Paciente cardiovascular con procedimiento quirúrgico'},
-    {tipo:'proceso',color:'var(--teal)',txt:'Profilaxis quirúrgica: cefazolina 2g IV 30–60 min antes de incisión'},
-    {tipo:'decision',txt:'¿Duración profilaxis > 24h?',si:'prol_si',no:'prol_no'},
-    {tipo:'proceso',id:'prol_si',color:'var(--red)',txt:'PROA: Revisar justificación · Suspender si no hay infección'},
-    {tipo:'proceso',id:'prol_no',color:'var(--teal)',txt:'Suspender profilaxis a las 24h post-cirugía'},
-    {tipo:'proceso',color:'var(--amber)',txt:'ATBs restringidos (carbapenémicos, vancomicina): requieren autorización previa PROA'},
-    {tipo:'fin',txt:'Seguimiento D3, D7 · Reporte infecciones del sitio quirúrgico'},
+    {tipo:'inicio',txt:'Paciente cardiovascular: cirugía o intervención'},
+    {tipo:'decision',txt:'¿Procedimiento quirúrgico programado?'},
+    {tipo:'branches',si:{color:'var(--teal)',titulo:'Profilaxis quirúrgica estándar',subs:['• Cefazolina 2g IV (3g si >120 kg) 30-60 min antes de incisión','• Repetir si cirugía >4h o pérdida >1.5L','• Duración máxima: 24h post-cirugía','• Alergia a penicilina: clindamicina 900mg IV o vancomicina 1g IV']},no:{color:'var(--amber)',titulo:'Evaluación de infección activa',subs:[]}},
+    {tipo:'decision',txt:'¿Profilaxis continúa > 24h post-cirugía?'},
+    {tipo:'branches',si:{color:'var(--red)',titulo:'PROA: Revisar — suspender si no hay infección activa documentada',subs:['• Notificar al cirujano: profilaxis ≠ tratamiento','• Si infección activa: iniciar tratamiento formal + PROA']},no:{color:'var(--teal)',titulo:'Correcto — documenta en expediente',subs:[]}},
+    {tipo:'proceso',color:'var(--amber)',txt:'Dispositivos: marcapasos, DAVS, válvulas — riesgo infección tardía'},
+    {tipo:'sub',txt:'• Endocarditis: protocolo Duke, ecocardiograma, 4-6 semanas ATB'},
+    {tipo:'sub',txt:'• PROA + Cardiología: co-manejo'},
+    {tipo:'fin',txt:'ISQ: seguimiento 30 días · Notificar a CODECIN (NOM-045)'},
   ]},
   {id:'hemodialisis',label:'Hemodiálisis',color:'var(--teal)',
    pasos:[
-    {tipo:'inicio',txt:'Paciente en programa de hemodiálisis con infección'},
-    {tipo:'proceso',color:'var(--amber)',txt:'Ajuste de dosis renal: consultar tabla TFG / HD'},
-    {tipo:'sub',txt:'• Vancomicina: post-HD, control de niveles (troughs)'},
-    {tipo:'sub',txt:'• Meropenem: ajuste por TFG, post-HD si TFG<10'},
-    {tipo:'sub',txt:'• Aminoglucósidos: evitar o dosis única post-HD'},
-    {tipo:'proceso',color:'var(--teal)',txt:'Preferir ATBs con eliminación no renal si disponible'},
-    {tipo:'decision',txt:'¿Cultivo disponible?',si:'hd_cult',no:'hd_nocult'},
-    {tipo:'proceso',id:'hd_cult',color:'var(--teal)',txt:'Ajustar a sensibilidad · Duración mínima efectiva'},
-    {tipo:'proceso',id:'hd_nocult',color:'var(--amber)',txt:'Empírico dirigido a foco · Revisión semanal PROA'},
-    {tipo:'fin',txt:'PROA: Revisión semanal · Niveles séricos si disponible'},
+    {tipo:'inicio',txt:'Paciente en HD crónica con infección o sospecha'},
+    {tipo:'proceso',color:'var(--red)',txt:'Ajuste renal OBLIGATORIO — consultar tabla PROA'},
+    {tipo:'sub',txt:'• Vancomicina: dosis post-HD, niveles valle 15-20 (o AUC/MIC)'},
+    {tipo:'sub',txt:'• Meropenem: 500mg post-HD (TFG <10)'},
+    {tipo:'sub',txt:'• Aminoglucósidos: evitar; si necesario: dosis única post-HD'},
+    {tipo:'sub',txt:'• Linezolid: misma dosis, sin ajuste · Ceftriaxona: misma dosis'},
+    {tipo:'decision',txt:'¿Infección de acceso vascular (catéter HD)?'},
+    {tipo:'branches',si:{color:'var(--red)',titulo:'Bacteriemia asociada a catéter',subs:['• Hemocultivos × 2 (periférico + catéter)','• Vancomicina empírico si MRSA posible','• Valorar retiro de catéter vs sellado (lock therapy)','• Ecocardiograma si bacteriemia por S. aureus']},no:{color:'var(--teal)',titulo:'ATB dirigido al foco — duración mínima efectiva',subs:[]}},
+    {tipo:'proceso',color:'var(--teal)',txt:'Fístula AV infectada: considerar cirugía · PROA + Nefrología'},
+    {tipo:'fin',txt:'Revisión PROA semanal · Niveles séricos si disponibles'},
   ]},
   {id:'trasplante',label:'Trasplantes',color:'var(--purple)',
    pasos:[
-    {tipo:'inicio',txt:'Paciente con trasplante o en espera de trasplante'},
-    {tipo:'proceso',color:'var(--purple)',txt:'Ver módulo completo: Flujograma → Trasplante / Hemato'},
-    {tipo:'proceso',color:'var(--amber)',txt:'Protocolo 24h aplicable: ver pestaña 🫀 Trasplante'},
-    {tipo:'fin',txt:'PROA + Infectología: co-manejo obligatorio en inmunocomprometido'},
+    {tipo:'inicio',txt:'Paciente con trasplante o en pre-trasplante'},
+    {tipo:'proceso',color:'var(--purple)',txt:'Clasificar: SOT (riñón/hígado/corazón/pulmón) vs TCMH'},
+    {tipo:'proceso',color:'var(--amber)',txt:'Definir fase: <30d / 30-100d / >100d / Pre-TX'},
+    {tipo:'decision',txt:'¿Fiebre u otro signo de infección?'},
+    {tipo:'branches',si:{color:'var(--red)',titulo:'Evaluación urgente — árbol diagnóstico',subs:['• Hemocultivos × 2, urocultivo, LDH, PCR, BH, Rx tórax','• CMV: carga viral cuantitativa','• Aspergillus: galactomanano, TC tórax si hay síntomas resp','• Notificar a PROA e Infectología urgente']},no:{color:'var(--teal)',titulo:'Revisión de profilaxis vigente',subs:['• ¿Profilaxis CMV activa? ¿Dosis correcta?','• ¿PCP (cotrimoxazol) activo?','• ¿Antifúngico profiláctico si corresponde?']}},
+    {tipo:'proceso',color:'var(--purple)',txt:'Ver módulo Trasplante/Hemato para protocolo completo'},
+    {tipo:'fin',txt:'PROA + Infectología: co-manejo en TODO paciente trasplantado con infección'},
   ]},
 ];
 window.renderFlujograma=function(){
@@ -11989,35 +11989,51 @@ window.renderFlujograma=function(){
   const cont=document.getElementById('flujograma-content');
   if(!tabsCont||!cont)return;
   if(!window._fluActivo)window._fluActivo='urgencias';
-  tabsCont.innerHTML=_FLU_DATA.map(f=>`<button onclick="window._fluActivo='${f.id}';renderFlujograma();" style="padding:7px 13px;border-radius:20px;border:1px solid ${window._fluActivo===f.id?f.color:'var(--brd)'};background:${window._fluActivo===f.id?'rgba(0,0,0,.2)':'transparent'};color:${window._fluActivo===f.id?f.color:'var(--t2)'};cursor:pointer;font-size:12px;font-weight:${window._fluActivo===f.id?'700':'400'};transition:.15s;">${f.label}</button>`).join('');
+  tabsCont.innerHTML=_FLU_DATA.map(f=>`<button onclick="window._fluActivo='${f.id}';renderFlujograma();" style="padding:7px 13px;border-radius:20px;border:1px solid ${window._fluActivo===f.id?f.color:'var(--brd)'};background:${window._fluActivo===f.id?'rgba(0,0,0,.15)':'transparent'};color:${window._fluActivo===f.id?f.color:'var(--t2)'};cursor:pointer;font-size:12px;font-weight:${window._fluActivo===f.id?'700':'400'};transition:.15s;">${f.label}</button>`).join('');
   const flu=_FLU_DATA.find(f=>f.id===window._fluActivo)||_FLU_DATA[0];
-  let html=`<div style="max-width:600px;margin:0 auto;">`;
+  const arr=`<div style="text-align:center;line-height:1;margin:4px 0;"><span style="font-size:20px;color:${flu.color};">↓</span></div>`;
+  let html=`<div style="max-width:560px;margin:0 auto;padding:8px 0;">`;
   flu.pasos.forEach((p,i)=>{
     if(p.tipo==='inicio'){
-      html+=`<div style="text-align:center;margin-bottom:12px;">
-        <div style="display:inline-block;background:var(--s2);border:2px solid ${flu.color};border-radius:30px;padding:10px 24px;font-size:13px;font-weight:700;color:${flu.color};">${escHtml(p.txt)}</div>
-      </div><div style="text-align:center;color:var(--t3);font-size:18px;line-height:1;">↓</div>`;
-    } else if(p.tipo==='decision'){
-      html+=`<div style="text-align:center;margin:8px 0;">
-        <div style="display:inline-block;background:rgba(245,166,35,.1);border:2px solid var(--amber);transform:rotate(0deg);padding:10px 20px;font-size:12px;font-weight:700;color:var(--amber);clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);width:200px;height:80px;display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1.3;">
-          ${escHtml(p.txt)}
-        </div>
-        <div style="display:flex;gap:20px;justify-content:center;margin-top:4px;">
-          <span style="font-size:10px;color:var(--teal);">← NO</span>
-          <span style="font-size:10px;color:var(--red);">SÍ →</span>
-        </div>
-      </div><div style="text-align:center;color:var(--t3);font-size:18px;">↓</div>`;
+      html+=`<div style="text-align:center;margin-bottom:4px;">
+        <div style="display:inline-block;background:var(--s2);border:2.5px solid ${flu.color};border-radius:40px;padding:10px 28px;font-size:13px;font-weight:700;color:${flu.color};letter-spacing:.3px;">${escHtml(p.txt)}</div>
+      </div>${arr}`;
     } else if(p.tipo==='proceso'){
       const c=p.color||flu.color;
-      html+=`<div style="text-align:center;margin:8px 0;">
-        <div style="display:inline-block;background:${c.replace(')','')+',0.08)'.replace('var(','rgba(')};border:1px solid ${c};border-radius:6px;padding:10px 20px;font-size:12px;color:${c};font-weight:600;max-width:400px;">${escHtml(p.txt)}</div>
-      </div>`;
-      if(i<flu.pasos.length-1&&flu.pasos[i+1].tipo!=='fin')html+=`<div style="text-align:center;color:var(--t3);font-size:18px;">↓</div>`;
+      html+=`<div style="margin:4px 0;">
+        <div style="background:var(--s2);border:1px solid var(--brd2);border-left:4px solid ${c};border-radius:6px;padding:10px 16px;font-size:12px;color:${c};font-weight:600;line-height:1.45;">${escHtml(p.txt)}</div>
+      </div>${arr}`;
     } else if(p.tipo==='sub'){
-      html+=`<div style="text-align:center;margin:3px 0;"><div style="display:inline-block;font-size:11px;color:var(--t2);max-width:380px;text-align:left;padding-left:16px;">${escHtml(p.txt)}</div></div>`;
+      html+=`<div style="padding:2px 0 2px 20px;display:flex;align-items:flex-start;gap:6px;">
+        <span style="color:${flu.color};font-size:14px;line-height:1.4;flex-shrink:0;">•</span>
+        <span style="font-size:11px;color:var(--t2);line-height:1.5;">${escHtml(p.txt.replace(/^•\s*/,''))}</span>
+      </div>`;
+    } else if(p.tipo==='decision'){
+      html+=`<div style="display:flex;justify-content:center;margin:8px 0 4px;">
+        <div style="position:relative;width:240px;height:90px;display:flex;align-items:center;justify-content:center;">
+          <div style="position:absolute;width:160px;height:66px;background:rgba(245,166,35,.1);border:2.5px solid var(--amber);transform:rotate(45deg);border-radius:4px;"></div>
+          <div style="position:relative;z-index:1;text-align:center;font-size:11px;font-weight:700;color:var(--amber);padding:10px 20px;line-height:1.35;">${escHtml(p.txt)}</div>
+        </div>
+      </div>`;
+    } else if(p.tipo==='branches'){
+      const si=p.si,no=p.no;
+      html+=`<div style="display:flex;justify-content:space-around;margin:0 0 6px;max-width:540px;">
+        <div style="text-align:center;"><span style="font-size:20px;color:var(--teal);">↙</span><br><span style="font-size:11px;font-weight:700;color:var(--teal);">NO</span></div>
+        <div style="text-align:center;"><span style="font-size:20px;color:var(--red);">↘</span><br><span style="font-size:11px;font-weight:700;color:var(--red);">SÍ</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 4px;">
+        <div style="background:var(--s2);border:1px solid var(--brd2);border-left:4px solid ${no.color};border-radius:6px;padding:10px 12px;">
+          <div style="font-size:11px;font-weight:700;color:${no.color};margin-bottom:5px;">${escHtml(no.titulo)}</div>
+          ${no.subs.map(s=>`<div style="display:flex;gap:5px;margin-bottom:3px;"><span style="color:${no.color};font-size:13px;flex-shrink:0;line-height:1.4;">•</span><span style="font-size:10.5px;color:var(--t2);line-height:1.45;">${escHtml(s.replace(/^•\s*/,''))}</span></div>`).join('')}
+        </div>
+        <div style="background:var(--s2);border:1px solid var(--brd2);border-left:4px solid ${si.color};border-radius:6px;padding:10px 12px;">
+          <div style="font-size:11px;font-weight:700;color:${si.color};margin-bottom:5px;">${escHtml(si.titulo)}</div>
+          ${si.subs.map(s=>`<div style="display:flex;gap:5px;margin-bottom:3px;"><span style="color:${si.color};font-size:13px;flex-shrink:0;line-height:1.4;">•</span><span style="font-size:10.5px;color:var(--t2);line-height:1.45;">${escHtml(s.replace(/^•\s*/,''))}</span></div>`).join('')}
+        </div>
+      </div>${arr}`;
     } else if(p.tipo==='fin'){
-      html+=`<div style="text-align:center;margin-top:12px;">
-        <div style="display:inline-block;background:rgba(0,212,168,.08);border:2px solid var(--teal);border-radius:6px;padding:10px 24px;font-size:12px;font-weight:700;color:var(--teal);">🏁 ${escHtml(p.txt)}</div>
+      html+=`<div style="text-align:center;margin-top:6px;">
+        <div style="display:inline-block;background:rgba(0,212,168,.08);border:2px solid var(--teal);border-radius:8px;padding:10px 24px;font-size:12px;font-weight:700;color:var(--teal);">${escHtml(p.txt)}</div>
       </div>`;
     }
   });
@@ -12080,78 +12096,331 @@ function _txCard(titulo,contenido,color){
 
 function _renderTxTipo(p){
   const tipoSOT=['Riñón','Hígado','Corazón','Pulmón','Páncreas','Intestino','Multivisceral'];
-  const tipoTCMH=['TCMH Autólogo','TCMH Alogénico (relacionado HLA)','TCMH Alogénico (no relacionado)','TCMH Alogénico (haploidéntico)'];
-  const fases=['<30 días post-TX','30–100 días post-TX','>100 días post-TX','En espera (pre-TX)'];
-  const inmunoOpts=['Tacrolimus','Ciclosporina','Micofenolato (MMF)','Prednisona','Sirolimus','Everolimus','Azatioprina','Basiliximab','Timoglobulina','Rituximab','Bortezomib'];
+  const tipoTCMH=['Autólogo','Alogénico HLA idéntico relacionado','Alogénico HLA no relacionado','Haploidéntico','Cordón umbilical'];
+  const tipoHemato=['Leucemia/Linfoma en quimioterapia','Mieloma múltiple','SMD/NMP','LLC/MCL','DLBCL/Folicular'];
+  const fases=['<30 días','30-100 días','>100 días','En espera (pre-TX)'];
+  // Immunosuppressants grouped by class with risk levels
+  const inmunoClases=[
+    {clase:'Inhibidores de Calcineurina',color:'var(--red)',items:[
+      {nom:'Tacrolimus',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'CMV, BK virus, Candida, Aspergillus',screening:'CMV/EBV serología, función renal, glucosa',profilaxis:'Valganciclovir/letermovir si D+/R-, cotrimoxazol PCP',monitoreo:'Niveles séricos, CMV PCR, creatinina, glucosa'},
+      {nom:'Ciclosporina',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'CMV, Candida',screening:'CMV serología, función renal',profilaxis:'Valganciclovir si D+/R-; cotrimoxazol PCP',monitoreo:'Niveles séricos, CMV PCR mensual'},
+    ]},
+    {clase:'Antiproliferativos',color:'var(--amber)',items:[
+      {nom:'Micofenolato (MMF)',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'CMV, infecciones virales',screening:'CMV serología basal',profilaxis:'Cotrimoxazol PCP; ajustar si neutropenia',monitoreo:'BHC semanal, CMV PCR'},
+      {nom:'Azatioprina',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'Infecciones oportunistas, neutropenia',screening:'TPMT genotipo (toxicidad hematológica)',profilaxis:'Cotrimoxazol PCP',monitoreo:'BHC quincenal'},
+    ]},
+    {clase:'Corticosteroides',color:'var(--amber)',items:[
+      {nom:'Prednisona >20mg/d × >4 sem',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'PCP, TB, Aspergillus, Strongyloides',screening:'QFT/IGRA, Strongyloides IgG, Histo Ag urinario',profilaxis:'Cotrimoxazol PCP obligatorio; ivermectina si sero+',monitoreo:'Glucosa, infecciones respiratorias'},
+      {nom:'Metilprednisolona (pulsos)',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'PCP, infecciones bacterianas, reactivación viral',screening:'CMV PCR basal antes de pulso',profilaxis:'Cotrimoxazol PCP; considerar valganciclovir post-pulso',monitoreo:'CMV PCR × 4 semanas post-pulso'},
+    ]},
+    {clase:'mTOR Inhibidores',color:'var(--teal)',items:[
+      {nom:'Sirolimus / Everolimus',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'PCP, algunos hongos, cicatrización lenta',screening:'CMV serología, función pulmonar',profilaxis:'Cotrimoxazol PCP durante toda la terapia',monitoreo:'Niveles séricos, BHC, función renal/hepática'},
+    ]},
+    {clase:'Agentes de Inducción',color:'var(--red)',items:[
+      {nom:'Timoglobulina (ATG)',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'CMV, EBV, hongos, Pneumocystis, bacterias',screening:'CMV/EBV/VZV/HSV serología antes de iniciar',profilaxis:'Valganciclovir o letermovir; cotrimoxazol; aciclovir VZV/HSV',monitoreo:'CMV PCR semanal × 3 meses post-ATG, BHC'},
+      {nom:'Basiliximab',riesgo:'BAJO-MODERADO',riesgoColor:'var(--teal)',riesgos:'Infecciones oportunistas (menor riesgo)',screening:'Serología estándar pre-TX',profilaxis:'Cotrimoxazol PCP estándar',monitoreo:'Rutina estándar'},
+      {nom:'Belatacept',riesgo:'MODERADO-ALTO',riesgoColor:'var(--amber)',riesgos:'CMV, PML/JC virus',screening:'EBV IgG (contraindicado en EBV-negativo), CMV serología',profilaxis:'Valganciclovir si D+/R-; cotrimoxazol PCP',monitoreo:'CMV PCR, JC virus PCR en LCR si síntomas neurológicos'},
+    ]},
+    {clase:'Anti-CD20',color:'var(--red)',items:[
+      {nom:'Rituximab',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'PCP (mandatorio ≥3 ciclos), HBV reactivación, hipogammaglobulinemia',screening:'HBsAg, Anti-HBc total, HBV DNA; CMV, EBV IgG',profilaxis:'Cotrimoxazol si ≥3 ciclos o CD4<200; entecavir si Anti-HBc+',monitoreo:'HBV DNA mensual, IgG niveles, CMV PCR'},
+      {nom:'Obinutuzumab',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'Similar rituximab, mayor depleción de células B',screening:'HBsAg, Anti-HBc, HBV DNA; CMV IgG',profilaxis:'Cotrimoxazol PCP; entecavir si HBc+',monitoreo:'HBV DNA, IgG, CMV PCR'},
+      {nom:'Ofatumumab',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'HBV reactivación, PCP, infecciones virales',screening:'HBsAg, Anti-HBc, HBV DNA',profilaxis:'Cotrimoxazol PCP; entecavir si HBc+',monitoreo:'HBV DNA, IgG'},
+    ]},
+    {clase:'Inhibidores BTK',color:'var(--red)',items:[
+      {nom:'Ibrutinib',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Aspergillus invasivo, PCP, HBV reactivación, CMV',screening:'HBsAg, Anti-HBc, HBV DNA; CMV IgG; Aspergillus Ag basal',profilaxis:'Considerar azol profiláctico (voriconazol/posaconazol) si prev Aspergillus; cotrimoxazol PCP',monitoreo:'Galactomanano mensual, CMV PCR, HBV DNA'},
+      {nom:'Acalabrutinib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'Menor riesgo fúngico que ibrutinib; PCP, HBV',screening:'HBsAg, Anti-HBc; CMV IgG',profilaxis:'Cotrimoxazol PCP; entecavir si HBc+',monitoreo:'HBV DNA, BHC'},
+      {nom:'Zanubrutinib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'Infecciones por Aspergillus, PCP, HBV',screening:'HBsAg, Anti-HBc, HBV DNA',profilaxis:'Cotrimoxazol PCP; entecavir si HBc+',monitoreo:'HBV DNA, galactomanano si fiebre'},
+      {nom:'Pirtobrutinib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'Datos emergentes — perfil similar BTK covalentes',screening:'HBsAg, Anti-HBc',profilaxis:'Cotrimoxazol PCP',monitoreo:'HBV DNA, BHC'},
+    ]},
+    {clase:'Inhibidores BCL-2',color:'var(--amber)',items:[
+      {nom:'Venetoclax',riesgo:'MODERADO-ALTO',riesgoColor:'var(--amber)',riesgos:'PCP si + esteroides o + anti-CD20, neutropenia',screening:'HBsAg, Anti-HBc; CMV IgG',profilaxis:'Cotrimoxazol PCP si con corticosteroides o anti-CD20',monitoreo:'BHC semanal en ciclo 1, neutrófilos absolutos'},
+    ]},
+    {clase:'Inhibidores PI3K',color:'var(--red)',items:[
+      {nom:'Idelalisib',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'PCP mandatoria, CMV, hepatitis, colitis inmune',screening:'HBsAg, Anti-HBc, HBV DNA; CMV/EBV IgG; función hepática basal',profilaxis:'Cotrimoxazol DS TID 3×/semana OBLIGATORIO; valganciclovir si CMV+',monitoreo:'CMV PCR mensual, transaminasas, colonoscopia si diarrea'},
+      {nom:'Duvelisib',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'PCP mandatoria, CMV, colitis neutropénica',screening:'CMV/EBV serología, HBsAg/Anti-HBc',profilaxis:'Cotrimoxazol PCP OBLIGATORIO',monitoreo:'CMV PCR, transaminasas, BHC'},
+      {nom:'Copanlisib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'Infecciones bacterianas y fúngicas, PCP',screening:'CMV IgG, HBsAg',profilaxis:'Cotrimoxazol PCP',monitoreo:'Glucosa (hiperglucemia infusión), BHC'},
+      {nom:'Umbralisib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'PCP, CMV, hepatitis inmune',screening:'HBsAg, Anti-HBc, CMV IgG',profilaxis:'Cotrimoxazol PCP',monitoreo:'Transaminasas, CMV PCR'},
+    ]},
+    {clase:'Inhibidores JAK',color:'var(--amber)',items:[
+      {nom:'Ruxolitinib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'VZV reactivación, TB, PCP en dosis altas, CMV',screening:'QFT/IGRA TB; VZV IgG; CMV IgG; HBsAg/Anti-HBc',profilaxis:'Aciclovir 400mg BID VZV/HSV; cotrimoxazol si dosis altas; LTBI tratamiento si QFT+',monitoreo:'CMV PCR mensual, BHC'},
+      {nom:'Tofacitinib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'VZV, TB reactivación, PCP',screening:'QFT/IGRA; VZV IgG; HBsAg/Anti-HBc',profilaxis:'Aciclovir 400mg BID; cotrimoxazol PCP; LTBI antes de iniciar',monitoreo:'BHC mensual, transaminasas'},
+      {nom:'Baricitinib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'VZV, reactivación TB, infecciones respiratorias',screening:'QFT/IGRA; VZV IgG; HBsAg/Anti-HBc',profilaxis:'Aciclovir VZV/HSV; LTBI tratar antes de iniciar',monitoreo:'BHC, función renal (secreción tubular)'},
+      {nom:'Upadacitinib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'VZV, TB, PCP',screening:'QFT/IGRA; VZV IgG; HBsAg',profilaxis:'Aciclovir; LTBI tratar antes; cotrimoxazol si alto riesgo',monitoreo:'BHC, transaminasas'},
+      {nom:'Abrocitinib',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'VZV, infecciones respiratorias altas',screening:'VZV IgG; QFT si endémico',profilaxis:'Aciclovir si VZV-negativo o historia de herpes zóster',monitoreo:'BHC mensual'},
+    ]},
+    {clase:'Anti-CD38',color:'var(--teal)',items:[
+      {nom:'Daratumumab',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'HBV reactivación, virus respiratorios, hipogammaglobulinemia',screening:'HBsAg, Anti-HBc total, HBV DNA; CMV IgG',profilaxis:'Entecavir si Anti-HBc+; IVIG si hipogammaglobulinemia sintomática',monitoreo:'HBV DNA mensual, IgG niveles, virus respiratorios si fiebre'},
+      {nom:'Isatuximab',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'HBV, infecciones respiratorias',screening:'HBsAg, Anti-HBc',profilaxis:'Entecavir si Anti-HBc+',monitoreo:'HBV DNA'},
+    ]},
+    {clase:'Inmunomoduladores (IMiDs)',color:'var(--teal)',items:[
+      {nom:'Lenalidomida',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'Infecciones, neutropenia, VZV reactivación',screening:'HBsAg, Anti-HBc; VZV IgG',profilaxis:'Aciclovir VZV/HSV; cotrimoxazol si corticosteroides concomitantes',monitoreo:'BHC semanal en primeros ciclos'},
+      {nom:'Pomalidomida',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'Neutropenia febril, VZV',screening:'HBsAg, VZV IgG',profilaxis:'Aciclovir; cotrimoxazol si + dexametasona',monitoreo:'BHC semanal'},
+      {nom:'Talidomida',riesgo:'BAJO-MODERADO',riesgoColor:'var(--teal)',riesgos:'Infecciones leves, neutropenia infrecuente',screening:'Estándar',profilaxis:'Considerar aciclovir VZV',monitoreo:'BHC mensual'},
+    ]},
+    {clase:'Inhibidores de Proteasoma',color:'var(--amber)',items:[
+      {nom:'Bortezomib',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'VZV reactivación muy frecuente, neutropenia',screening:'VZV IgG',profilaxis:'Aciclovir 400mg BID o valaciclovir 500mg QD — OBLIGATORIO desde D1',monitoreo:'BHC, neuropatía periférica (afecta defensa)'},
+      {nom:'Carfilzomib',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'Infecciones respiratorias, VZV, neutropenia',screening:'VZV IgG; función cardíaca (toxicidad cardiovascular)',profilaxis:'Aciclovir VZV/HSV',monitoreo:'BHC, función cardíaca'},
+      {nom:'Ixazomib',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'VZV, infecciones GI',screening:'VZV IgG',profilaxis:'Aciclovir VZV/HSV',monitoreo:'BHC'},
+    ]},
+    {clase:'Anticuerpos Biespecíficos',color:'var(--red)',items:[
+      {nom:'Blinatumomab',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Aplasia B, hipogammaglobulinemia, CMV, bacterias',screening:'CMV/EBV IgG; HBsAg/Anti-HBc; HBV DNA; IgG niveles basales',profilaxis:'Cotrimoxazol PCP; aciclovir; IVIG si IgG <400; valganciclovir si CMV+',monitoreo:'CMV PCR semanal, IgG mensual, BHC'},
+      {nom:'Mosunetuzumab',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Aplasia B prolongada, CMV, infecciones oportunistas',screening:'HBsAg/Anti-HBc/HBV DNA; CMV IgG',profilaxis:'Cotrimoxazol PCP; aciclovir; entecavir si HBc+',monitoreo:'CMV PCR, IgG, HBV DNA'},
+      {nom:'Epcoritamab',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Aplasia B, CMV, PCP, bacterias',screening:'CMV/EBV IgG; HBsAg/Anti-HBc',profilaxis:'Cotrimoxazol; aciclovir; IVIG si IgG baja',monitoreo:'CMV PCR mensual, IgG'},
+      {nom:'Glofitamab',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'CRS-asociado, aplasia B, CMV',screening:'CMV/EBV IgG; HBsAg/Anti-HBc',profilaxis:'Cotrimoxazol; aciclovir; IVIG si indicado',monitoreo:'CMV PCR, IgG'},
+      {nom:'Talquetamab (mieloma)',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'CMV reactivación, infecciones fúngicas, mucositis (GPRC5D)',screening:'CMV IgG; HBsAg/Anti-HBc',profilaxis:'Valganciclovir/aciclovir; cotrimoxazol PCP',monitoreo:'CMV PCR semanal, BHC'},
+      {nom:'Teclistamab (mieloma)',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'CMV, bacterias, infecciones fúngicas, aplasia B',screening:'CMV IgG; HBsAg/Anti-HBc; IgG basal',profilaxis:'Cotrimoxazol; aciclovir; IVIG si IgG <400; valganciclovir profiláctico',monitoreo:'CMV PCR semanal, IgG mensual'},
+    ]},
+    {clase:'CAR-T Cell Therapy',color:'var(--red)',items:[
+      {nom:'Tisagenlecleucel (Kymriah)',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Aplasia B prolongada, CMV, HHV-6, bacterias, hongos',screening:'CMV/EBV/VZV/HBV/HCV serologías completas; IgG basal; galactomanano',profilaxis:'Cotrimoxazol; aciclovir; IVIG si IgG <400; valganciclovir si CMV+; fluconazol/micafungin peri-infusión',monitoreo:'CMV PCR semanal × 6m; IgG mensual × 12m; HHV-6 PCR si encefalopatía'},
+      {nom:'Axicabtagene (Yescarta)',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Similar Kymriah: aplasia B, CMV, bacterias',screening:'Serologías completas; IgG; galactomanano basal',profilaxis:'Cotrimoxazol; aciclovir; IVIG; valganciclovir si CMV+',monitoreo:'CMV PCR semanal; IgG mensual'},
+      {nom:'Lisocabtagene (Breyanzi)',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Aplasia B, CMV, infecciones oportunistas',screening:'Serologías completas; IgG; función hepática',profilaxis:'Cotrimoxazol; aciclovir; IVIG; valganciclovir si CMV+',monitoreo:'CMV PCR; IgG mensual'},
+      {nom:'Ciltacabtagene (Carvykti)',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Aplasia B prolongada, CMV, bacterias, neuropatía (atraso en inmunorecuperación)',screening:'CMV/EBV/VZV; HBsAg/Anti-HBc; IgG basal',profilaxis:'Cotrimoxazol; aciclovir; IVIG; valganciclovir/letermovir CMV',monitoreo:'CMV PCR semanal × 6m; IgG mensual'},
+    ]},
+    {clase:'Inhibidores HDAC',color:'var(--teal)',items:[
+      {nom:'Vorinostat',riesgo:'BAJO-MODERADO',riesgoColor:'var(--teal)',riesgos:'Neutropenia, infecciones respiratorias',screening:'BHC basal',profilaxis:'Cotrimoxazol si neutropenia prolongada',monitoreo:'BHC semanal'},
+      {nom:'Romidepsin',riesgo:'BAJO-MODERADO',riesgoColor:'var(--teal)',riesgos:'Infecciones virales, neutropenia',screening:'BHC, función cardíaca (QT)',profilaxis:'Cotrimoxazol si indicado',monitoreo:'BHC, ECG'},
+    ]},
+    {clase:'Checkpoint Inhibitors',color:'var(--teal)',items:[
+      {nom:'Pembrolizumab / Nivolumab / Atezolizumab',riesgo:'BAJO',riesgoColor:'var(--teal)',riesgos:'Bajo riesgo para infecciones oportunistas; irAE pueden simular infección (neumonitis, colitis)',screening:'QFT/IGRA TB si corticosteroides para manejo de irAE; función tiroidea',profilaxis:'Sin profilaxis antimicrobiana estándar; cotrimoxazol si pulsos de esteroides >4 semanas para irAE',monitoreo:'Síntomas de irAE; distinguir infección vs toxicidad inmune'},
+    ]},
+    {clase:'Anti-BCMA / ADC / Otros',color:'var(--amber)',items:[
+      {nom:'Belantamab mafodotin',riesgo:'MODERADO-ALTO',riesgoColor:'var(--amber)',riesgos:'Queratopatía (barrera), infecciones respiratorias',screening:'Examen oftalmológico basal; CMV IgG',profilaxis:'Cotrimoxazol PCP',monitoreo:'Examen ocular cada ciclo; BHC'},
+      {nom:'Brentuximab vedotin',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'PML/JC reportado, PCP, neuropatía',screening:'Anti-JC virus Ac; HBsAg/Anti-HBc',profilaxis:'Cotrimoxazol PCP; entecavir si HBc+',monitoreo:'Síntomas neurológicos (PML), BHC'},
+      {nom:'Polatuzumab vedotin',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'PCP, neutropenia, infecciones bacterianas',screening:'HBsAg/Anti-HBc; CMV IgG',profilaxis:'Cotrimoxazol PCP; entecavir si HBc+',monitoreo:'BHC, CMV PCR'},
+      {nom:'Mogamulizumab',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'Infecciones virales, dermatitis infecciosa (CCR4)',screening:'HBsAg/Anti-HBc; CMV IgG; HTLV si aplica',profilaxis:'Cotrimoxazol si bajo CD4; aciclovir VZV',monitoreo:'BHC, CMV PCR, vigilancia dermatológica'},
+      {nom:'Daratumumab',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'HBV reactivación, virus respiratorios, hipogammaglobulinemia',screening:'HBsAg, Anti-HBc total, HBV DNA; CMV IgG',profilaxis:'Entecavir si Anti-HBc+; IVIG si hipogammaglobulinemia sintomática',monitoreo:'HBV DNA mensual, IgG niveles'},
+    ]},
+  ];
+  // Risk badge helper
+  function riskBadge(r,c){return `<span style="background:${c};color:#fff;border-radius:4px;padding:1px 7px;font-size:9.5px;font-weight:700;font-family:var(--mono);letter-spacing:.5px;">${r}</span>`;}
   let html=_txCard('🫀 Clasificar Paciente Trasplantado',`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
       <div>
-        <div style="font-size:11px;color:var(--t3);margin-bottom:6px;">Tipo de trasplante SOT</div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">SOT</div>
         ${tipoSOT.map(t=>`<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;font-size:12px;color:var(--t2);"><input type="radio" name="tx-tipo-r" value="${t}" style="accent-color:var(--purple);"> ${t}</label>`).join('')}
       </div>
       <div>
-        <div style="font-size:11px;color:var(--t3);margin-bottom:6px;">Tipo TCMH (si aplica)</div>
-        ${tipoTCMH.map(t=>`<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;font-size:12px;color:var(--t2);"><input type="radio" name="tx-tipo-r" value="${t}" style="accent-color:var(--purple);"> ${t}</label>`).join('')}
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">TCMH</div>
+        ${tipoTCMH.map(t=>`<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;font-size:12px;color:var(--t2);"><input type="radio" name="tx-tipo-r" value="TCMH ${t}" style="accent-color:var(--purple);"> ${t}</label>`).join('')}
+      </div>
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Hematológico (sin TX)</div>
+        ${tipoHemato.map(t=>`<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;font-size:12px;color:var(--t2);"><input type="radio" name="tx-tipo-r" value="${t}" style="accent-color:var(--purple);"> ${t}</label>`).join('')}
       </div>
     </div>
     <div style="margin-bottom:14px;">
-      <div style="font-size:11px;color:var(--t3);margin-bottom:6px;">Fase post-trasplante</div>
+      <div style="font-size:10px;font-family:var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Fase post-trasplante</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        ${fases.map(f=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--t2);padding:6px 10px;border:1px solid var(--brd2);border-radius:4px;"><input type="radio" name="tx-fase-r" value="${f}" style="accent-color:var(--purple);"> ${f}</label>`).join('')}
+        ${fases.map(f=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--t2);padding:6px 12px;border:1px solid var(--brd2);border-radius:20px;"><input type="radio" name="tx-fase-r" value="${f}" style="accent-color:var(--purple);"> ${f}</label>`).join('')}
       </div>
     </div>
     <div style="margin-bottom:14px;">
-      <div style="font-size:11px;color:var(--t3);margin-bottom:6px;">Inmunosupresión activa (seleccionar todos)</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:5px;">
-        ${inmunoOpts.map(t=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--t2);"><input type="checkbox" style="accent-color:var(--purple);"> ${t}</label>`).join('')}
-      </div>
-    </div>
-    <div>
-      <div style="font-size:11px;color:var(--t3);margin-bottom:6px;">GVHD (TCMH)</div>
+      <div style="font-size:10px;font-family:var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">GVHD (TCMH)</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        ${['No aplica / No hay GVHD','GVHD Aguda (grado I–IV)','GVHD Crónica (limitada/extensa)'].map(f=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--t2);padding:5px 10px;border:1px solid var(--brd2);border-radius:4px;"><input type="radio" name="tx-gvhd-r" value="${f}" style="accent-color:var(--purple);"> ${f}</label>`).join('')}
+        ${['No aplica / No hay GVHD','GVHD Aguda (grado I–IV)','GVHD Crónica (limitada/extensa)'].map(f=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--t2);padding:5px 12px;border:1px solid var(--brd2);border-radius:20px;"><input type="radio" name="tx-gvhd-r" value="${f}" style="accent-color:var(--purple);"> ${f}</label>`).join('')}
       </div>
     </div>
   `,'var(--purple)');
+  // Immunosuppressants accordion by class
+  html+=`<div style="background:var(--s1);border:1px solid var(--brd2);border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:12px;">Inmunosupresión activa — seleccionar todos los agentes</div>
+    <div id="tx-inmuno-cards" style="margin-top:8px;"></div>`;
+  inmunoClases.forEach((cls,ci)=>{
+    html+=`<div style="margin-bottom:10px;">
+      <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:${cls.color};margin-bottom:5px;border-bottom:1px solid var(--brd2);padding-bottom:4px;">${cls.clase}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:5px;">
+        ${cls.items.map((item,ii)=>{
+          const cid=`txis_${ci}_${ii}`;
+          const riskC=item.riesgoColor||'var(--amber)';
+          return `<label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:5px 8px;border:1px solid var(--brd2);border-radius:5px;font-size:11px;color:var(--t2);" onclick="window._txShowInmuno&&window._txShowInmuno('${cid}')">
+            <input type="checkbox" id="${cid}_cb" style="accent-color:var(--purple);flex-shrink:0;" onchange="window._txShowInmuno&&window._txShowInmuno('${cid}')">
+            <span>${escHtml(item.nom)}</span>
+            ${riskBadge(item.riesgo,riskC)}
+          </label>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+  html+=`</div>`;
+  // Detail panel per agent (shown on check)
+  html+=`<div id="tx-inmuno-detail"></div>`;
+  // Attach JS logic
+  html+=`<script>(function(){
+    const _agents=${JSON.stringify(inmunoClases.flatMap((c,ci)=>c.items.map((item,ii)=>({cid:'txis_'+ci+'_'+ii,cls:c.clase,clsColor:c.color,...item}))))};
+    window._txShowInmuno=function(cid){
+      const checked=_agents.filter(a=>document.getElementById(a.cid+'_cb')?.checked);
+      const det=document.getElementById('tx-inmuno-detail');
+      if(!det)return;
+      if(!checked.length){det.innerHTML='';return;}
+      let h='';
+      checked.forEach(a=>{
+        const rc=a.riesgoColor||'var(--amber)';
+        h+=\`<div style="background:var(--s1);border:1px solid var(--brd2);border-left:4px solid \${rc};border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="font-size:12px;font-weight:700;color:\${rc};">\${a.nom}</span>
+            <span style="background:\${rc};color:#fff;border-radius:4px;padding:1px 7px;font-size:9px;font-weight:700;font-family:var(--mono);">RIESGO \${a.riesgo}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">
+            <div><div style="color:var(--t3);font-family:var(--mono);font-size:9px;letter-spacing:1px;margin-bottom:3px;">RIESGOS INFECCIOSOS</div><div style="color:var(--t2);line-height:1.5;">\${a.riesgos}</div></div>
+            <div><div style="color:var(--t3);font-family:var(--mono);font-size:9px;letter-spacing:1px;margin-bottom:3px;">SCREENING PREVIO</div><div style="color:var(--t2);line-height:1.5;">\${a.screening}</div></div>
+            <div><div style="color:var(--t3);font-family:var(--mono);font-size:9px;letter-spacing:1px;margin-bottom:3px;">PROFILAXIS RECOMENDADA</div><div style="color:var(--t2);line-height:1.5;">\${a.profilaxis}</div></div>
+            <div><div style="color:var(--t3);font-family:var(--mono);font-size:9px;letter-spacing:1px;margin-bottom:3px;">MONITOREO</div><div style="color:var(--t2);line-height:1.5;">\${a.monitoreo}</div></div>
+          </div>
+        </div>\`;
+      });
+      if(checked.length>1){
+        const anyVH=checked.some(a=>a.riesgo==='MUY ALTO');
+        const anyH=checked.some(a=>a.riesgo==='ALTO');
+        const lvl=anyVH?'MUY ALTO':anyH?'ALTO':'MODERADO';
+        const lc=anyVH?'var(--red)':anyH?'var(--red)':'var(--amber)';
+        h+=\`<div style="background:rgba(255,77,109,.07);border:2px solid \${lc};border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+          <div style="font-size:12px;font-weight:700;color:\${lc};margin-bottom:6px;">Riesgo combinado: \${lvl}</div>
+          <div style="font-size:11px;color:var(--t2);line-height:1.6;">Con \${checked.length} agentes activos — la inmunosupresión combinada eleva el riesgo de manera aditiva o sinérgica. Revisar profilaxis con Infectología/PROA.</div>
+        </div>\`;
+      }
+      det.innerHTML=h;
+    };
+  })();<\/script>`;
   return html;
 }
 
 function _renderTxProfilaxis(p){
-  const perfilesSOT=[
-    {titulo:'SOT — Bacterial (Post-operatorio)',items:[
-      {atb:'Cefazolina',indicacion:'Profilaxis quirúrgica · dosis única 2g IV 30–60 min pre-incisión',evidencia:'ASHP/IDSA · Nivel I',color:'var(--teal)'},
-      {atb:'TMP-SMX',indicacion:'Profilaxis PCP: 1 tab SS c/24h VO · inicio al 1–3 mes · duración 6–12 meses',evidencia:'IDSA 2013 SOT · Nivel I',color:'var(--teal)'},
-    ]},
-    {titulo:'SOT — Antifúngica (<30 días)',items:[
-      {atb:'Fluconazol',indicacion:'Riñón/hígado: 200–400mg c/24h VO/IV · 4–8 semanas',evidencia:'IDSA Candidiasis 2016 · Nivel II',color:'var(--amber)'},
-      {atb:'Micafungina',indicacion:'Si fluconazol resistente o Candida krusei/glabrata: 150mg c/24h IV',evidencia:'ECMM 2020 · Nivel II',color:'var(--amber)'},
-    ]},
-    {titulo:'SOT — Antiviral (CMV)',items:[
-      {atb:'Valganciclovir',indicacion:'D+/R-: 900mg c/24h VO · 3–6 meses (profilaxis universal)\nD+/R+ o D-/R+: 900mg c/24h VO · 3 meses o estrategia pre-emptiva',evidencia:'IDSA CMV 2013 · AST 2019 · Nivel I',color:'var(--blue)'},
-      {atb:'Aciclovir',indicacion:'HSV/VZV: 200mg c/8h VO o valganciclovir · mínimo 30 días post-TX',evidencia:'IDSA SOT · Nivel I',color:'var(--blue)'},
-    ]},
-    {titulo:'TCMH — Bacterial (pre-engraftment)',items:[
-      {atb:'Levofloxacino',indicacion:'Profilaxis en neutropenia prolongada: 500mg c/24h VO · desde día 0 hasta engraftment',evidencia:'IDSA Neutropenia 2010 · EBMT 2022 · Nivel I',color:'var(--teal)'},
-    ]},
-    {titulo:'TCMH — Antifúngica',items:[
-      {atb:'Fluconazol',indicacion:'Pre-engraftment: 400mg c/24h VO/IV (cobertura Candida)',evidencia:'ECMM · Nivel I',color:'var(--amber)'},
-      {atb:'Micafungina',indicacion:'Alternativa o si fluconazol R: 150mg c/24h IV',evidencia:'ECMM 2020 · Nivel I',color:'var(--amber)'},
-      {atb:'Posaconazol',indicacion:'Post-engraftment TCMH alogénico + GVHD: 300mg c/24h VO (cobija Aspergillus)',evidencia:'IDSA Aspergilosis 2016 · EBMT 2022 · Nivel I',color:'var(--red)'},
-    ]},
-    {titulo:'TCMH — Antiviral',items:[
-      {atb:'Aciclovir / Valaciclovir',indicacion:'HSV: aciclovir 250mg c/12h IV o valaciclovir 500mg c/12h VO · desde acondicionamiento hasta engraftment',evidencia:'IDSA · EBMT · Nivel I',color:'var(--blue)'},
-      {atb:'TMP-SMX',indicacion:'PCP: 1 tab DS 3×/semana VO · inicio post-engraftment · duración ≥6 meses',evidencia:'IDSA · EBMT · Nivel I',color:'var(--teal)'},
-    ]},
-  ];
-  let html='';
-  perfilesSOT.forEach(perfil=>{
-    html+=_txCard(perfil.titulo,perfil.items.map(item=>`
-      <div style="background:var(--s2);border-radius:5px;padding:10px 12px;margin-bottom:8px;border-left:3px solid ${item.color};">
-        <div style="font-size:12px;font-weight:700;color:${item.color};margin-bottom:4px;">${item.atb}</div>
-        <div style="font-size:11px;color:var(--t2);line-height:1.6;">${escHtml(item.indicacion)}</div>
-        <div style="font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--mono);">📚 ${item.evidencia}</div>
-      </div>`).join(''),'var(--amber)');
-  });
+  // Lab form with dynamic recommendations
+  let html=`<div style="background:var(--s1);border:1px solid var(--brd2);border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:12px;">Laboratorios para guiar profilaxis</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;">
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Serología CMV / EBV</div>
+        ${[
+          {id:'pf_cmv_r',lbl:'CMV IgG receptor',opts:['Positivo (+)','Negativo (-)']},
+          {id:'pf_cmv_d',lbl:'CMV IgG donador',opts:['Positivo (+)','Negativo (-)']},
+          {id:'pf_ebv',lbl:'EBV IgG',opts:['Positivo (+)','Negativo (-)']},
+        ].map(f=>`<div style="margin-bottom:7px;">
+          <div style="font-size:11px;color:var(--t2);margin-bottom:3px;">${f.lbl}</div>
+          <select id="${f.id}" onchange="window._txProfRec&&window._txProfRec()" style="width:100%;padding:4px 8px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;">
+            <option value="">— Seleccionar —</option>
+            ${f.opts.map(o=>`<option value="${o}">${o}</option>`).join('')}
+          </select>
+        </div>`).join('')}
+      </div>
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Hepatitis B / C</div>
+        ${[
+          {id:'pf_hbsag',lbl:'HBsAg',opts:['Positivo (+)','Negativo (-)']},
+          {id:'pf_hbc',lbl:'Anti-HBc total',opts:['Positivo (+)','Negativo (-)']},
+          {id:'pf_hcv',lbl:'Anti-HCV / HCV RNA',opts:['Negativo','Anti-HCV+ / RNA indetectable','HCV RNA detectable']},
+          {id:'pf_hbv_dna',lbl:'HBV DNA',opts:['Indetectable','Detectable']},
+        ].map(f=>`<div style="margin-bottom:7px;">
+          <div style="font-size:11px;color:var(--t2);margin-bottom:3px;">${f.lbl}</div>
+          <select id="${f.id}" onchange="window._txProfRec&&window._txProfRec()" style="width:100%;padding:4px 8px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;">
+            <option value="">— Seleccionar —</option>
+            ${f.opts.map(o=>`<option value="${o}">${o}</option>`).join('')}
+          </select>
+        </div>`).join('')}
+        <div style="margin-bottom:7px;">
+          <div style="font-size:11px;color:var(--t2);margin-bottom:3px;">Anti-HBs (UI/L)</div>
+          <input type="number" id="pf_hbs_titer" onchange="window._txProfRec&&window._txProfRec()" placeholder="ej. 12" style="width:100%;padding:4px 8px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;box-sizing:border-box;">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">TB / Parásitos</div>
+        ${[
+          {id:'pf_qft',lbl:'QFT/IGRA para TB',opts:['Negativo (-)','Positivo (+)','Indeterminado']},
+          {id:'pf_chagas',lbl:'Chagas (T. cruzi) IgG',opts:['Negativo (-)','Positivo (+)']},
+          {id:'pf_toxo',lbl:'Toxoplasma IgG',opts:['Negativo (-)','Positivo (+)']},
+          {id:'pf_strongy',lbl:'Strongyloides IgG',opts:['Negativo (-)','Positivo (+)']},
+          {id:'pf_histo',lbl:'Histoplasma urinario Ag',opts:['Negativo (-)','Positivo (+)']},
+        ].map(f=>`<div style="margin-bottom:7px;">
+          <div style="font-size:11px;color:var(--t2);margin-bottom:3px;">${f.lbl}</div>
+          <select id="${f.id}" onchange="window._txProfRec&&window._txProfRec()" style="width:100%;padding:4px 8px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;">
+            <option value="">— Seleccionar —</option>
+            ${f.opts.map(o=>`<option value="${o}">${o}</option>`).join('')}
+          </select>
+        </div>`).join('')}
+      </div>
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:6px;">Otros laboratorios</div>
+        ${[
+          {id:'pf_g6pd',lbl:'G6PD',opts:['Normal','Deficiente']},
+        ].map(f=>`<div style="margin-bottom:7px;">
+          <div style="font-size:11px;color:var(--t2);margin-bottom:3px;">${f.lbl}</div>
+          <select id="${f.id}" onchange="window._txProfRec&&window._txProfRec()" style="width:100%;padding:4px 8px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;">
+            <option value="">— Seleccionar —</option>
+            ${f.opts.map(o=>`<option value="${o}">${o}</option>`).join('')}
+          </select>
+        </div>`).join('')}
+        <div style="margin-bottom:7px;">
+          <div style="font-size:11px;color:var(--t2);margin-bottom:3px;">CD4 (si VIH+, cells/μL)</div>
+          <input type="number" id="pf_cd4" onchange="window._txProfRec&&window._txProfRec()" placeholder="ej. 350" style="width:100%;padding:4px 8px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;box-sizing:border-box;">
+        </div>
+      </div>
+    </div>
+    <div id="pf-recs" style="margin-top:14px;"></div>
+  </div>
+  <script>(function(){
+  window._txProfRec=function(){
+    const g=id=>document.getElementById(id)?.value||'';
+    const gn=id=>parseFloat(document.getElementById(id)?.value||'NaN');
+    const cmvR=g('pf_cmv_r'),cmvD=g('pf_cmv_d'),ebv=g('pf_ebv');
+    const hbsag=g('pf_hbsag'),hbc=g('pf_hbc'),hbvDna=g('pf_hbv_dna'),hbsTiter=gn('pf_hbs_titer');
+    const hcv=g('pf_hcv'),qft=g('pf_qft'),chagas=g('pf_chagas'),toxo=g('pf_toxo'),strongy=g('pf_strongy'),histo=g('pf_histo'),g6pd=g('pf_g6pd'),cd4=gn('pf_cd4');
+    const el=document.getElementById('pf-recs');
+    if(!el)return;
+    let h='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:10px;">Recomendaciones automáticas basadas en laboratorios</div>';
+    function rec(icon,titulo,contenido,color){
+      return \`<div style="background:var(--s2);border:1px solid var(--brd2);border-left:4px solid \${color};border-radius:7px;padding:11px 14px;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:\${color};margin-bottom:5px;">\${icon} \${titulo}</div>
+        <div style="font-size:11px;color:var(--t2);line-height:1.6;">\${contenido}</div>
+      </div>\`;
+    }
+    // CMV
+    const dPos=cmvD.includes('+'),rPos=cmvR.includes('+');
+    if(dPos&&!rPos){
+      h+=rec('🔴','CMV D+/R- — Riesgo MUY ALTO (>50% viremia)','<b>TCMH:</b> Letermovir 480 mg PO QD (240 mg si ciclosporina concomitante). Iniciar día 0–28, continuar hasta día 100. Extender a día 200 si: HLA no relacionado, haploidéntico, cordón umbilical, GVHD grado ≥2 o esteroides prolongados ≥1 mg/kg/d. [Marty FM et al. NEJM 2017 — PREVENT trial; IDSA 2024]<br><b>SOT riñón/hígado:</b> Valganciclovir 900 mg PO QD × 6 meses. [KDIGO 2024; AST-IDCOP 2019]<br><b>SOT corazón/pulmón:</b> Valganciclovir 900 mg PO QD × 6–12 meses. [ISHLT 2022]<br><b>Nota SOT off-label:</b> Letermovir en SOT en estudio (SOLSTICE trial — Kumar et al. NEJM 2023). Considerar en toxicidad a ganciclovir.','var(--red)');
+    } else if((dPos&&rPos)||(cmvD.includes('-')&&rPos)){
+      h+=rec('🟡','CMV D+/R+ ó D-/R+ — Riesgo ALTO (20-40% viremia)','Profilaxis o estrategia pre-emptiva según protocolo del centro. <b>Pre-emptiva:</b> PCR CMV semanal × 3–6 meses; tratar si >1000 UI/mL (>500 UI/mL en TCMH). <b>Profilaxis:</b> Valganciclovir 900 mg PO QD × 3 meses (riñón/hígado), 6 meses (corazón/pulmón). [AST 2019; IDSA 2024]','var(--amber)');
+    } else if(cmvD.includes('-')&&cmvR.includes('-')){
+      h+=rec('✅','CMV D-/R- — Riesgo BAJO (<3%)','Sin profilaxis CMV indicada. Algunos centros usan estrategia pre-emptiva. Aciclovir para HSV/VZV estándar. Notificar cualquier donador de último momento + o transfusión CMV+.','var(--teal)');
+    }
+    // PCP
+    h+=rec('✅','Profilaxis PCP (Pneumocystis jirovecii)','<b>Cotrimoxazol</b> TMP-SMX DS 1 tableta VO TID × 3 días/semana — todos los trasplantados. Duración: ≥6–12 meses SOT; hasta 6 meses post-engraftment TCMH. Continuar si corticosteroides altos o GVHD.'+(g6pd.includes('Deficiente')?'<br><b>G6PD DEFICIENTE:</b> Usar <b>Dapsone 100 mg VO QD</b> o <b>Atovaquone 1500 mg VO QD</b> en lugar de cotrimoxazol.':'<br>Si CD4 <200 cells/μL: cotrimoxazol diario indefinido.')+(cd4<200&&!isNaN(cd4)?'<br><b>CD4 '+cd4+' cells/μL → cotrimoxazol diario.</b>':''),'var(--teal)');
+    // HBV
+    if(hbsag.includes('+')){
+      h+=rec('🔴','HBsAg POSITIVO — Hepatitis B activa','<b>Entecavir 0.5–1 mg VO QD</b> o <b>Tenofovir (TDF/TAF)</b> durante TODA la inmunosupresión + 12–18 meses después. NO usar lamivudina (alta resistencia). Consultar Hepatología. [AASLD 2023]','var(--red)');
+    } else if(hbc.includes('+')&&!hbsag.includes('+')){
+      h+=rec('🟡','Anti-HBc POSITIVO / HBsAg negativo — Riesgo de reactivación','Monitoreo HBV DNA mensual. Si se usa Anti-CD20 (rituximab/obinutuzumab), ibrutinib, o inmunosupresión intensa: <b>Entecavir profiláctico</b> durante la inmunosupresión + 12 meses después. [AASLD 2023; AST 2019]','var(--amber)');
+    }
+    if(!isNaN(hbsTiter)&&hbsTiter<10){
+      h+=rec('🟡','Anti-HBs <10 UI/L — Protección insuficiente HBV','Considerar refuerzo de vacuna HBV (doble dosis) si hay tiempo antes del trasplante. Post-TX: respuesta subóptima por inmunosupresión. Monitorear Anti-HBs anualmente.','var(--amber)');
+    }
+    // TB
+    if(qft.includes('+')){
+      h+=rec('🔴','QFT/IGRA POSITIVO — Tuberculosis Latente (LTBI)','Descartar TB activa (Rx tórax, TC si clínica). Si LTBI confirmada: <b>Isoniazida 300 mg VO QD × 9 meses + Piridoxina 25 mg QD</b>. Iniciar ANTES del trasplante si posible. Alternativa corta: <b>Rifapentina 900 mg + Isoniazida 900 mg semanal × 12 semanas (3HP)</b>. IMPORTANTE: Rifampicina tiene interacciones graves con tacrolimus/ciclosporina. [OMS 2023; IDSA 2024]','var(--red)');
+    }
+    // Chagas
+    if(chagas.includes('+')){
+      h+=rec('🟡','Chagas POSITIVO (T. cruzi IgG+)','<b>Benznidazol 5 mg/kg/d VO × 60 días</b> ANTES del trasplante (si posible y tiempo lo permite). Post-TX: Monitoreo PCR T. cruzi cada 3 meses × 2 años. Si reactivación: benznidazol de nuevo. [Rev Soc Bras Med Trop 2022; AST 2019]','var(--amber)');
+    }
+    // Strongyloides
+    if(strongy.includes('+')){
+      h+=rec('🔴','Strongyloides POSITIVO — Riesgo de hiperinfección','<b>Ivermectina 200 μg/kg VO × 2 dosis (Día 1 y Día 15)</b> ANTES del trasplante. Con inmunosupresión intensa (ATG/corticosteroides), riesgo de síndrome de hiperinfección fatal. [IDSA 2024]','var(--red)');
+    }
+    // Toxoplasma (heart TX D+/R-)
+    if(toxo.includes('-')){
+      h+=rec('🟡','Toxoplasma IgG NEGATIVO (receptor)','Si donador es seropositivo (D+/R-) en trasplante cardíaco: <b>Pirimetamina + ácido folínico × 6 semanas</b> post-TX. Riesgo de toxoplasmosis cardíaca primaria. Cotrimoxazol NO cubre Toxoplasma en este contexto.','var(--amber)');
+    }
+    // Histoplasma
+    if(histo.includes('+')){
+      h+=rec('🔴','Histoplasma urinario Ag POSITIVO','Descartar histoplasmosis activa (TC tórax/abdomen, cultivos). Si activa: <b>Anfotericina B liposomal</b> → luego <b>Itraconazol × ≥12 meses</b>. Post-TX con exposición a áreas endémicas: considerar itraconazol profiláctico. [IDSA 2024]','var(--red)');
+    }
+    // Antifungal general
+    h+=rec('💊','Profilaxis Antifúngica','<b>TCMH pre-engraftment:</b> Fluconazol 400 mg PO QD (si sin riesgo Aspergillus) o Micafungin 50 mg IV QD.<br><b>TCMH post-engraftment + GVHD:</b> Voriconazol 200 mg PO BID o Posaconazol 300 mg PO QD — cubre Aspergillus. [ECMM 2022; ESCMID 2023]<br><b>SOT hígado:</b> Fluconazol o micafungin × 4 semanas post-TX.<br><b>SOT riñón:</b> Fluconazol 200 mg PO QD × 1–3 meses si riesgo.<br><b>BTK inhibidores (ibrutinib):</b> Considerar azol profiláctico si episodio previo de Aspergillus.','var(--amber)');
+    // Antiviral VZV/HSV
+    h+=rec('💊','Profilaxis Antiviral (VZV/HSV)','<b>Aciclovir 400 mg BID</b> o <b>Valaciclovir 500 mg QD</b> durante todo el período inmunosupresor relevante.<br><b>Bortezomib:</b> Aciclovir MANDATORIO desde D1 (VZV muy frecuente).<br><b>Inhibidores JAK:</b> Aciclovir 400 mg BID.<br><b>TCMH:</b> Aciclovir desde acondicionamiento hasta engraftment.','var(--blue)');
+    el.innerHTML=h;
+  };
+  window._txProfRec();
+  })();<\/script>`;
   return html;
 }
 
@@ -12172,55 +12441,401 @@ function _renderTxPatogenos(p){
 }
 
 function _renderTxCMV(p){
-  return _txCard('🔬 Protocolo CMV — Vigilancia y Tratamiento',`
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+  // Risk stratification table
+  let html=_txCard('🔬 Estratificación de Riesgo CMV',`
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
       ${[
-        {riesgo:'Alto',def:'D+/R-',color:'var(--red)',estrategia:'Profilaxis universal: Valganciclovir 900mg c/24h VO · 3–6 meses'},
-        {riesgo:'Moderado',def:'D+/R+ o D-/R+',color:'var(--amber)',estrategia:'Profilaxis o estrategia pre-emptiva: PCR semanal · tratar si >1000 UI/mL'},
-        {riesgo:'Bajo',def:'D-/R-',color:'var(--teal)',estrategia:'Solo aciclovir para HSV · Sin profilaxis CMV'},
-      ].map(r=>`<div style="background:var(--s2);border-radius:6px;padding:10px;border-top:3px solid ${r.color};">
-        <div style="font-size:11px;font-weight:700;color:${r.color};margin-bottom:4px;">Riesgo ${r.riesgo}</div>
-        <div style="font-size:10px;color:var(--t3);margin-bottom:6px;">(${r.def})</div>
-        <div style="font-size:11px;color:var(--t2);line-height:1.5;">${r.estrategia}</div>
+        {riesgo:'MUY ALTO',def:'D+/R-',pct:'>50% viremia',color:'var(--red)',nota:'Profilaxis universal obligatoria'},
+        {riesgo:'ALTO',def:'D+/R+ ó D-/R+',pct:'20-40%',color:'var(--amber)',nota:'Profilaxis o pre-emptiva'},
+        {riesgo:'BAJO',def:'D-/R-',pct:'<3%',color:'var(--teal)',nota:'Sin profilaxis CMV típica'},
+        {riesgo:'+1 nivel',def:'Con ATG / depleción T',pct:'Añadir',color:'var(--purple)',nota:'ATG eleva riesgo un nivel adicional'},
+      ].map(r=>`<div style="background:var(--s2);border-radius:6px;padding:10px;border-top:3px solid ${r.color};text-align:center;">
+        <div style="font-size:10.5px;font-weight:700;color:${r.color};margin-bottom:3px;">${r.riesgo}</div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:5px;">${r.def}</div>
+        <div style="font-size:11px;color:var(--t2);line-height:1.4;">${r.nota}</div>
       </div>`).join('')}
     </div>
+  `,'var(--blue)');
+
+  // Letermovir card
+  html+=_txCard('💊 Profilaxis CMV con Letermovir (TCMH)',`
     <div style="background:rgba(61,155,255,.06);border:1px solid rgba(61,155,255,.2);border-radius:6px;padding:12px;margin-bottom:10px;">
-      <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:8px;">Frecuencia de monitoreo PCR-CMV (estrategia pre-emptiva)</div>
-      <ul style="margin:0;padding-left:16px;">
-        <li style="font-size:11px;color:var(--t2);margin-bottom:4px;">Meses 1–3: PCR semanal</li>
-        <li style="font-size:11px;color:var(--t2);margin-bottom:4px;">Meses 3–6: PCR c/2 semanas</li>
-        <li style="font-size:11px;color:var(--t2);">Meses 6–12: PCR mensual (alto riesgo)</li>
-      </ul>
+      <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:8px;">Letermovir (Prevymis) — Inhibidor de terminasa viral UL56</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11px;color:var(--t2);">
+        <div><b style="color:var(--blue);">Dosis estándar:</b> 480 mg PO QD<br><b style="color:var(--blue);">Con ciclosporina:</b> 240 mg PO QD (interacción farmacocinética)<br><b style="color:var(--blue);">Inicio:</b> Día 0–28 post-TCMH (generalmente día 0 ó 1)<br><b style="color:var(--blue);">Duración estándar:</b> Hasta día 100</div>
+        <div><b style="color:var(--red);">Extender a día 200 si:</b>
+          <ul style="margin:5px 0 0;padding-left:14px;line-height:1.7;">
+            <li>HLA no relacionado o mismatch</li>
+            <li>Trasplante haploidéntico</li>
+            <li>Cordón umbilical</li>
+            <li>GVHD activa grado ≥2</li>
+            <li>Esteroides prolongados ≥1 mg/kg/d</li>
+          </ul>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--t2);line-height:1.6;"><b style="color:var(--amber);">Mecanismo:</b> Inhibidor de la terminasa viral — diferente al ganciclovir (sin resistencia cruzada). NO activo contra CMV enfermedad establecida en órganos.<br><b style="color:var(--amber);">Si viremia en letermovir:</b> Switch inmediato a ganciclovir/valganciclovir.</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:8px;font-family:var(--mono);">📚 Marty FM et al. NEJM 2017 (PREVENT trial) · Winston DJ et al. CID 2020 · IDSA 2024</div>
     </div>
-    <div style="background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.2);border-radius:6px;padding:12px;">
-      <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:8px;">Tratamiento CMV</div>
-      <ul style="margin:0;padding-left:16px;">
-        <li style="font-size:11px;color:var(--t2);margin-bottom:4px;"><b>Ganciclovir IV:</b> 5mg/kg c/12h · 14–21 días (enfermedad grave / SNC)</li>
-        <li style="font-size:11px;color:var(--t2);margin-bottom:4px;"><b>Valganciclovir VO:</b> 900mg c/12h · cuando tolera VO y viremia disminuye</li>
-        <li style="font-size:11px;color:var(--t2);margin-bottom:4px;"><b>Duración:</b> Mínimo 2 semanas DESPUÉS de PCR indetectable</li>
-        <li style="font-size:11px;color:var(--t2);"><b>Resistencia (UL97/UL54):</b> Foscarnet o Cidofovir — PROA + Infectología</li>
-      </ul>
-      <div style="font-size:10px;color:var(--t3);margin-top:8px;font-family:var(--mono);">📚 IDSA CMV 2013 · AST 2019 · ECMM 2020</div>
+    <div style="background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.2);border-radius:6px;padding:12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:8px;">Valganciclovir — SOT</div>
+      <div style="font-size:11px;color:var(--t2);line-height:1.7;">
+        <b>Dosis:</b> 900 mg PO QD (ajustar a función renal — ver tabla PROA)<br>
+        Riñón: 6 meses si D+/R- · Hígado: 3 meses · Corazón/Pulmón: 6–12 meses<br>
+        <b>Nota off-label Letermovir en SOT:</b> En estudio — SOLSTICE trial (trasplante renal). Considerar en toxicidad hematológica a ganciclovir o refractariedad.
+      </div>
+      <div style="font-size:10px;color:var(--t3);margin-top:6px;font-family:var(--mono);">📚 KDIGO 2024 · AST-IDCOP 2019 · Kumar et al. NEJM 2023 (SOLSTICE)</div>
     </div>
   `,'var(--blue)');
+
+  // Pre-emptive strategy
+  html+=_txCard('📡 Estrategia Pre-emptiva (riesgo más bajo)',`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11px;color:var(--t2);">
+      <div style="background:var(--s2);padding:10px;border-radius:6px;">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--t3);letter-spacing:1px;margin-bottom:5px;">FRECUENCIA DE MONITOREO</div>
+        <div style="line-height:1.7;">Meses 1–3: PCR CMV semanal<br>Meses 3–6: PCR cada 2 semanas<br>Meses 6–12: PCR mensual (alto riesgo)</div>
+      </div>
+      <div style="background:var(--s2);padding:10px;border-radius:6px;">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--t3);letter-spacing:1px;margin-bottom:5px;">UMBRAL PARA TRATAR</div>
+        <div style="line-height:1.7;"><b>&gt;1000 UI/mL</b> (SOT, mayoría centros)<br><b>&gt;500 UI/mL</b> (TCMH, muchos centros)<br>Técnica: qPCR sangre total o plasma — estandarizar UI/mL OMS</div>
+      </div>
+    </div>
+  `,'var(--teal)');
+
+  // CMV disease types
+  html+=_txCard('🦠 Presentaciones clínicas de CMV',`
+    ${[
+      {tipo:'CMV Viremia / Síndrome',sx:'Fiebre, malestar, citopenias — CMV PCR+, sin afección orgánica',tx:'Valganciclovir 900 mg PO BID × 14–21d',color:'var(--amber)'},
+      {tipo:'CMV Neumonitis',sx:'Fiebre + tos + infiltrados bilaterales + PCR plasma o BAL+ (considerar biopsia)',tx:'Ganciclovir IV 5 mg/kg c/12h + IVIG si TCMH. Alta mortalidad en TCMH',color:'var(--red)'},
+      {tipo:'CMV Colitis',sx:'Diarrea + rectorragia + colonoscopia: células búho (owl-eye), IHC+ o PCR biopsia+',tx:'Ganciclovir IV → Valganciclovir VO × 3–6 semanas',color:'var(--amber)'},
+      {tipo:'CMV Retinitis',sx:'Cambios visuales, lesiones retinianas — URGENCIA oftalmológica',tx:'Ganciclovir IV inducción 3 sem → mantenimiento indefinido',color:'var(--red)'},
+      {tipo:'CMV Esofagitis',sx:'Odinofagia + úlceras esofágicas en endoscopia + biopsia CMV+',tx:'Valganciclovir 900 mg BID × 14–21d',color:'var(--amber)'},
+      {tipo:'CMV Encefalitis',sx:'Rara, devastadora — PCR CMV en LCR positiva',tx:'Ganciclovir IV × 3–6 semanas → mantenimiento oral',color:'var(--red)'},
+    ].map(d=>`<div style="background:var(--s2);border:1px solid var(--brd2);border-left:4px solid ${d.color};border-radius:6px;padding:9px 12px;margin-bottom:8px;">
+      <div style="font-size:11px;font-weight:700;color:${d.color};margin-bottom:3px;">${d.tipo}</div>
+      <div style="font-size:11px;color:var(--t2);margin-bottom:4px;">Sx: ${d.sx}</div>
+      <div style="font-size:11px;color:var(--t2);">Tx: ${d.tx}</div>
+    </div>`).join('')}
+  `,'var(--amber)');
+
+  // Treatment + resistant
+  html+=_txCard('💊 Tratamiento y CMV Resistente',`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div style="background:var(--s2);padding:10px;border-radius:6px;">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--t3);letter-spacing:1px;margin-bottom:5px;">PRIMERA LÍNEA</div>
+        <div style="font-size:11px;color:var(--t2);line-height:1.7;"><b>Ganciclovir IV:</b> 5 mg/kg IV c/12h × 14–21d (inducción)<br><b>Valganciclovir VO:</b> 900 mg c/12h (switch cuando tolera VO)<br><b>Mantenimiento:</b> 900 mg QD hasta PCR (-) × 2<br><b>Duración por tipo:</b> Viremia 2 sem · Neumonitis 3–4 sem · Colitis 3–6 sem · Retinitis mantenimiento indefinido</div>
+      </div>
+      <div style="background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.2);padding:10px;border-radius:6px;">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--red);letter-spacing:1px;margin-bottom:5px;">CMV REFRACTARIO / RESISTENTE (mutación UL97)</div>
+        <div style="font-size:11px;color:var(--t2);line-height:1.7;"><b>Foscarnet:</b> 90 mg/kg IV c/12h (nefrotóxico — creatinina QD)<br><b>Cidofovir:</b> 5 mg/kg IV semana × 2 → quincenal (+ probenecid + SF preinfusión)<br><b>Maribavir:</b> 400 mg PO BID × 8 semanas (FDA aprobado 2021 — inhibidor UL97) [Avery RK et al. NEJM 2022]<br><b>Letermovir salvage:</b> Si resistencia a ganciclovir sin mutación de terminasa</div>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--t3);font-family:var(--mono);">📚 IDSA CMV 2013 · AST-IDCOP 2019 · Avery RK NEJM 2022 · IDSA 2024</div>
+  `,'var(--red)');
+
+  // CMV Flowchart
+  html+=`<div style="background:var(--s1);border:1px solid var(--brd2);border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:14px;">Flujograma CMV — Manejo post-Trasplante</div>
+    <div style="max-width:520px;margin:0 auto;">
+      <div style="text-align:center;margin-bottom:4px;">
+        <div style="display:inline-block;background:var(--s2);border:2.5px solid var(--blue);border-radius:40px;padding:9px 24px;font-size:12px;font-weight:700;color:var(--blue);">Trasplante realizado + CMV serologías definidas</div>
+      </div>
+      <div style="text-align:center;margin:4px 0;"><span style="font-size:20px;color:var(--blue);">↓</span></div>
+      <div style="display:flex;justify-content:center;margin:4px 0 4px;">
+        <div style="position:relative;width:260px;height:90px;display:flex;align-items:center;justify-content:center;">
+          <div style="position:absolute;width:170px;height:68px;background:rgba(245,166,35,.1);border:2.5px solid var(--amber);transform:rotate(45deg);border-radius:4px;"></div>
+          <div style="position:relative;z-index:1;text-align:center;font-size:11px;font-weight:700;color:var(--amber);padding:10px 24px;line-height:1.3;">Estrategia: Profilaxis vs Pre-emptiva</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-around;margin:0 0 6px;max-width:480px;">
+        <div style="text-align:center;"><span style="font-size:20px;color:var(--teal);">↙</span><br><span style="font-size:11px;font-weight:700;color:var(--teal);">Pre-emptiva</span></div>
+        <div style="text-align:center;"><span style="font-size:20px;color:var(--blue);">↘</span><br><span style="font-size:11px;font-weight:700;color:var(--blue);">Profilaxis</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">
+        <div style="background:var(--s2);border-left:4px solid var(--teal);border-radius:6px;padding:9px 12px;font-size:11px;color:var(--t2);">
+          <div style="font-weight:700;color:var(--teal);margin-bottom:4px;">PCR CMV semanal × 3–6 meses</div>
+          Umbral tratamiento: >1000 UI/mL (SOT) / >500 UI/mL (TCMH)
+        </div>
+        <div style="background:var(--s2);border-left:4px solid var(--blue);border-radius:6px;padding:9px 12px;font-size:11px;color:var(--t2);">
+          <div style="font-weight:700;color:var(--blue);margin-bottom:4px;">Letermovir (TCMH) o Valganciclovir (SOT)</div>
+          Ver dosis y duración arriba
+        </div>
+      </div>
+      <div style="text-align:center;margin:4px 0;"><span style="font-size:20px;color:var(--blue);">↓</span></div>
+      <div style="display:flex;justify-content:center;margin:4px 0 4px;">
+        <div style="position:relative;width:240px;height:90px;display:flex;align-items:center;justify-content:center;">
+          <div style="position:absolute;width:160px;height:66px;background:rgba(245,166,35,.1);border:2.5px solid var(--amber);transform:rotate(45deg);border-radius:4px;"></div>
+          <div style="position:relative;z-index:1;text-align:center;font-size:11px;font-weight:700;color:var(--amber);padding:10px 22px;line-height:1.3;">¿PCR CMV positivo?</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-around;margin:0 0 6px;max-width:480px;">
+        <div style="text-align:center;"><span style="font-size:20px;color:var(--teal);">↙</span><br><span style="font-size:11px;font-weight:700;color:var(--teal);">NO</span></div>
+        <div style="text-align:center;"><span style="font-size:20px;color:var(--red);">↘</span><br><span style="font-size:11px;font-weight:700;color:var(--red);">SÍ</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">
+        <div style="background:var(--s2);border-left:4px solid var(--teal);border-radius:6px;padding:9px 12px;font-size:11px;color:var(--t2);">
+          <div style="font-weight:700;color:var(--teal);margin-bottom:3px;">Continuar monitoreo</div>
+          Reducir frecuencia si >3 meses y carga estable
+        </div>
+        <div style="background:var(--s2);border-left:4px solid var(--red);border-radius:6px;padding:9px 12px;">
+          <div style="font-size:10px;font-family:var(--mono);color:var(--red);letter-spacing:1px;margin-bottom:4px;">¿>1000 UI/mL (SOT) ó >500 (TCMH)?</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10.5px;color:var(--t2);">
+            <div style="border-left:3px solid var(--teal);padding-left:6px;"><b style="color:var(--teal);">NO:</b> Repetir PCR en 7 días</div>
+            <div style="border-left:3px solid var(--red);padding-left:6px;"><b style="color:var(--red);">SÍ → Tratar</b><br>Con org afectado: Ganciclovir IV<br>Sin org: Valganciclovir BID</div>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:center;margin:4px 0;"><span style="font-size:20px;color:var(--blue);">↓</span></div>
+      <div style="display:flex;justify-content:center;margin:4px 0 4px;">
+        <div style="position:relative;width:280px;height:90px;display:flex;align-items:center;justify-content:center;">
+          <div style="position:absolute;width:185px;height:72px;background:rgba(245,166,35,.1);border:2.5px solid var(--amber);transform:rotate(45deg);border-radius:4px;"></div>
+          <div style="position:relative;z-index:1;text-align:center;font-size:11px;font-weight:700;color:var(--amber);padding:10px 26px;line-height:1.3;">¿Respuesta? Carga viral ↓ 1–2 log en 7–14 días</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-around;margin:0 0 6px;max-width:480px;">
+        <div style="text-align:center;"><span style="font-size:20px;color:var(--teal);">↙</span><br><span style="font-size:11px;font-weight:700;color:var(--teal);">SÍ</span></div>
+        <div style="text-align:center;"><span style="font-size:20px;color:var(--red);">↘</span><br><span style="font-size:11px;font-weight:700;color:var(--red);">NO</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">
+        <div style="background:var(--s2);border-left:4px solid var(--teal);border-radius:6px;padding:9px 12px;font-size:11px;color:var(--t2);">
+          <div style="font-weight:700;color:var(--teal);margin-bottom:3px;">Completar duración mínima</div>
+          → PCR negativo × 2 consecutivos
+        </div>
+        <div style="background:rgba(255,77,109,.07);border-left:4px solid var(--red);border-radius:6px;padding:9px 12px;font-size:11px;color:var(--t2);">
+          <div style="font-weight:700;color:var(--red);margin-bottom:3px;">Pensar en RESISTENCIA</div>
+          Genotipo UL97/UL54 → Foscarnet / Maribavir / Cidofovir
+        </div>
+      </div>
+      <div style="text-align:center;margin:4px 0;"><span style="font-size:20px;color:var(--teal);">↓</span></div>
+      <div style="text-align:center;margin-top:4px;">
+        <div style="display:inline-block;background:rgba(0,212,168,.08);border:2px solid var(--teal);border-radius:8px;padding:10px 24px;font-size:12px;font-weight:700;color:var(--teal);">Alta sin CMV detectable — profilaxis secundaria si indicada</div>
+      </div>
+    </div>
+  </div>`;
+  return html;
 }
 
 function _renderTxPreTx(p){
-  const serologias=[
-    {g:'Virales',items:['CMV IgG (receptor y donante)','EBV IgG/IgM','HSV-1/2 IgG','VZV IgG','Hepatitis B (HBsAg, Anti-HBc, Anti-HBs)','Hepatitis C (Anti-VHC + PCR)','HIV 1/2','HTLV-1/2 (TCMH)']},
-    {g:'Parasitarias y bacterianas',items:['Toxoplasma gondii IgG (donante y receptor)','Chagas (Trypanosoma cruzi) — zona endémica MX','VDRL/RPR (sífilis)','QFT-Gold o PPD + Rx tórax (TB latente)','Coccidioides IgG (zona endémica — norte MX/suroeste EUA)']},
-    {g:'Colonización / Infección activa',items:['Urocultivo','MRSA screening nasal (hisopado)','HBV PCR si Anti-HBc positivo','CMV PCR cuantitativo basal','Frotis e IFD si fiebre activa']},
-  ];
-  const vacunas=['Influenza anual','Neumococo (PCV15 o PCV20 + PPSV23)','Hepatitis B (si Anti-HBs < 10 UI/L)','VZV / Varicela (si seronegativo — viva, dar ≥4 sem antes del TX)','HPV (si aplica por edad)','Tdap (tétanos-difteria-pertussis)','NO dar vacunas vivas después del trasplante'];
-  let html=_txCard('🩸 Serología Pre-Trasplante',serologias.map(sg=>`
-    <div style="margin-bottom:10px;">
-      <div style="font-size:10px;font-family:var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:5px;">${sg.g}</div>
-      ${sg.items.map(item=>`<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;font-size:11px;color:var(--t2);">
-        <input type="checkbox" style="accent-color:var(--purple);width:14px;height:14px;"> ${escHtml(item)}
-      </label>`).join('')}
-    </div>`).join(''),'var(--purple)');
-  html+=_txCard('💉 Vacunas Pre-Trasplante (completar ≥4 semanas antes)',vacunas.map(v=>`<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;font-size:11px;color:var(--t2);"><input type="checkbox" style="accent-color:var(--purple);width:14px;height:14px;"> ${escHtml(v)}</label>`).join(''),'var(--teal)');
-  html+=_txCard('🦷 Clearance Dental','<p style="font-size:11px;color:var(--t2);line-height:1.6;margin:0;">Realizar evaluación dental completa y tratar focos infecciosos orales ≥4–6 semanas antes del trasplante. Especialmente crítico en SOT cardíaco y pulmonar.</p>','var(--amber)');
+  const nom=p?.nombre||'';
+  // Build the receptor serology form
+  function selField(id,lbl,opts,onChange){
+    return `<div style="margin-bottom:7px;">
+      <div style="font-size:11px;color:var(--t2);margin-bottom:2px;">${lbl}</div>
+      <select id="${id}" onchange="${onChange||''}" style="width:100%;padding:4px 8px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;">
+        <option value="">— Seleccionar —</option>
+        ${opts.map(o=>`<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('')}
+      </select>
+    </div>`;
+  }
+  function numField(id,lbl,ph){
+    return `<div style="margin-bottom:7px;">
+      <div style="font-size:11px;color:var(--t2);margin-bottom:2px;">${lbl}</div>
+      <input type="number" id="${id}" placeholder="${ph||''}" onchange="window._pretxRecs&&window._pretxRecs()" style="width:100%;padding:4px 8px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;box-sizing:border-box;">
+    </div>`;
+  }
+  function txtField(id,lbl,ph){
+    return `<div style="margin-bottom:7px;">
+      <div style="font-size:11px;color:var(--t2);margin-bottom:2px;">${lbl}</div>
+      <input type="text" id="${id}" placeholder="${ph||''}" onchange="window._pretxRecs&&window._pretxRecs()" style="width:100%;padding:4px 8px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;box-sizing:border-box;">
+    </div>`;
+  }
+  function vacc(id,lbl){
+    return `<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;font-size:11px;color:var(--t2);">
+      <select id="${id}" style="padding:3px 7px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;">
+        <option value="">—</option>
+        <option>Completa ✓</option>
+        <option>Pendiente</option>
+        <option>Contraindicada</option>
+        <option>Serie incompleta</option>
+      </select> ${escHtml(lbl)}
+    </label>`;
+  }
+  const POS=['Positivo (+)','Negativo (-)'];
+  const PNND=['Positivo (+)','Negativo (-)','No realizado'];
+  const DET=['Indetectable','Detectable'];
+  let html=`<div style="background:var(--s1);border:1px solid var(--brd2);border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:12px;">Evaluación Pre-Trasplante — RECEPTOR</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Virología</div>
+        ${selField('pt_cmv','CMV IgG',PNND,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_ebv','EBV VCA IgG',PNND,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_hsv','HSV-1/2 IgG',PNND,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_vzv','VZV IgG',PNND,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_hbsag','HBsAg',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_hbc','Anti-HBc total',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${numField('pt_hbs_t','Anti-HBs (UI/L)','ej. 12')}
+        ${selField('pt_hbvdna','HBV DNA',DET,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_hcv','Anti-HCV',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_hcvrna','HCV RNA',DET,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_hiv','HIV Ag/Ab 4ta gen',PNND,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_htlv','HTLV-1/2',POS,'window._pretxRecs&&window._pretxRecs()')}
+      </div>
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Parásitos y TB</div>
+        ${selField('pt_chagas','Chagas IgG (T. cruzi)',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_toxo','Toxoplasma IgG',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_strongy','Strongyloides IgG',PNND,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_qft','QFT/IGRA para TB',['Negativo (-)','Positivo (+)','Indeterminado','No realizado'],'window._pretxRecs&&window._pretxRecs()')}
+        ${numField('pt_ppd','PPD (mm, si no IGRA)','ej. 10')}
+        ${selField('pt_rxtx','Rx Tórax',['Normal','Anormal'],'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_tbanterior','Historia de TB previa',['No','Sí'],'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_bcg','BCG aplicada',['Sí','No'],'window._pretxRecs&&window._pretxRecs()')}
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:8px;margin-bottom:7px;">Hongos</div>
+        ${selField('pt_histo','Histoplasma urinario Ag',PNND,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_coccidio','Coccidioides IgG',PNND,'window._pretxRecs&&window._pretxRecs()')}
+      </div>
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Labs generales</div>
+        ${selField('pt_g6pd','G6PD',['Normal','Deficiente','No realizado'],'window._pretxRecs&&window._pretxRecs()')}
+        ${numField('pt_cd4','CD4 (si VIH+, cells/μL)','ej. 400')}
+        ${numField('pt_hb','Hemoglobina (g/dL)','ej. 12.5')}
+        ${numField('pt_leuco','Leucocitos (×10³/μL)','ej. 7.2')}
+        ${numField('pt_neut','Neutrófilos absolutos (×10³/μL)','ej. 4.1')}
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:8px;margin-bottom:7px;">Vacunas Pre-TX (≥4 semanas antes)</div>
+        ${vacc('ptv_flu','Influenza anual')}
+        ${vacc('ptv_neumo','Neumococo (PCV15 + PPSV23)')}
+        ${vacc('ptv_vzv','VZV/varicela (viva — contraindicada post-TX)')}
+        ${vacc('ptv_mmr','MMR (viva — contraindicada post-TX)')}
+        ${vacc('ptv_hepb','Hepatitis B')}
+        ${vacc('ptv_tdap','Tdap')}
+        ${vacc('ptv_covid','COVID-19')}
+      </div>
+    </div>
+  </div>`;
+
+  // Donor section
+  html+=`<div style="background:var(--s1);border:1px solid var(--brd2);border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:12px;">Evaluación Pre-Trasplante — DONADOR</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Donador Vivo</div>
+        ${selField('pd_cmv','CMV IgG',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_ebv','EBV IgG',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_hsv','HSV IgG',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_hbsag','HBsAg',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_hbc','Anti-HBc total',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_hbvdna','HBV DNA',DET,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_hcv','Anti-HCV',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_hcvrna','HCV RNA',DET,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_hiv','HIV Ag/Ab',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_htlv','HTLV-1/2',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_chagas','Chagas IgG',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_sifilis','Sífilis VDRL/RPR',['Negativo','Reactivo','Treponemal +'],'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_qft','QFT/IGRA TB',['Negativo (-)','Positivo (+)','Indeterminado'],'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_urocult','Urocultivo',['Negativo','Positivo'],'window._pretxRecs&&window._pretxRecs()')}
+      </div>
+      <div>
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Donador Fallecido (adicional)</div>
+        ${selField('pd_hemocult','Hemocultivos',['Negativos','Positivos'],'window._pretxRecs&&window._pretxRecs()')}
+        ${txtField('pd_hemocult_org','Organismo (si hemocult +)','ej. S. aureus')}
+        ${selField('pd_bal','Cultivo BAL (si aplica)',['Negativo','Positivo'],'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_lcr','Cultivo LCR (si aplica)',['Negativo','Positivo'],'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_meningitis','Meningitis bacteriana como causa de muerte',['No','Sí'],'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pd_wnv','WNV PCR (si aplica por región)',PNND,'window._pretxRecs&&window._pretxRecs()')}
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-top:8px;margin-bottom:7px;">Paciente</div>
+        ${txtField('pt_nombre_doc','Nombre del receptor (para documento)','Nombre completo')}
+        ${txtField('pt_medico','Médico responsable','Nombre del infectólogo/PROA')}
+        ${txtField('pt_hospital','Hospital','Nombre del hospital')}
+      </div>
+    </div>
+  </div>`;
+
+  // Recommendations panel
+  html+=`<div id="pretx-recs" style="margin-bottom:14px;"></div>`;
+
+  // Word export button
+  html+=`<button onclick="window._pretxWordExport&&window._pretxWordExport()" style="width:100%;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);color:var(--blue);border-radius:6px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px;">Generar Documento Word — Evaluación Pre-Trasplante</button>`;
+
+  // JS logic
+  html+=`<script>(function(){
+  function g(id){return document.getElementById(id)?.value||'';}
+  function gn(id){return parseFloat(document.getElementById(id)?.value||'NaN');}
+  function rec(icon,titulo,contenido,color){
+    return '<div style="background:var(--s2);border:1px solid var(--brd2);border-left:4px solid '+color+';border-radius:7px;padding:10px 14px;margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:'+color+';margin-bottom:4px;">'+icon+' '+titulo+'</div><div style="font-size:11px;color:var(--t2);line-height:1.6;">'+contenido+'</div></div>';
+  }
+  window._pretxRecs=function(){
+    const el=document.getElementById('pretx-recs');
+    if(!el)return;
+    let h='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:10px;">Recomendaciones automáticas</div>';
+    const cmvR=g('pt_cmv'),cmvD=g('pd_cmv');
+    const hbsag=g('pt_hbsag'),hbc=g('pt_hbc');
+    const pdHbsag=g('pd_hbsag'),pdHbc=g('pd_hbc');
+    const qft=g('pt_qft'),chagas=g('pt_chagas'),toxo=g('pt_toxo'),strongy=g('pt_strongy'),histo=g('pt_histo');
+    const hiv=g('pt_hiv'),cd4=gn('pt_cd4');
+    // CMV D+/R-
+    if(cmvD.includes('+')&&cmvR.includes('-')){
+      h+=rec('🔴','CMV D+/R- — Riesgo MUY ALTO','Iniciar profilaxis CMV: Letermovir (TCMH) o Valganciclovir 900 mg QD (SOT) desde el día 0. Ver tab CMV para dosis y duración completas.','var(--red)');
+    } else if(cmvD&&cmvR&&!cmvD.includes('+')&&!cmvR.includes('+')){
+      h+=rec('✅','CMV D-/R- — Riesgo bajo','Sin profilaxis CMV. Solo aciclovir estándar para VZV/HSV.','var(--teal)');
+    } else if(cmvD||cmvR){
+      h+=rec('🟡','CMV — Revisar estrategia','D+/R+ o D-/R+: Profilaxis o pre-emptiva según protocolo del centro y órgano trasplantado.','var(--amber)');
+    }
+    // HBV receptor
+    if(hbsag.includes('+')){h+=rec('🔴','HBsAg+ RECEPTOR','Entecavir 0.5–1 mg VO QD durante toda la inmunosupresión + 12–18 meses post-TX. Hepatología co-manejo.','var(--red)');}
+    else if(hbc.includes('+')){h+=rec('🟡','Anti-HBc+ RECEPTOR','Monitoreo HBV DNA mensual. Si anti-CD20 o ATG: entecavir profiláctico durante inmunosupresión.','var(--amber)');}
+    // HBV donor
+    if(pdHbsag.includes('+')){h+=rec('🔴','HBsAg+ DONADOR','Evaluar riesgo de transmisión HBV. Entecavir en receptor. Discutir con Hepatología y Trasplante.','var(--red)');}
+    else if(pdHbc.includes('+')){h+=rec('🟡','Anti-HBc+ DONADOR','Riesgo de transmisión HBV. Monitoreo HBV DNA mensual en receptor. Considerar entecavir profiláctico.','var(--amber)');}
+    // TB
+    if(qft.includes('+')){h+=rec('🔴','QFT/IGRA+ — LTBI','Descartar TB activa. Tratamiento: Isoniazida 300 mg + Piridoxina × 9 meses ANTES del TX si posible. Rifampicina EVITAR por interacciones con calcineurina inhibidores.','var(--red)');}
+    // Chagas
+    if(chagas.includes('+')){h+=rec('🟡','Chagas+ — T. cruzi','Benznidazol 5 mg/kg/d × 60 días antes del TX. Post-TX: PCR T. cruzi cada 3 meses × 2 años.','var(--amber)');}
+    // Strongyloides
+    if(strongy.includes('+')){h+=rec('🔴','Strongyloides+','Ivermectina 200 μg/kg × 2 dosis (D1 y D15) ANTES del TX. Riesgo de hiperinfección fatal con ATG/esteroides.','var(--red)');}
+    // Toxoplasma
+    if(toxo.includes('-')){h+=rec('🟡','Toxoplasma IgG negativo (receptor)','Si donador seropositivo en TX cardíaco: pirimetamina + ácido folínico × 6 semanas post-TX.','var(--amber)');}
+    // Histoplasma
+    if(histo.includes('+')){h+=rec('🔴','Histoplasma Ag urinario +','Descartar histoplasmosis activa antes del TX. TC tórax/abdomen. Itraconazol × ≥12 meses si activo.','var(--red)');}
+    // HIV
+    if(hiv.includes('+')){h+=rec('🟡','VIH+','CD4 actual: '+(isNaN(cd4)?'no registrado':cd4+' cells/μL')+'. Mantener TAR. CD4 >200 ideal pre-TX. Cotrimoxazol diario. Discutir con Infectología.','var(--amber)');}
+    if(!h.includes('border-left:4px solid')){h+='<div style="font-size:11px;color:var(--t3);text-align:center;padding:14px;">Complete los campos de laboratorio para ver las recomendaciones.</div>';}
+    el.innerHTML=h;
+  };
+  window._pretxWordExport=function(){
+    const nom=document.getElementById('pt_nombre_doc')?.value||'Paciente';
+    const med=document.getElementById('pt_medico')?.value||'';
+    const hosp=document.getElementById('pt_hospital')?.value||'';
+    const fecha=new Date().toLocaleDateString('es-MX');
+    function row(lbl,id){const v=document.getElementById(id)?.value||'—';const pos=v.includes('+');const neg=v.includes('-')||v==='Negativo'||v==='Indetectable'||v==='Negativos';return '<tr><td>'+lbl+'</td><td class="'+(pos?'pos':neg?'neg':'')+'">'+(v||'—')+'</td></tr>';}
+    const wordContent='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="UTF-8"><style>body{font-family:Calibri,sans-serif;font-size:11pt;}h1{font-size:16pt;color:#2E4057;}h2{font-size:13pt;color:#2E4057;border-bottom:1px solid #ccc;}table{border-collapse:collapse;width:100%;margin:10px 0;}td,th{border:1px solid #aaa;padding:6px 10px;font-size:10pt;}th{background:#2E4057;color:white;font-weight:bold;}.pos{color:#c00;font-weight:bold;}.neg{color:#007700;}.rec{background:#fff3cd;border-left:4px solid #ffc107;padding:8px 12px;margin:8px 0;}</style></head><body>'
+      +'<h1>EVALUACIÓN INFECTOLÓGICA PRE-TRASPLANTE</h1>'
+      +'<p><b>Hospital:</b> '+hosp+' &nbsp;&nbsp; <b>Fecha:</b> '+fecha+'</p>'
+      +'<p><b>Paciente:</b> '+nom+' &nbsp;&nbsp; <b>Médico:</b> '+med+'</p>'
+      +'<h2>RECEPTOR — Serología</h2>'
+      +'<table><tr><th>Estudio</th><th>Resultado</th></tr>'
+      +row('CMV IgG','pt_cmv')+row('EBV VCA IgG','pt_ebv')+row('HSV-1/2 IgG','pt_hsv')+row('VZV IgG','pt_vzv')
+      +row('HBsAg','pt_hbsag')+row('Anti-HBc total','pt_hbc')+'<tr><td>Anti-HBs</td><td>'+(document.getElementById('pt_hbs_t')?.value||'—')+' UI/L</td></tr>'
+      +row('HBV DNA','pt_hbvdna')+row('Anti-HCV','pt_hcv')+row('HCV RNA','pt_hcvrna')
+      +row('HIV Ag/Ab','pt_hiv')+row('HTLV-1/2','pt_htlv')
+      +row('Chagas IgG','pt_chagas')+row('Toxoplasma IgG','pt_toxo')+row('Strongyloides IgG','pt_strongy')
+      +row('QFT/IGRA TB','pt_qft')+row('Rx Tórax','pt_rxtx')
+      +row('Histoplasma urinario Ag','pt_histo')+row('G6PD','pt_g6pd')
+      +'<tr><td>CD4 (si VIH+)</td><td>'+(document.getElementById('pt_cd4')?.value||'—')+' cells/μL</td></tr>'
+      +'</table>'
+      +'<h2>DONADOR — Serología</h2>'
+      +'<table><tr><th>Estudio</th><th>Resultado</th></tr>'
+      +row('CMV IgG','pd_cmv')+row('EBV IgG','pd_ebv')+row('HSV IgG','pd_hsv')
+      +row('HBsAg','pd_hbsag')+row('Anti-HBc total','pd_hbc')+row('HBV DNA','pd_hbvdna')
+      +row('Anti-HCV','pd_hcv')+row('HCV RNA','pd_hcvrna')+row('HIV Ag/Ab','pd_hiv')
+      +row('HTLV-1/2','pd_htlv')+row('Chagas IgG','pd_chagas')+row('Sífilis VDRL/RPR','pd_sifilis')
+      +row('QFT/IGRA TB','pd_qft')+row('Urocultivo','pd_urocult')
+      +row('Hemocultivos','pd_hemocult')+row('Meningitis bacteriana (causa de muerte)','pd_meningitis')
+      +'</table>'
+      +'<h2>RECOMENDACIONES</h2>'
+      +(document.getElementById('pretx-recs')?.innerText||'Completar laboratorios para generar recomendaciones.')
+      +'<br><br><p><b>Firma:</b> '+med+' — Infectología / PROA &nbsp;&nbsp;&nbsp; <b>Fecha:</b> '+fecha+'</p>'
+      +'<p style="font-size:9pt;color:#666;">Referencias: IDSA 2024 · AST-IDCOP 2019 · KDIGO 2024 · OMS 2023 · Marty FM NEJM 2017 · AASLD 2023</p>'
+      +'</body></html>';
+    const blob=new Blob([wordContent],{type:'application/msword'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='PreTrasplante_'+nom.replace(/\\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.doc';
+    a.click();URL.revokeObjectURL(url);
+  };
+  window._pretxRecs();
+  })();<\/script>`;
+  // Dental clearance note
+  html+=_txCard('Clearance Dental','<p style="font-size:11px;color:var(--t2);line-height:1.6;margin:0;">Realizar evaluación dental completa y tratar focos infecciosos orales ≥4–6 semanas antes del trasplante. Especialmente crítico en SOT cardíaco y pulmonar.</p>','var(--amber)');
   return html;
 }
 
