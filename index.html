@@ -2900,11 +2900,7 @@ function abrirFormPaciente(p){
   const ck=(mid,val)=>val?'checked':'';
 
   let html='';
-  // Voice dictation button row
-  html+='<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px;gap:8px;">'
-      +'<button type="button" onclick="window.abrirDictado()" style="display:flex;align-items:center;gap:6px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.4);color:var(--purple);border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">🎙️ Dictado con IA</button>'
-      +'</div>';
-  // Tab bar
+  // Tab bar (botón de dictado movido al FAB flotante — siempre visible en toda la app)
   html+='<div class="form-tabs"><button class="ftab active" onclick="swFTab(this,\'ft-datos\')">Paciente</button><button class="ftab" onclick="swFTab(this,\'ft-atb\')">Antimicrobianos</button><button class="ftab" onclick="swFTab(this,\'ft-micro\')">Microbiología</button><button class="ftab" onclick="swFTab(this,\'ft-abg\')">Antibiograma</button><button class="ftab" onclick="swFTab(this,\'ft-proa\')">Decisión PROA</button><button class="ftab" onclick="swFTab(this,\'ft-ic\')">🔄 Interconsulta</button></div>';
 
   // ── TIPO DE VISITA (aparece siempre, encima de todo) ──
@@ -12285,115 +12281,182 @@ window.renderFlujograma=function(){
   cont.innerHTML=html;
 };
 
-// ══ DICTADO POR VOZ ══
-window._dictFinal='';
-window._dictActive=false;
-window._dictRecog=null;
+// ══════════════════════════════════════════════════════════════════════
+// ASISTENTE DE VOZ UNIVERSAL — Flotante, fuera del modal, siempre activo
+// Funciona en paralelo con CUALQUIER formulario o vista de la app.
+// ══════════════════════════════════════════════════════════════════════
+window._va={active:false,recog:null,final:'',processing:false};
 
-window.abrirDictado=function(){
-  window._dictFinal='';window._dictActive=false;
-  const html='<div style="padding:4px 0 8px;">'
-    +'<div style="text-align:center;margin-bottom:16px;">'
-    +'<div id="dict-mic" onclick="window._dictToggle()" style="width:84px;height:84px;border-radius:50%;background:var(--s2);border:3px solid var(--brd2);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:40px;cursor:pointer;transition:all .3s;user-select:none;">🎙️</div>'
-    +'<div id="dict-st" style="font-size:12px;color:var(--t2);font-weight:600;">Toca el micrófono para comenzar</div>'
-    +'<div style="font-size:10.5px;color:var(--t3);margin-top:4px;">Habla con el paciente — incluye nombre, edad, servicio, diagnóstico, antibióticos...</div>'
+window._vaInit=function(){
+  if(document.getElementById('va-fab'))return;
+  const fab=document.createElement('div');
+  fab.id='va-fab';fab.title='Asistente de Voz — Dictado con IA';fab.textContent='🎙️';
+  fab.onclick=window._vaTogglePanel;
+  document.body.appendChild(fab);
+  const panel=document.createElement('div');
+  panel.id='va-panel';
+  panel.innerHTML=
+    '<div id="va-head">'
+    +'<div style="display:flex;align-items:center;gap:9px;">'
+    +'<div id="va-mic-btn" onclick="window._vaToggle()" title="Iniciar/pausar grabación" style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;flex-shrink:0;transition:all .3s;">🎙️</div>'
+    +'<div><div style="font-size:11.5px;font-weight:700;color:#fff;letter-spacing:.3px;">Asistente Clínico IA</div>'
+    +'<div id="va-status" style="font-size:10px;color:rgba(255,255,255,.75);">Listo — toca el mic para grabar</div></div>'
     +'</div>'
-    +'<div id="dict-live" style="min-height:90px;max-height:200px;overflow-y:auto;background:var(--s2);border:1px solid var(--brd2);border-radius:7px;padding:10px;font-size:11.5px;color:var(--t2);line-height:1.6;margin-bottom:12px;white-space:pre-wrap;font-style:italic;">El texto aparecerá aquí en tiempo real...</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
-    +'<button id="dict-proc" onclick="window._dictProcesar()" style="background:rgba(167,139,250,.12);border:1px solid var(--purple);color:var(--purple);border-radius:6px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">✨ Llenar campos con IA</button>'
-    +'<button onclick="window._dictLimpiar()" style="background:var(--s2);border:1px solid var(--brd2);color:var(--t2);border-radius:6px;padding:10px;font-size:12px;cursor:pointer;">🗑 Limpiar</button>'
+    +'<button onclick="window._vaTogglePanel()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:20px;cursor:pointer;padding:0;line-height:1;" title="Cerrar">✕</button>'
     +'</div>'
-    +'<div style="font-size:10px;color:var(--t3);text-align:center;line-height:1.5;">La IA extrae: nombre, edad, sexo, servicio, diagnóstico,<br>gravedad, antibióticos, microorganismo, foco infeccioso y más.</div>'
+    +'<div id="va-ctx" style="padding:5px 12px;font-size:10px;color:var(--t3);background:var(--s2);border-bottom:1px solid var(--brd2);"></div>'
+    +'<div id="va-transcript" style="min-height:72px;max-height:160px;overflow-y:auto;padding:10px 12px;font-size:11px;color:var(--t2);line-height:1.65;white-space:pre-wrap;font-style:italic;">Habla con el paciente — la transcripción aparece aquí en tiempo real...</div>'
+    +'<div id="va-advisor" style="display:none;max-height:160px;overflow-y:auto;padding:8px 12px;border-top:1px solid var(--brd2);font-size:10.5px;line-height:1.55;"></div>'
+    +'<div style="padding:9px 12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+    +'<button id="va-fill-btn" onclick="window._vaFill()" style="background:rgba(167,139,250,.18);border:1px solid rgba(167,139,250,.5);color:var(--purple);border-radius:6px;padding:9px;font-size:11.5px;font-weight:700;cursor:pointer;">✨ Llenar con IA</button>'
+    +'<button onclick="window._vaClear()" style="background:var(--s2);border:1px solid var(--brd2);color:var(--t2);border-radius:6px;padding:9px;font-size:11.5px;cursor:pointer;">🗑 Limpiar</button>'
     +'</div>';
-  abrirContenido('🎙️ Dictado Inteligente — Llenado con IA', html);
+  document.body.appendChild(panel);
+  setInterval(window._vaUpdateCtx,2500);
 };
 
-window._dictToggle=function(){if(window._dictActive)window._dictStop();else window._dictStart();};
+window._vaTogglePanel=function(){
+  const p=document.getElementById('va-panel');if(!p)return;
+  if(p.classList.contains('open')){p.classList.remove('open');window._vaStop();}
+  else{p.classList.add('open');window._vaUpdateCtx();}
+};
 
-window._dictStart=function(){
+window._vaUpdateCtx=function(){
+  const el=document.getElementById('va-ctx');if(!el)return;
+  const modalOpen=document.getElementById('modal-bg')?.classList.contains('open');
+  const tab=modalOpen?document.querySelector('#modal-bdy .ftab.active')?.textContent?.trim():'';
+  const vMap={censo:'📋 Censo',farmacia:'💊 Farmacia',reporte:'📊 Reporte',camas:'🏥 Camas',trasplante:'🫀 Trasplante',profilaxis:'💉 Profilaxis',ddd:'📈 DDD',whatsapp:'📲 Contactos'};
+  el.textContent=modalOpen?('📝 Formulario: '+(tab||'Paciente')):(vMap[window.currentView||'censo']||window.currentView||'Inicio');
+};
+
+window._vaToggle=function(){if(window._va.active)window._vaStop();else window._vaStart();};
+
+window._vaStart=function(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){toast('Dictado requiere Chrome o Edge','am');return;}
-  const r=new SR();
-  r.continuous=true;r.interimResults=true;r.lang='es-MX';
+  if(!SR){toast('Dictado requiere Chrome o Edge ≥89','am');return;}
+  const r=new SR();r.continuous=true;r.interimResults=true;r.lang='es-MX';
   r.onresult=function(e){
-    let interim='';
+    let irim='';
     for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal)window._dictFinal+=e.results[i][0].transcript+' ';
-      else interim+=e.results[i][0].transcript;
+      if(e.results[i].isFinal)window._va.final+=e.results[i][0].transcript+' ';
+      else irim+=e.results[i][0].transcript;
     }
-    const el=document.getElementById('dict-live');
-    if(el)el.textContent=window._dictFinal+interim;
+    const el=document.getElementById('va-transcript');
+    if(el){el.textContent=window._va.final+irim;el.scrollTop=el.scrollHeight;}
   };
-  r.onerror=function(e){
-    window._dictActive=false;
-    const mic=document.getElementById('dict-mic');
-    if(mic){mic.style.background='var(--s2)';mic.style.borderColor='var(--brd2)';}
-    const st=document.getElementById('dict-st');
-    if(st)st.textContent='Error: '+e.error+'. Verifica permisos de micrófono.';
+  r.onerror=function(ev){
+    window._va.active=false;
+    document.getElementById('va-fab')?.classList.remove('listening');
+    const m=document.getElementById('va-mic-btn');
+    if(m){m.style.background='rgba(255,255,255,.15)';m.style.borderColor='rgba(255,255,255,.35)';m.textContent='🎙️';}
+    const s=document.getElementById('va-status');
+    if(s)s.textContent='Error: '+ev.error+' — verifica permisos de micrófono';
   };
-  r.onend=function(){if(window._dictActive)r.start();};
-  r.start();window._dictRecog=r;window._dictActive=true;
-  const mic=document.getElementById('dict-mic');
-  if(mic){mic.style.background='rgba(255,77,109,.12)';mic.style.borderColor='var(--red)';}
-  const st=document.getElementById('dict-st');
-  if(st)st.textContent='🔴 Escuchando... toca para pausar';
+  r.onend=function(){if(window._va.active){try{r.start();}catch(_){}}};
+  r.start();window._va.recog=r;window._va.active=true;
+  const m=document.getElementById('va-mic-btn');
+  if(m){m.style.background='rgba(239,68,68,.35)';m.style.borderColor='rgba(239,68,68,.7)';m.textContent='⏸';}
+  const s=document.getElementById('va-status');if(s)s.textContent='🔴 Grabando conversación...';
+  document.getElementById('va-fab')?.classList.add('listening');
+  document.getElementById('va-panel')?.classList.add('open');
+  window._vaUpdateCtx();
 };
 
-window._dictStop=function(){
-  window._dictActive=false;
-  if(window._dictRecog){try{window._dictRecog.stop();}catch(_){}window._dictRecog=null;}
-  const mic=document.getElementById('dict-mic');
-  if(mic){mic.style.background='var(--s2)';mic.style.borderColor='var(--teal)';}
-  const st=document.getElementById('dict-st');
-  if(st)st.textContent='⏸ Pausado — toca el mic para continuar o procesa con IA';
+window._vaStop=function(){
+  window._va.active=false;
+  if(window._va.recog){try{window._va.recog.stop();}catch(_){}window._va.recog=null;}
+  const m=document.getElementById('va-mic-btn');
+  if(m){m.style.background='rgba(255,255,255,.15)';m.style.borderColor='rgba(255,255,255,.35)';m.textContent='🎙️';}
+  const s=document.getElementById('va-status');if(s)s.textContent='⏸ Pausado — toca mic para continuar';
+  document.getElementById('va-fab')?.classList.remove('listening');
 };
 
-window._dictLimpiar=function(){
-  window._dictFinal='';window._dictStop();
-  const el=document.getElementById('dict-live');if(el)el.textContent='';
-  const st=document.getElementById('dict-st');if(st)st.textContent='Toca el micrófono para comenzar';
+window._vaClear=function(){
+  window._va.final='';window._vaStop();
+  const t=document.getElementById('va-transcript');
+  if(t)t.textContent='Habla con el paciente — la transcripción aparece aquí en tiempo real...';
+  const adv=document.getElementById('va-advisor');if(adv){adv.style.display='none';adv.innerHTML='';}
+  const s=document.getElementById('va-status');if(s)s.textContent='Listo — toca el mic para grabar';
 };
 
-window._dictProcesar=async function(){
-  const texto=(window._dictFinal||(document.getElementById('dict-live')?.textContent||'')).trim();
-  if(!texto){toast('Habla primero antes de procesar','am');return;}
-  if(!window._anthropicProxyURL&&!window._abgApiKey){toast('Configura API Key de Anthropic en Administración del hospital','am');return;}
-  window._dictStop();
-  const btn=document.getElementById('dict-proc');
+window._vaFill=async function(){
+  const text=window._va.final.trim();
+  if(!text){toast('Graba primero — toca el micrófono','am');return;}
+  if(!window._anthropicProxyURL&&!window._abgApiKey){toast('Configura la API Key de Anthropic en Administración del hospital','am');return;}
+  if(window._va.processing)return;
+  window._va.processing=true;
+  window._vaStop();
+  const btn=document.getElementById('va-fill-btn');
   if(btn){btn.disabled=true;btn.textContent='⌛ Analizando...';}
-  const st=document.getElementById('dict-st');
-  if(st)st.textContent='IA procesando el texto...';
+  const s=document.getElementById('va-status');if(s)s.textContent='Enviando a IA...';
   try{
-    const sys='Eres un extractor de datos clínicos para un hospital en México. Tu ÚNICA tarea es devolver un JSON. NO escribas ningún texto antes ni después del JSON. NO uses markdown ni backticks. La respuesta debe comenzar exactamente con { y terminar exactamente con }.\n\nEsquema (usa null para campos no mencionados):\n{"nombre":string|null,"edad":number|null,"sexo":"Masculino"|"Femenino"|null,"exp":string|null,"servicio":string|null,"cama":string|null,"medico":string|null,"dx":string|null,"focoInf":string|null,"gravedad":"Leve"|"Moderada"|"Grave"|"Crítica"|null,"via":"VO"|"IV"|"IM"|null,"atb":string|null,"organismo":string|null,"cult":"Positivo"|"Negativo"|"Pendiente"|null,"muestra":string|null,"renal":"Normal"|"ERC"|"Lesión renal aguda"|null,"notas":string|null}';
-    const res=await llamarAnthropicSeguro([{role:'user',content:texto}],sys,700,'claude-sonnet-4-5');
+    const modalOpen=document.getElementById('modal-bg')?.classList.contains('open');
+    const tab=modalOpen?document.querySelector('#modal-bdy .ftab.active')?.textContent?.trim():'';
+    const view=window.currentView||'censo';
+    const ctxStr='Vista: '+view+(modalOpen?'. Formulario abierto, pestaña: '+(tab||'Paciente'):'');
+    const sys='Eres el asistente clínico de StewardMX (PROA hospitalario México). Contexto: '+ctxStr+'\n'
+      +'Analiza la conversación médico-paciente y extrae TODOS los datos clínicos. SOLO devuelve JSON. La respuesta EMPIEZA con { y TERMINA con }. Sin markdown, sin texto adicional.\n\n'
+      +'{"paciente":{"nombre":null,"edad":null,"sexo":null,"exp":null,"servicio":null,"cama":null,"medico":null,"dx":null,"gravedad":null,"focoInf":null,"via":null,"renal":null,"bacteriemia":null,"accion":null,"rev":null,"notas":null},'
+      +'"atb":[{"nombre":null,"dosis":null,"via":null,"dias":null}],'
+      +'"micro":{"cult":null,"muestra":null,"organismo":null,"fenotipo":null},'
+      +'"labs":{"hb":null,"leucocitos":null,"neutrofilos":null,"plaquetas":null,"creatinina":null,"bun":null,"pcr":null,"procalcitonina":null,"lactato":null,"glucosa":null,"sodio":null,"potasio":null,"otros":null},'
+      +'"missing":["campos clínicos importantes no mencionados que el médico debería preguntar al paciente según NOM-004 para historia clínica completa"],'
+      +'"sugerencias":["recomendaciones PROA/infectología basadas en los datos mencionados"],'
+      +'"alertas":["alertas clínicas críticas si las hay"]}';
+    const res=await llamarAnthropicSeguro([{role:'user',content:text}],sys,1500,'claude-sonnet-4-5');
     const raw=res?.content?.[0]?.text||'';
-    // Strip markdown code fences if present, then match outermost JSON object
     const cleaned=raw.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'').trim();
-    const m=cleaned.match(/\{[\s\S]*\}/); // greedy — first { to last }
-    if(!m)throw new Error('La IA no devolvió JSON. Respuesta: '+cleaned.substring(0,80));
+    const m=cleaned.match(/\{[\s\S]*\}/);
+    if(!m)throw new Error('Sin JSON válido en respuesta');
     const d=JSON.parse(m[0]);
-    const fill=(id,val)=>{if(val==null)return;const el=document.getElementById(id);if(el)el.value=val;};
-    const sel=(id,val)=>{if(!val)return;const el=document.getElementById(id);if(!el)return;const o=Array.from(el.options).find(o=>o.value===val||o.text===val||o.text.includes(val));if(o)el.value=o.value;};
-    fill('f-nom',d.nombre);fill('f-edad',d.edad);fill('f-exp',d.exp);fill('f-cama',d.cama);
-    fill('f-medico',d.medico);fill('f-dx',d.dx);fill('f-foco',d.focoInf);fill('f-notas',d.notas);
-    fill('f-organismo',d.organismo);fill('f-muestra',d.muestra);
-    sel('f-sexo',d.sexo);sel('f-grav',d.gravedad);sel('f-via',d.via);
-    sel('f-renal',d.renal);sel('f-cult',d.cult);
-    // Try ATB in nombre field of first ATB row
-    if(d.atb){const atbEl=document.getElementById('atb-0-nom');if(atbEl)atbEl.value=d.atb;}
-    // Try servicio dropdown or input
-    const svcEl=document.getElementById('f-servicio')||document.getElementById('f-svc');
-    if(svcEl&&d.servicio){if(svcEl.tagName==='SELECT')sel('f-servicio',d.servicio);else svcEl.value=d.servicio;}
-    const filled=Object.values(d).filter(v=>v!=null).length;
-    if(st)st.textContent='✅ '+filled+' campos llenados correctamente';
-    if(btn){btn.disabled=false;btn.textContent='✨ Llenar campos con IA';}
-    toast('✅ '+filled+' campos completados por IA','ok');
+    // ── Helpers
+    const fill=(id,val)=>{if(val==null||val==='')return;const el=document.getElementById(id);if(el)el.value=val;};
+    const selOpt=(id,val)=>{if(!val)return;const el=document.getElementById(id);if(!el)return;const o=Array.from(el.options).find(op=>op.value===val||op.text===val||op.text.toLowerCase().includes(String(val).toLowerCase()));if(o)el.value=o.value;};
+    // ── Paciente
+    if(d.paciente){
+      const p=d.paciente;
+      fill('f-nom',p.nombre);fill('f-edad',p.edad);fill('f-exp',p.exp);fill('f-cama',p.cama);
+      fill('f-medico',p.medico);fill('f-dx',p.dx);fill('f-notas',p.notas);fill('f-renal',p.renal);
+      selOpt('f-sexo',p.sexo);selOpt('f-grav',p.gravedad);selOpt('f-bact',p.bacteriemia);
+      selOpt('f-accion',p.accion);selOpt('f-rev',p.rev);
+      selOpt('f-foco',p.focoInf==='sí'||p.focoInf===true?'sí':p.focoInf==='no'||p.focoInf===false?'no':'pendiente');
+      const svc=document.getElementById('f-servicio');
+      if(svc&&p.servicio){if(svc.tagName==='SELECT'){const o=Array.from(svc.options).find(op=>op.text.toLowerCase().includes(p.servicio.toLowerCase())||op.value.toLowerCase().includes(p.servicio.toLowerCase()));if(o)svc.value=o.value;}else svc.value=p.servicio;}
+    }
+    // ── Microbiología
+    if(d.micro){
+      selOpt('f-cult',d.micro.cult);selOpt('f-muestra',d.micro.muestra);
+      if(d.micro.organismo){const org=document.getElementById('f-org');if(org){const o=Array.from(org.options).find(op=>op.text.toLowerCase().includes(d.micro.organismo.toLowerCase()));if(o){org.value=o.value;try{inferirFenotipo();}catch(_){}}}
+      }
+    }
+    // ── ATB row 0
+    if(d.atb&&d.atb[0]){
+      const a=d.atb[0];
+      fill('atb-0-nom',a.nombre);fill('atb-0-dosis',a.dosis);
+      if(a.via){const v=document.getElementById('atb-0-via');if(v){const o=Array.from(v.options).find(op=>op.value===a.via||op.text===a.via);if(o)v.value=o.value;}}
+    }
+    // ── Switch tab si hay datos de micro/org
+    if(d.micro?.organismo||d.micro?.cult){
+      const microTab=document.querySelector('#modal-bdy button.ftab[onclick*="ft-micro"]');if(microTab)microTab.click();
+    }
+    // ── Panel de asesor PROA
+    let ah='';
+    if(d.alertas?.length){ah+='<div style="color:var(--red);font-weight:700;margin-bottom:5px;">🚨 Alertas:</div>';d.alertas.forEach(x=>{ah+='<div style="color:var(--red);margin-bottom:3px;">• '+x+'</div>';});}
+    if(d.sugerencias?.length){ah+='<div style="color:var(--teal);font-weight:700;margin:6px 0 4px;">💡 PROA / Infectología:</div>';d.sugerencias.forEach(x=>{ah+='<div style="color:var(--t2);margin-bottom:3px;">• '+x+'</div>';});}
+    if(d.missing?.length){ah+='<div style="color:var(--amber);font-weight:700;margin:6px 0 4px;">❓ Preguntar al paciente:</div>';d.missing.forEach(x=>{ah+='<div style="color:var(--t2);margin-bottom:3px;">• '+x+'</div>';});}
+    const adv=document.getElementById('va-advisor');
+    if(adv){adv.innerHTML=ah||'<div style="color:var(--teal);">✅ Sin alertas adicionales.</div>';adv.style.display='block';}
+    if(btn){btn.disabled=false;btn.textContent='✨ Llenar con IA';}
+    if(s)s.textContent='✅ Campos completados';
+    toast('✅ Campos completados por IA','ok');
   }catch(e){
-    if(btn){btn.disabled=false;btn.textContent='✨ Llenar campos con IA';}
-    if(st)st.textContent='Error: '+e.message;
-    toast('Error IA dictado: '+e.message,'rd');
-  }
+    if(btn){btn.disabled=false;btn.textContent='✨ Llenar con IA';}
+    const s2=document.getElementById('va-status');if(s2)s2.textContent='Error: '+e.message;
+    toast('Error IA: '+e.message,'rd');
+  }finally{window._va.processing=false;}
 };
+// Alias para compatibilidad con botón en formulario
+window.abrirDictado=window._vaTogglePanel;
 
 // ══ WORD EXPORT HELPER ══
 function _txWordExport(titulo,bodyHTML,pac){
@@ -14531,6 +14594,15 @@ select option{background:var(--s2);}
 .sir-btn.sir-s:hover,.sir-btn.sir-s.active{background:rgba(0,212,168,.15);border-color:var(--teal);color:var(--teal);}
 .sir-btn.sir-i:hover,.sir-btn.sir-i.active{background:rgba(245,166,35,.15);border-color:var(--amber);color:var(--amber);}
 .sir-btn.sir-r:hover,.sir-btn.sir-r.active{background:rgba(255,77,109,.15);border-color:var(--red);color:var(--red);}
+/* ── Asistente de Voz Universal ── */
+#va-fab{position:fixed;bottom:22px;right:22px;z-index:9990;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 18px rgba(109,40,217,.55);transition:all .3s;user-select:none;}
+#va-fab:hover{transform:scale(1.1);box-shadow:0 6px 26px rgba(109,40,217,.75);}
+#va-fab.listening{background:linear-gradient(135deg,#dc2626,#ea580c);animation:va-pulse 1.5s infinite;}
+@keyframes va-pulse{0%,100%{box-shadow:0 4px 18px rgba(220,38,38,.5);}50%{box-shadow:0 4px 28px rgba(220,38,38,.8),0 0 0 10px rgba(220,38,38,.1);}}
+#va-panel{position:fixed;bottom:84px;right:22px;z-index:9989;width:348px;background:var(--s1);border:1px solid var(--brd2);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.35);display:none;flex-direction:column;overflow:hidden;max-height:calc(100vh - 110px);}
+#va-panel.open{display:flex;}
+#va-head{padding:11px 14px;background:linear-gradient(135deg,#7c3aed,#6d28d9);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;}
+@media(max-width:600px){#va-fab{bottom:14px;right:14px;width:48px;height:48px;font-size:20px;}#va-panel{width:calc(100vw - 24px);right:12px;bottom:72px;}}
 .modal-bg{display:none;position:fixed;inset:0;background:var(--bg-overlay);z-index:var(--z-modal);align-items:center;justify-content:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
 .modal-bg.open{display:flex;animation:fadeIn .2s ease;}
 .modal-box{background:var(--s1);border:1px solid var(--brd);border-radius:var(--r-lg);width:720px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;box-shadow:var(--sh-lg);animation:mIn .25s cubic-bezier(.2,.8,.2,1);}
@@ -16070,6 +16142,8 @@ input:focus,select:focus,textarea:focus{
 // ── PWA: registro de Service Worker con auto-update ──
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
+    // Inicializar asistente de voz flotante
+    try{window._vaInit();}catch(_){}
     try{
       const reg=await navigator.serviceWorker.register('/sw.js');
       // Detectar nueva versión disponible
