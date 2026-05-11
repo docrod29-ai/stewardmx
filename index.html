@@ -1631,7 +1631,7 @@ window.guardarApiKeyHosp=async()=>{
     const aks=document.getElementById('apikey-status');if(aks)aks.style.display='';
     const msg=U?.email===SUPER_ADMIN?'API Key guardada GLOBALMENTE ✓ — disponible para todos los hospitales y usuarios sin configuración adicional':'API Key guardada ✓ — análisis IA disponible para este hospital';
     toast(msg);
-    document.getElementById('cfg-apikey').value='';
+    const _akEl=document.getElementById('cfg-apikey');if(_akEl)_akEl.value='';
   }catch(e){toast('Error: '+e.message,'rd');}
 };
 
@@ -2153,14 +2153,14 @@ async function cargarCamas(){
   CAMAS=s.exists()?s.data():{UCI:['1','2','3','4','5','6'],'Terapia Intermedia':['TI-1','TI-2','TI-3','TI-4'],'Medicina Interna':['MI-1','MI-2','MI-3','MI-4','MI-5','MI-6','MI-7','MI-8'],'Cirugía General':['CG-1','CG-2','CG-3','CG-4'],'Urgencias':['URG-1','URG-2','URG-3'],'Pediatría':['PED-1','PED-2','PED-3','PED-4'],'Ginecología':['GO-1','GO-2','GO-3'],'Ortopedia':['ORT-1','ORT-2','ORT-3'],'Hemodiálisis':['HD-1','HD-2','HD-3']};}catch(e){CAMAS={};}
   renderCamas();
 }
-async function saveCamas(){await setDoc(doc(db,'hospitals',HOSP,'info','camas'),CAMAS);}
-window.addCama=async svc=>{const inp=document.getElementById('nc-'+svc.replace(/\W/g,'_'));const val=(inp?.value||'').trim();if(!val)return;if(!CAMAS[svc])CAMAS[svc]=[];if(CAMAS[svc].includes(val)){toast('Ya existe','am');return;}CAMAS[svc].push(val);await saveCamas();renderCamas();toast('Cama agregada ✓');};
-window.delCama=async(svc,cama)=>{CAMAS[svc]=(CAMAS[svc]||[]).filter(c=>c!==cama);await saveCamas();renderCamas();};
+async function saveCamas(){try{await setDoc(doc(db,'hospitals',HOSP,'info','camas'),CAMAS);}catch(e){toast('Error guardando camas: '+e.message,'rd');throw e;}}
+window.addCama=async svc=>{const inp=document.getElementById('nc-'+svc.replace(/\W/g,'_'));const val=(inp?.value||'').trim();if(!val)return;if(!CAMAS[svc])CAMAS[svc]=[];if(CAMAS[svc].includes(val)){toast('Ya existe','am');return;}CAMAS[svc].push(val);try{await saveCamas();renderCamas();toast('Cama agregada ✓');}catch(_){}};
+window.delCama=async(svc,cama)=>{CAMAS[svc]=(CAMAS[svc]||[]).filter(c=>c!==cama);try{await saveCamas();renderCamas();}catch(_){}};
 window.delServicio=async(svc)=>{
   const pOcup=PACS.filter(p=>p.servicio===svc).length;
   if(pOcup>0){toast('Tiene '+pOcup+' pac. activos, reasígnalos primero','rd');return;}
   if(!confirm('¿Eliminar servicio "'+svc+'" y sus '+((CAMAS[svc]||[]).length)+' camas?'))return;
-  delete CAMAS[svc];await saveCamas();renderCamas();toast('Servicio eliminado ✓');
+  delete CAMAS[svc];try{await saveCamas();renderCamas();toast('Servicio eliminado ✓');}catch(_){}
 };
 window.renombrarServicio=async(svc)=>{
   const nuevo=prompt('Nuevo nombre para "'+svc+'":',svc);
@@ -2174,7 +2174,7 @@ window.renombrarServicio=async(svc)=>{
     await saveCamas();renderCamas();toast('Servicio renombrado ✓');
   }catch(e){toast('Error al renombrar: '+e.message,'rd');}
 };
-window.addServicio=async()=>{const nom=prompt('Nombre del nuevo servicio:');if(!nom?.trim())return;if(CAMAS[nom.trim()]){toast('Ya existe','am');return;}CAMAS[nom.trim()]=[];await saveCamas();renderCamas();toast('Servicio creado ✓');};
+window.addServicio=async()=>{const nom=prompt('Nombre del nuevo servicio:');if(!nom?.trim())return;if(CAMAS[nom.trim()]){toast('Ya existe','am');return;}CAMAS[nom.trim()]=[];try{await saveCamas();renderCamas();toast('Servicio creado ✓');}catch(_){}};
 
 function renderCamas(){
   const el=document.getElementById('camas-grid');if(!el)return;
@@ -3168,7 +3168,7 @@ function abrirFormPaciente(p){
 
 // ── Helpers: Tipo de Visita ──
 window.selTipoVisita=function(v){
-  document.getElementById('f-tipo-visita').value=v;
+  const _tvEl=document.getElementById('f-tipo-visita');if(!_tvEl)return;_tvEl.value=v;
   const tvOpts=[
     {v:'seguimiento',color:'var(--teal)',bg:'rgba(0,212,168,.12)',brd:'rgba(0,212,168,.4)'},
     {v:'interconsulta',color:'var(--blue)',bg:'rgba(61,155,255,.12)',brd:'rgba(61,155,255,.4)'},
@@ -3958,8 +3958,9 @@ window.toggleCultFecha=function(sel){
   const v=sel?sel.value:(document.getElementById('f-cult')?.value);
   const w=document.getElementById('cult-fecha-wrap');
   if(w)w.style.display=(v&&v!=='no')?'':'none';
-  if(w&&(v&&v!=='no')&&!document.getElementById('f-cult-fecha').value){
-    document.getElementById('f-cult-fecha').value=new Date().toISOString().slice(0,10);
+  const _cfEl=document.getElementById('f-cult-fecha');
+  if(w&&(v&&v!=='no')&&_cfEl&&!_cfEl.value){
+    _cfEl.value=new Date().toISOString().slice(0,10);
   }
 };
 
@@ -4073,7 +4074,7 @@ window.calcTFG=function(){
   const edad=parseFloat(gv('f-edad'))||0;
   const creat=parseFloat(gv('f-creat'))||0;
   const sexo=gv('f-sexo');
-  if(!edad||!creat||creat<=0){document.getElementById('f-renal').value='';return;}
+  if(!edad||!creat||creat<=0){const r0=document.getElementById('f-renal');if(r0)r0.value='';return;}
   // CKD-EPI 2021 (race-free)
   const female=sexo==='F';
   const kappa=female?0.7:0.9;
@@ -4091,7 +4092,7 @@ window.calcTFG=function(){
   else if(tfgR>=30)cat='TFG '+tfgR+' mL/min (G3b mod-sev↓)';
   else if(tfgR>=15)cat='TFG '+tfgR+' mL/min (G4 severa↓)';
   else cat='TFG '+tfgR+' mL/min (G5 falla renal)';
-  document.getElementById('f-renal').value=cat;
+  const renalEl=document.getElementById('f-renal');if(renalEl)renalEl.value=cat;
 };
 
 // ── Inferir fenotipo automáticamente ──
@@ -4228,7 +4229,7 @@ window.autoCalcRiesgo=function(){
   if(/mec-blee/.test(mecsStr)&&bact==='sí')riesgo='alto';
   if(/CRE|XDR|PDR/i.test(gv('f-feno')))riesgo='alto';
   if(/tuberculosis|MDR|MAC|PCP|jirovecii|Toxoplasma|Cryptococcus|CMV|Cytomegalovirus|avium/i.test(org))riesgo='alto';
-  document.getElementById('f-riesgo').value=riesgo;
+  const riesgoEl=document.getElementById('f-riesgo');if(riesgoEl)riesgoEl.value=riesgo;
   toast('Riesgo calculado: '+riesgo.toUpperCase());
 };
 
@@ -4472,7 +4473,7 @@ window.cargarExpediente=async(pid)=>{
     }
 
     if(!numNotas){
-      el.innerHTML='<div style="color:var(--t3);font-size:11px;text-align:center;padding:30px;"><div style="font-size:28px;opacity:.3;margin-bottom:8px;">📋</div>Sin notas de interconsulta.<br><span style="font-size:10px;">Escribe la primera nota PROA arriba.</span></div>';
+      el.innerHTML='<div style="color:var(--t3);font-size:11px;text-align:center;padding:30px;"><div style="font-size:28px;opacity:.3;margin-bottom:8px;">📋</div>Aún no hay notas de interconsulta.<br><span style="font-size:10px;color:var(--purple);">🎙️ Dicta la primera nota PROA con tu voz o escríbela arriba.</span></div>';
       return;
     }
 
@@ -6399,7 +6400,7 @@ function calcDOTAuto(){
 }
 
 window.renderDDD=function renderDDD(){
-  cargarDDD().then(()=>{
+  cargarDDD().catch(()=>{}).then(()=>{
     const el=document.getElementById('ddd-content');if(!el)return;
     const dotA=calcDOTAuto();
     const mesDDD=document.getElementById('ddd-mes')?.value||currentMonth;
@@ -7633,7 +7634,7 @@ async function cargarProfilaxis(){
 }
 
 function renderProfilaxis(){
-  cargarProfilaxis().then(()=>{
+  cargarProfilaxis().catch(()=>{}).then(()=>{
     const el=document.getElementById('prof-content');if(!el)return;
     let h='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
     // Panel izq: formulario
@@ -7756,15 +7757,17 @@ window.guardarProfilaxis=async()=>{
     const diff=(t1-t2)/60000;
     cumplimiento=diff>=20&&diff<=90; // ≥20min (marge operativo) hasta 90min (cubre vancomicina/FQ)
   }
-  await addDoc(collection(db,'hospitals',HOSP,'profilaxis'),{
-    paciente:pac,exp:document.getElementById('prf-exp')?.value||'',
-    tipo,cirujano:document.getElementById('prf-cir')?.value||'',
-    fechaCirugia:dtCir,horaAdm:hadm,
-    atb:document.getElementById('prf-atb')?.value||proto?.atb||'',
-    obs:document.getElementById('prf-obs')?.value||'',
-    cumplimiento,by:U.email,ts:serverTimestamp()
-  });
-  toast('Registro guardado ✓');renderProfilaxis();
+  try{
+    await addDoc(collection(db,'hospitals',HOSP,'profilaxis'),{
+      paciente:pac,exp:document.getElementById('prf-exp')?.value||'',
+      tipo,cirujano:document.getElementById('prf-cir')?.value||'',
+      fechaCirugia:dtCir,horaAdm:hadm,
+      atb:document.getElementById('prf-atb')?.value||proto?.atb||'',
+      obs:document.getElementById('prf-obs')?.value||'',
+      cumplimiento,by:U.email,ts:serverTimestamp()
+    });
+    toast('Registro guardado ✓');renderProfilaxis();
+  }catch(e){toast('Error al guardar: '+e.message,'rd');}
 };
 
 window.exportarProfilaxis=()=>{
@@ -12338,7 +12341,7 @@ window._vaToggle=function(){if(window._va.active)window._vaStop();else window._v
 
 window._vaCheckCommands=function(text){
   const t=text.toLowerCase();
-  if(t.includes('guardar')){toast('💾 Guardando...','ok');window._va.final=window._va.final.replace(/guardar/gi,'').trim();try{document.getElementById('btn-guardar-pac')?.click();}catch(_){}return true;}
+  if(t.includes('guardar')){toast('💾 Guardando...','ok');window._va.final=window._va.final.replace(/guardar/gi,'').trim();try{(document.querySelector('button[onclick="guardar()"],button[onclick*="guardar()"]')||document.getElementById('btn-guardar-pac'))?.click();}catch(_){}return true;}
   if(t.includes('nuevo paciente')){toast('➕ Abriendo nuevo paciente...','ok');window._va.final=window._va.final.replace(/nuevo paciente/gi,'').trim();try{document.querySelector('[onclick*="abrirFormPaciente"]')?.click();}catch(_){}return true;}
   if(t.includes('limpiar')||t.includes('borrar todo')){window._vaClear();return true;}
   if(t.includes('analizar')||t.includes('llenar campos')||t.includes('llenar formulario')){window._vaFill();return true;}
@@ -12427,7 +12430,7 @@ Analiza la conversación médico-paciente y extrae TODOS los datos clínicos. DE
 
 Reglas estrictas:
 - gravedad: "leve"|"moderada"|"grave"|"critica"
-- focoInf: "sí"|"no-aplica"|"pendiente"|"no"
+- focoInf: texto libre descriptivo del foco infeccioso (ej. "Neumonía", "ITU", "Bacteriemia", "Foco abdominal")
 - tipoVisita: "seguimiento"|"interconsulta"|"urgente"|"trasplante"
 - inmuno: "no"|"corticoides"|"quimioterapia"|"trasplante"|"VIH"|"otra"
 - indic: "sí"|"parcial"|"no"
@@ -12461,7 +12464,9 @@ Reglas estrictas:
       if(selOpt('f-sexo',p.sexo))n++;if(selOpt('f-grav',p.gravedad))n++;
       if(selOpt('f-bact',p.bacteriemia))n++;if(selOpt('f-accion',p.accion))n++;
       if(selOpt('f-rev',p.rev))n++;if(selOpt('f-inmuno',p.inmuno))n++;
-      if(selOpt('f-indic',p.indic))n++;if(selOpt('f-foco',p.focoInf))n++;
+      if(selOpt('f-indic',p.indic))n++;
+      // f-foco-inf es texto libre (foco infeccioso); usar _cboSel para no abrir el dropdown
+      if(p.focoInf&&p.focoInf!=='null'){try{window._cboSel('f-foco-inf',String(p.focoInf));n++;}catch(_){fill('f-foco-inf',p.focoInf);}}
       if(selOpt('f-durplan',p.durplan))n++;
       if(p.servicio)selSvc(p.servicio);
       if(p.tipoVisita&&typeof selTipoVisita==='function'){try{selTipoVisita(p.tipoVisita);n++;}catch(_){}}
@@ -15453,14 +15458,18 @@ input:focus,select:focus,textarea:focus{
         <div class="tbl-wrap">
           <table class="ctbl"><thead><tr><th>#</th><th>Paciente</th><th>Serv/Cama</th><th>Dx</th><th>Antimicrobiano(s)</th><th>Política</th><th>Día</th><th>Cultivo</th><th>Organismo</th><th>Riesgo</th><th>Acción</th><th>Rev</th><th></th></tr></thead><tbody id="tbody"></tbody></table>
           <div id="empty-tbl" class="empty-tbl" style="display:none;">
-  <div style="font-size:48px;opacity:.25;margin-bottom:16px;line-height:1;">🦠</div>
-  <div style="font-size:15px;font-weight:700;color:var(--t2);margin-bottom:8px;">Sin pacientes en este mes</div>
-  <div style="font-size:12px;color:var(--t3);line-height:1.7;max-width:320px;margin:0 auto 20px;">
-    Agrega el primer paciente con antibiótico activo para comenzar el seguimiento PROA en tiempo real.
+  <div style="font-size:44px;opacity:.35;margin-bottom:14px;line-height:1;">🦠</div>
+  <div style="font-size:16px;font-weight:700;color:var(--t2);margin-bottom:6px;">Tu primer pase de visita PROA empieza aquí</div>
+  <div style="font-size:12px;color:var(--t3);line-height:1.8;max-width:360px;margin:0 auto 10px;">
+    Agrega un paciente con antibiótico activo. StewardMX genera alertas AWaRe, calcula DOT, ajusta dosis por TFG y sugiere desescalada — automáticamente.
+  </div>
+  <div style="font-size:11px;color:var(--purple);background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.22);border-radius:6px;padding:6px 16px;display:inline-block;margin-bottom:18px;">
+    🎙️ Tip: Toca el botón morado para dictar los datos con tu voz — sin teclear.
   </div>
   <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
     <button onclick="abrirNuevo()" class="btn-main" style="font-size:12px;padding:9px 18px;">+ Agregar paciente</button>
     <button onclick="showView('guias',document.querySelector('.tab-btn[onclick*=guias]'))" style="background:rgba(0,212,168,.08);border:1px solid rgba(0,212,168,.25);color:var(--teal);border-radius:6px;padding:9px 18px;font-size:12px;cursor:pointer;font-weight:600;">🧬 Ver guías clínicas</button>
+    <button onclick="(window.matchMedia('(display-mode:standalone)').matches||window.navigator.standalone)?window.location.href='guia.html':window.open('guia.html','_blank')" style="background:rgba(61,155,255,.08);border:1px solid rgba(61,155,255,.25);color:var(--blue);border-radius:6px;padding:9px 18px;font-size:12px;cursor:pointer;font-weight:600;">📘 Guía de uso</button>
   </div>
 </div>
         </div>
