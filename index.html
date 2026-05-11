@@ -832,6 +832,14 @@ async function cargarApp(u,isAdmin){
   }
   // Pre-inicializar GIS en background para que Google Sheets funcione al primer click
   setTimeout(()=>_preinitSheets(),4000);
+  // Inicializar URL de Whisper (Cloud Function)
+  try{
+    window._va.whisperURL=window._va.whisperURL||'https://us-central1-stewardmx-1.cloudfunctions.net/whisperTranscribe';
+    window._whisperURL=window._va.whisperURL;
+  }catch(_){}
+  // Procesar queue offline si hay conectividad
+  window.addEventListener('online',()=>{try{window._vaProcessOfflineQueue();}catch(_){}},{once:true});
+  try{window._vaProcessOfflineQueue();}catch(_){}
 }
 
 function mostrarBannerNovedades(){
@@ -1255,6 +1263,11 @@ window.cargarPlataforma=async()=>{
                 <option value="no_aplica"${cfdiSel('no_aplica')}>— No aplica</option>
               </select>
             </div>
+            <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <span style="font-size:10px;color:var(--t3);white-space:nowrap;flex-shrink:0;">🎤 Voz:</span>
+              <button onclick="toggleVoiceEnabled('${h.id}',${!h.voice_enabled})" style="background:${h.voice_enabled?'rgba(0,212,168,.15)':'rgba(255,255,255,.05)'};border:1px solid ${h.voice_enabled?'rgba(0,212,168,.4)':'var(--brd2)'};color:${h.voice_enabled?'var(--teal)':'var(--t3)'};border-radius:5px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600;">${h.voice_enabled?'✅ Activada':'🔇 Desactivada'}</button>
+              ${h.voice_enabled?`<select onchange="setVoiceCap('${h.id}',this.value)" title="Cap mensual de minutos Whisper" style="background:var(--s1);border:1px solid var(--brd2);color:var(--t2);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;">${[100,300,600,1200,-1].map(v=>`<option value="${v}"${((h.voice_cap_min||300)===v||(v===-1&&h.voice_cap_min===-1))?' selected':''}>${v===-1?'♾ Sin límite':v+' min/mes'}</option>`).join('')}</select>`:''}
+            </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;">
             ${btonesHTML}
@@ -1276,6 +1289,22 @@ window.guardarWaVentas=async()=>{
     const st=document.getElementById('wa-ventas-status');
     if(st)st.textContent=wa?'✓ wa.me/52'+wa:'(sin número — botón de planes desactivado)';
     toast('WhatsApp de ventas guardado ✓');
+  }catch(e){toast('Error: '+e.message,'rd');}
+};
+window.toggleVoiceEnabled=async(hospId,enable)=>{
+  if(!requireManagerAccess())return;
+  try{
+    await setDoc(doc(db,'hospitals_registry',hospId),{voice_enabled:enable,voice_cap_min:enable?300:0},{merge:true});
+    toast(enable?'🎤 Voz activada para este hospital ✓':'🔇 Voz desactivada ✓');
+    cargarPlataforma();
+  }catch(e){toast('Error: '+e.message,'rd');}
+};
+window.setVoiceCap=async(hospId,val)=>{
+  if(!requireManagerAccess())return;
+  const cap=parseInt(val);
+  try{
+    await setDoc(doc(db,'hospitals_registry',hospId),{voice_cap_min:cap},{merge:true});
+    toast('Cap de voz actualizado: '+(cap===-1?'sin límite':cap+' min/mes')+' ✓');
   }catch(e){toast('Error: '+e.message,'rd');}
 };
 window.guardarNota=async(hospId)=>{
@@ -12462,6 +12491,11 @@ window.renderFlujograma=function(){
 // TFG automática · múltiples ATBs · detección de paciente · comandos de voz
 // ══════════════════════════════════════════════════════════════════════
 window._va={active:false,recog:null,final:'',processing:false};
+window._va.mediaRecorder=null;
+window._va.audioChunks=[];
+window._va.audioBlob=null;
+window._va.patientId=null; // ID of patient being visited
+window._va.whisperURL=null; // set at runtime from Cloud Function URL
 
 window._vaInit=function(){
   if(document.getElementById('va-fab'))return;
@@ -12482,6 +12516,7 @@ window._vaInit=function(){
     +'</div>'
     +'<div id="va-ctx" style="padding:5px 12px;font-size:10px;color:var(--t3);background:var(--s2);border-bottom:1px solid var(--brd2);"></div>'
     +'<div id="va-pac-match" style="display:none;padding:7px 12px;background:rgba(0,212,168,.07);border-bottom:1px solid rgba(0,212,168,.2);font-size:10.5px;"></div>'
+    +'<div id="va-usage" style="font-family:var(--mono);font-size:9px;color:var(--t3);text-align:right;padding:4px 12px 0;"></div>'
     +'<div id="va-transcript" style="min-height:80px;max-height:148px;overflow-y:auto;padding:10px 12px;font-size:11px;color:var(--t2);line-height:1.65;white-space:pre-wrap;font-style:italic;">Habla con el paciente — la transcripción aparece aquí en tiempo real...</div>'
     +'<div style="padding:2px 12px 4px;font-size:9.5px;color:var(--t3);">Comandos: <b>«guardar»</b> · <b>«nuevo paciente»</b> · <b>«limpiar»</b> · <b>«analizar»</b></div>'
     +'<div id="va-waveform" style="display:none;padding:4px 12px 4px;align-items:flex-end;justify-content:center;gap:3px;height:34px;">'
@@ -12519,6 +12554,12 @@ window._vaCheckCommands=function(text){
   if(t.includes('limpiar')||t.includes('borrar todo')){window._vaClear();return true;}
   if(t.includes('analizar')||t.includes('llenar campos')||t.includes('llenar formulario')){window._vaFill();return true;}
   if(t.includes('cancelar')||t.includes('cerrar formulario')){try{cerrarModal();}catch(_){}return true;}
+  if(t.includes('ir a laboratorios')||t.includes('abrir laboratorios')){try{document.querySelector('.ftab[onclick*="dt-labs"]')?.click();}catch(_){}toast('📈 Laboratorios','ok');return true;}
+  if(t.includes('ir a antibiograma')||t.includes('abrir antibiograma')){try{document.querySelector('.ftab[onclick*="dt-abg"]')?.click();}catch(_){}toast('🧫 Antibiograma','ok');return true;}
+  if(t.includes('ir a visita')||t.includes('pase de visita')||t.includes('abrir visita')){try{document.querySelector('.ftab[onclick*="dt-reco"]')?.click();}catch(_){}toast('🩺 Pase de visita','ok');return true;}
+  if(t.includes('ir a censo')||t.includes('abrir censo')){try{showView('censo');}catch(_){}toast('📋 Censo','ok');return true;}
+  if(t.includes('ir a farmacia')){try{showView('farmacia');}catch(_){}toast('🧪 Farmacia','ok');return true;}
+  if(t.includes('ir a flujograma')){try{showView('flujograma');}catch(_){}toast('🔄 Flujograma','ok');return true;}
   return false;
 };
 
@@ -12553,6 +12594,28 @@ window._vaStart=function(){
   };
   r.onend=function(){if(window._va.active){try{r.start();}catch(_){}}};
   r.start();window._va.recog=r;window._va.active=true;
+  // ── MediaRecorder: grabar audio para Whisper (cuando hay internet) ──
+  try{
+    if(navigator.mediaDevices&&!window._va.mediaRecorder){
+      navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(stream=>{
+        const mimeTypes=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
+        const mime=mimeTypes.find(m=>MediaRecorder.isTypeSupported(m))||'';
+        window._va.audioChunks=[];
+        window._va.audioBlob=null;
+        const mr=new MediaRecorder(stream,mime?{mimeType:mime}:{});
+        mr.ondataavailable=e=>{if(e.data&&e.data.size>0)window._va.audioChunks.push(e.data);};
+        mr.onstop=()=>{
+          window._va.audioBlob=new Blob(window._va.audioChunks,{type:mime||'audio/webm'});
+          stream.getTracks().forEach(t=>t.stop());
+          window._va.mediaRecorder=null;
+        };
+        mr.start(1000); // collect in 1-sec chunks
+        window._va.mediaRecorder=mr;
+        window._va._audioMime=mime;
+        window._va._recordStart=Date.now();
+      }).catch(()=>{}); // No MediaRecorder: fall back to Web Speech only
+    }
+  }catch(_){}
   const m=document.getElementById('va-mic-btn');
   if(m){m.style.background='rgba(239,68,68,.35)';m.style.borderColor='rgba(239,68,68,.7)';m.innerHTML='⏸';}
   const s=document.getElementById('va-status');if(s)s.textContent='🔴 Grabando conversación...';
@@ -12565,6 +12628,9 @@ window._vaStart=function(){
 window._vaStop=function(){
   window._va.active=false;
   if(window._va.recog){try{window._va.recog.stop();}catch(_){}window._va.recog=null;}
+  if(window._va.mediaRecorder&&window._va.mediaRecorder.state!=='inactive'){
+    try{window._va.mediaRecorder.stop();}catch(_){}
+  }
   const m=document.getElementById('va-mic-btn');
   if(m){m.style.background='rgba(255,255,255,.15)';m.style.borderColor='rgba(255,255,255,.35)';m.innerHTML='🎙️';}
   const s=document.getElementById('va-status');if(s)s.textContent='⏸ Pausado — toca mic para continuar';
@@ -12582,16 +12648,61 @@ window._vaClear=function(){
 };
 
 window._vaFill=async function(){
-  const text=window._va.final.trim();
-  if(!text){toast('Graba primero — toca el micrófono','am');return;}
-  if(!window._anthropicProxyURL&&!window._abgApiKey){toast('Configura la API Key de Anthropic en Administración','am');return;}
+  const webText=window._va.final.trim();
+  if(!webText&&!window._va.audioBlob){toast('Graba primero — toca el micrófono','am');return;}
   if(window._va.processing)return;
   window._va.processing=true;
   window._vaStop();
   const btn=document.getElementById('va-fill-btn');
-  if(btn){btn.disabled=true;btn.textContent='⌛ Analizando...';}
-  const st=document.getElementById('va-status');if(st)st.textContent='🧠 IA analizando conversación...';
+  const st=document.getElementById('va-status');
+  if(btn){btn.disabled=true;btn.textContent='⌛ Procesando...';}
+
   try{
+    // ── 1. Transcripción: Whisper online >> Web Speech offline ──
+    let transcript=webText;
+    const whisperURL=window._va.whisperURL||window._whisperURL;
+    if(navigator.onLine&&window._va.audioBlob&&whisperURL&&HOSP&&U){
+      if(st)st.textContent='🔊 Transcribiendo audio (Whisper)...';
+      try{
+        const reader=new FileReader();
+        const b64=await new Promise((res,rej)=>{reader.onload=e=>res(e.target.result.split(',')[1]);reader.onerror=rej;reader.readAsDataURL(window._va.audioBlob);});
+        const durationSec=window._va._recordStart?Math.round((Date.now()-window._va._recordStart)/1000):60;
+        const wRes=await fetch(whisperURL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64:b64,mimeType:window._va._audioMime||'audio/webm',hospId:HOSP,uid:U.uid,durationEstSec:durationSec})});
+        const wData=await wRes.json();
+        if(wRes.ok&&wData.transcript){
+          transcript=wData.transcript;
+          if(st)st.textContent='✅ Whisper: '+Math.round(wData.durationSec||0)+'s transcritos';
+          // Mostrar uso en el panel
+          if(wData.minutesUsed!==undefined&&wData.cap!==-1){
+            const pct=Math.round((wData.minutesUsed/(wData.cap||300))*100);
+            const uEl=document.getElementById('va-usage');
+            if(uEl)uEl.textContent=`🎤 ${Math.round(wData.minutesUsed)} / ${wData.cap} min`;
+          }
+        }else if(wData.code==='VOICE_DISABLED'){
+          toast('⚠ Voz no activada para este hospital. Usando texto de Web Speech.','am');
+        }else if(wData.code==='VOICE_CAP_REACHED'){
+          toast('⚠ Límite mensual de voz alcanzado. Usando texto de Web Speech.','am');
+        }
+      }catch(e){console.warn('[whisper]',e.message);}
+    }else if(!navigator.onLine&&webText){
+      // Guardar en cola offline
+      try{
+        const queue=JSON.parse(localStorage.getItem('_va_offline_queue')||'[]');
+        queue.push({transcript:webText,ts:Date.now(),hospId:HOSP,uid:U?.uid});
+        if(queue.length>10)queue.shift();
+        localStorage.setItem('_va_offline_queue',JSON.stringify(queue));
+        toast('📴 Sin internet — transcripción guardada para procesar cuando haya señal','am');
+      }catch(_){}
+    }
+
+    if(!transcript){if(btn){btn.disabled=false;btn.textContent='✨ Llenar con IA';}window._va.processing=false;return;}
+
+    // ── 2. Extracción con Claude ──
+    if(st)st.textContent='🧠 Claude analizando conversación...';
+    if(!window._anthropicProxyURL&&!window._abgApiKey){
+      toast('Configura la API Key de Anthropic en Administración','am');
+      window._va.processing=false;if(btn){btn.disabled=false;btn.textContent='✨ Llenar con IA';}return;
+    }
     const modalOpen=document.getElementById('modal-bg')?.classList.contains('open');
     const tab=modalOpen?document.querySelector('#modal-bdy .ftab.active')?.textContent?.trim():'';
     const view=window.currentView||'censo';
@@ -12599,103 +12710,245 @@ window._vaFill=async function(){
 
 Analiza la conversación médico-paciente y extrae TODOS los datos clínicos. DEVUELVE ÚNICAMENTE JSON válido — sin markdown, sin texto extra. Inicia con { y termina con }.
 
-{"paciente":{"nombre":null,"edad":null,"sexo":null,"expediente":null,"servicio":null,"cama":null,"medico":null,"peso":null,"dx":null,"gravedad":null,"focoInf":null,"tipoVisita":null,"inmuno":null,"indic":null,"bacteriemia":null,"accion":null,"rev":null,"durplan":null,"notas":null},"labs":{"creatinina":null,"hb":null,"leucocitos":null,"neutrofilos":null,"plaquetas":null,"bun":null,"pcr":null,"procalcitonina":null,"lactato":null,"glucosa":null,"sodio":null,"potasio":null,"otros":null},"atb":[{"nombre":null,"dosis":null,"via":null,"durplan":null}],"micro":{"cult":null,"muestra":null,"organismo":null,"fenotipo":null},"missing":["campos NOM-004 no mencionados que el médico debe preguntar"],"sugerencias":["recomendaciones PROA basadas en los datos"],"alertas":["alertas clínicas o de resistencia críticas"]}
+{"paciente":{"nombre":null,"edad":null,"sexo":null,"expediente":null,"servicio":null,"cama":null,"medico":null,"peso":null,"dx":null,"gravedad":null,"focoInf":null,"tipoVisita":null,"inmuno":null,"indic":null,"bacteriemia":null,"accion":null,"rev":null,"durplan":null,"notas":null},"labs":{"creatinina":null,"hb":null,"leucocitos":null,"neutrofilos":null,"plaquetas":null,"bun":null,"pcr":null,"procalcitonina":null,"lactato":null,"glucosa":null,"sodio":null,"potasio":null,"cloro":null,"calcio":null,"alt":null,"ast":null,"fa":null,"bt":null,"albumina":null,"otros":null},"labsNotas":null,"atb":[{"nombre":null,"dosis":null,"via":null,"durplan":null}],"micro":{"cult":null,"muestra":null,"organismo":null,"fenotipo":null},"notaVisita":{"subjetivo":null,"objetivo":null,"analisis":null,"plan":null},"esNuevoPaciente":false,"missing":["campos NOM-004 no mencionados"],"sugerencias":["recomendaciones PROA"],"alertas":["alertas críticas"]}
 
-Reglas estrictas:
-- gravedad: "leve"|"moderada"|"grave"|"critica"
-- focoInf: texto libre descriptivo del foco infeccioso (ej. "Neumonía", "ITU", "Bacteriemia", "Foco abdominal")
-- tipoVisita: "seguimiento"|"interconsulta"|"urgente"|"trasplante"
-- inmuno: "no"|"corticoides"|"quimioterapia"|"trasplante"|"VIH"|"otra"
-- indic: "sí"|"parcial"|"no"
-- bacteriemia: "no"|"sí"|"sospecha"
-- accion: "mantener"|"desescalar"|"suspender"|"vo"|"escalar"|"ajustar"|"cambiar"
-- rev: "24h"|"48h"|"72h"|"1 semana"|"alta"
-- durplan: "3-5d"|"5-7d"|"7-10d"|"14d"|"≥21d"|"indefinida"
-- atb.via: "IV"|"VO"|"IM"|"SC"|"Inhal"|"Tópica"
-- micro.cult: "sí"|"posterior"|"pendiente"|"positivo"|"negativo"|"no"
-- creatinina: número en mg/dL (solo el número, ej. 1.8)
-- edad, peso: solo el número sin unidades
-- Si hay varios ATB, todos van en el array atb[]
-- servicio: inferir del contexto (ej. "Medicina Interna", "UCI", "Cirugía General")`;
-    const res=await llamarAnthropicSeguro([{role:'user',content:text}],sys,2000,'claude-sonnet-4-5');
+Reglas: gravedad:"leve"|"moderada"|"grave"|"critica" · focoInf:texto libre · tipoVisita:"seguimiento"|"interconsulta"|"urgente" · inmuno:"no"|"corticoides"|"quimioterapia"|"trasplante"|"VIH"|"otra" · indic:"sí"|"parcial"|"no" · bacteriemia:"no"|"sí"|"sospecha" · accion:"mantener"|"desescalar"|"suspender"|"vo"|"escalar"|"ajustar"|"cambiar" · rev:"24h"|"48h"|"72h"|"1 semana"|"alta" · durplan:"3-5d"|"5-7d"|"7-10d"|"14d"|"≥21d"|"indefinida" · atb.via:"IV"|"VO"|"IM"|"SC" · micro.cult:"sí"|"posterior"|"pendiente"|"positivo"|"negativo"|"no" · creatinina,hb,pcr,procalcitonina,lactato,etc: solo número decimal · edad,peso:solo número`;
+    const res=await llamarAnthropicSeguro([{role:'user',content:transcript}],sys,2048,'claude-sonnet-4-5');
     const raw=res?.content?.[0]?.text||'';
     const cleaned=raw.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'').trim();
     const mJSON=cleaned.match(/\{[\s\S]*\}/);
     if(!mJSON)throw new Error('Sin JSON válido en respuesta IA');
     const d=JSON.parse(mJSON[0]);
-    // ── Helpers de llenado
-    const fill=(id,val)=>{if(val==null||val===''||String(val)==='null')return false;const el=document.getElementById(id);if(!el)return false;el.value=String(val);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;};
-    const selOpt=(id,val)=>{if(!val||String(val)==='null')return false;const el=document.getElementById(id);if(!el||el.tagName!=='SELECT')return false;const v=String(val).toLowerCase().trim();const o=Array.from(el.options).find(op=>op.value===val||op.value.toLowerCase()===v||op.text.toLowerCase()===v||op.text.toLowerCase().includes(v)||v.includes(op.value.toLowerCase()));if(o){el.value=o.value;el.dispatchEvent(new Event('change',{bubbles:true}));return true;}return false;};
-    const selSvc=(val)=>{if(!val)return;const svc=document.getElementById('f-svc');if(!svc)return;const v=String(val).toLowerCase().trim();const o=Array.from(svc.options).find(op=>op.text.toLowerCase().includes(v)||op.value.toLowerCase().includes(v)||v.includes(op.value.toLowerCase()));if(o){svc.value=o.value;svc.dispatchEvent(new Event('change',{bubbles:true}));}};
-    let n=0;
-    // ── Datos del paciente
-    if(d.paciente){
-      const p=d.paciente;
-      if(fill('f-nom',p.nombre))n++;if(fill('f-edad',p.edad))n++;if(fill('f-exp',p.expediente))n++;
-      if(fill('f-cama',p.cama))n++;if(fill('f-medico',p.medico))n++;if(fill('f-dx',p.dx))n++;
-      if(fill('f-notas',p.notas))n++;if(fill('f-peso',p.peso))n++;
-      if(selOpt('f-sexo',p.sexo))n++;if(selOpt('f-grav',p.gravedad))n++;
-      if(selOpt('f-bact',p.bacteriemia))n++;if(selOpt('f-accion',p.accion))n++;
-      if(selOpt('f-rev',p.rev))n++;if(selOpt('f-inmuno',p.inmuno))n++;
-      if(selOpt('f-indic',p.indic))n++;
-      // f-foco-inf es texto libre (foco infeccioso); usar _cboSel para no abrir el dropdown
-      if(p.focoInf&&p.focoInf!=='null'){try{window._cboSel('f-foco-inf',String(p.focoInf));n++;}catch(_){fill('f-foco-inf',p.focoInf);}}
-      if(selOpt('f-durplan',p.durplan))n++;
-      if(p.servicio)selSvc(p.servicio);
-      if(p.tipoVisita&&typeof selTipoVisita==='function'){try{selTipoVisita(p.tipoVisita);n++;}catch(_){}}
-    }
-    // ── Creatinina → TFG automático (CKD-EPI 2021)
-    if(d.labs&&d.labs.creatinina!=null&&String(d.labs.creatinina)!=='null'){
-      if(fill('f-creat',d.labs.creatinina))n++;
-      setTimeout(()=>{try{(window.calcTFG||calcTFG)();}catch(_){}},180);
-    }
-    // ── ATB múltiples filas
-    if(d.atb&&d.atb.length){
-      const need=d.atb.length;
-      let rows=document.querySelectorAll('[id^="atb-"][id$="-nom"]').length||0;
-      while(rows<need){try{addAtbRow();rows++;}catch(_){break;}}
-      d.atb.forEach((a,i)=>{
-        if(!a||(!a.nombre&&!a.dosis&&!a.via))return;
-        if(fill('atb-'+i+'-nom',a.nombre))n++;
-        if(fill('atb-'+i+'-dosis',a.dosis))n++;
-        const vEl=document.getElementById('atb-'+i+'-via');
-        if(vEl&&a.via){const vo=Array.from(vEl.options).find(op=>op.value===a.via||op.text===a.via||op.value.toLowerCase()===String(a.via).toLowerCase());if(vo){vEl.value=vo.value;n++;}}
-        if(a.durplan)selOpt('f-durplan',a.durplan);
-      });
-    }
-    // ── Microbiología + fenotipo automático
-    if(d.micro){
-      if(selOpt('f-cult',d.micro.cult))n++;
-      if(fill('f-muestra',d.micro.muestra))n++;
-      if(d.micro.organismo){
-        const orgEl=document.getElementById('f-org');
-        if(orgEl){const ov=Array.from(orgEl.options).find(op=>op.text.toLowerCase().includes(d.micro.organismo.toLowerCase())||d.micro.organismo.toLowerCase().includes(op.text.toLowerCase().split(' ')[0]));if(ov){orgEl.value=ov.value;n++;try{inferirFenotipo();}catch(_){}try{mostrarResistenciasIntrinsecas(ov.value);}catch(_){}}}
-      }
-    }
-    // ── Detección de paciente en PACS
+    d._transcript=transcript; // keep for reference
+    // Buscar paciente existente
     const pac=window._vaBuscarPac(d.paciente?.nombre);
-    const pm=document.getElementById('va-pac-match');
-    if(pac&&pm){
-      pm.innerHTML='<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:15px;">👤</span><div style="flex:1;"><div style="font-weight:700;color:var(--teal);font-size:11px;">Paciente encontrado en censo</div><div style="font-size:10px;color:var(--t2);">'+escHtml(pac.nombre)+' — '+escHtml(pac.servicio||'S/S')+' — Cama '+escHtml(String(pac.cama||'—'))+'</div></div><button onclick="try{abrirFormPaciente(\''+pac.id+'\');}catch(_){} document.getElementById(\'va-pac-match\').style.display=\'none\';" style="background:var(--teal);border:none;color:#fff;border-radius:5px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">Abrir ↗</button></div>';
-      pm.style.display='block';
-    }else if(pm)pm.style.display='none';
-    // ── Panel asesor PROA
-    let ah='';
-    if(d.alertas?.length){ah+='<div style="color:var(--red);font-weight:700;margin-bottom:5px;font-size:11px;">🚨 Alertas:</div>';d.alertas.forEach(x=>{ah+='<div style="color:var(--red);margin-bottom:3px;font-size:10.5px;">• '+x+'</div>';});}
-    if(d.sugerencias?.length){ah+='<div style="color:var(--teal);font-weight:700;margin:6px 0 4px;font-size:11px;">💡 PROA:</div>';d.sugerencias.forEach(x=>{ah+='<div style="color:var(--t2);margin-bottom:3px;font-size:10.5px;">• '+x+'</div>';});}
-    if(d.missing?.length){ah+='<div style="color:var(--amber);font-weight:700;margin:6px 0 4px;font-size:11px;">❓ Preguntar al paciente:</div>';d.missing.forEach(x=>{ah+='<div style="color:var(--t2);margin-bottom:3px;font-size:10.5px;">• '+x+'</div>';});}
-    const adv=document.getElementById('va-advisor');
-    if(adv){adv.innerHTML=ah||'<div style="color:var(--teal);font-size:10.5px;">✅ Sin alertas adicionales.</div>';adv.style.display='block';}
+    if(pac)window._va.patientId=pac.id;
+    d._foundPac=pac||null;
+    // Mostrar modal de confirmación en lugar de llenar directamente
+    _vaShowConfirmModal(d);
+    if(st)st.textContent='✅ Revisión lista — confirma los datos';
     if(btn){btn.disabled=false;btn.textContent='✨ Llenar con IA';}
-    if(st)st.textContent='✅ '+n+' campos completados';
-    toast('✅ '+n+' campos completados por IA','ok');
-    setTimeout(()=>{try{document.getElementById('f-nom')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(_){}},350);
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='✨ Llenar con IA';}
     const st2=document.getElementById('va-status');if(st2)st2.textContent='Error: '+e.message;
     toast('Error IA dictado: '+e.message,'rd');
   }finally{window._va.processing=false;}
 };
+// ── Modal de confirmación de voz ──────────────────────────────────────────
+window._vaShowConfirmModal=function(d){
+  const pac=d._foundPac;
+  const pacNom=pac?pac.nombre:(d.paciente?.nombre||'Nuevo paciente');
+  let h=`<div style="padding:16px 20px;background:linear-gradient(135deg,rgba(124,58,237,.15),rgba(109,40,217,.08));border-bottom:1px solid rgba(124,58,237,.25);">
+    <div style="font-size:13px;font-weight:700;color:var(--purple);">🎤 Datos extraídos de la visita</div>
+    <div style="font-size:10px;color:var(--t3);margin-top:2px;">${pac?'Paciente encontrado en censo — '+escHtml(pac.servicio||'S/S')+' · Cama '+escHtml(String(pac.cama||'—')):'Paciente nuevo — se creará al confirmar'}</div>
+  </div>
+  <div style="padding:16px 20px;overflow:auto;max-height:calc(80vh - 160px);">`;
+
+  // ── Sección Paciente ──
+  const P=d.paciente||{};
+  h+=`<details open style="margin-bottom:12px;border:1px solid var(--brd2);border-radius:8px;overflow:hidden;">
+    <summary style="padding:10px 14px;background:var(--s2);cursor:pointer;font-size:11px;font-weight:700;color:var(--t1);list-style:none;display:flex;justify-content:space-between;user-select:none;">📋 Datos del paciente <span style="color:var(--t3);font-weight:400;">▾</span></summary>
+    <div style="padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">`;
+  const fld=(lbl,id,val,type='text')=>`<div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:2px;">${lbl}</label><input type="${type}" id="vac-${id}" value="${escHtml(String(val||''))}" style="width:100%;border:1px solid var(--brd);background:var(--s1);color:var(--t1);border-radius:4px;padding:5px 8px;font-size:12px;" ${val?'style="border-color:rgba(124,58,237,.4);"':''}></div>`;
+  h+=fld('Nombre','nom',P.nombre)+fld('Edad','edad',P.edad,'number')+fld('Expediente','exp',P.expediente)+fld('Cama','cama',P.cama)+fld('Servicio','svc',P.servicio)+fld('Médico','medico',P.medico)+fld('Diagnóstico','dx',P.dx)+fld('Foco infeccioso','focoInf',P.focoInf)+fld('Peso (kg)','peso',P.peso,'number');
+  h+=`<div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:2px;">Gravedad</label><select id="vac-grav" style="width:100%;border:1px solid var(--brd);background:var(--s1);color:var(--t1);border-radius:4px;padding:5px 8px;font-size:12px;">${['','leve','moderada','grave','critica'].map(v=>`<option value="${v}" ${P.gravedad===v?'selected':''}>${v||'—'}</option>`).join('')}</select></div>`;
+  h+=`<div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:2px;">Acción PROA</label><select id="vac-accion" style="width:100%;border:1px solid var(--brd);background:var(--s1);color:var(--t1);border-radius:4px;padding:5px 8px;font-size:12px;">${['','mantener','desescalar','suspender','vo','escalar','ajustar','cambiar'].map(v=>`<option value="${v}" ${P.accion===v?'selected':''}>${v||'—'}</option>`).join('')}</select></div>`;
+  h+=`<div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:2px;">Revisión</label><select id="vac-rev" style="width:100%;border:1px solid var(--brd);background:var(--s1);color:var(--t1);border-radius:4px;padding:5px 8px;font-size:12px;">${['','24h','48h','72h','1 semana','alta'].map(v=>`<option value="${v}" ${P.rev===v?'selected':''}>${v||'—'}</option>`).join('')}</select></div>`;
+  h+=`</div></details>`;
+
+  // ── Sección ATB ──
+  const atbs=(d.atb||[]).filter(a=>a.nombre);
+  if(atbs.length){
+    h+=`<details open style="margin-bottom:12px;border:1px solid var(--brd2);border-radius:8px;overflow:hidden;">
+      <summary style="padding:10px 14px;background:var(--s2);cursor:pointer;font-size:11px;font-weight:700;color:var(--t1);list-style:none;display:flex;justify-content:space-between;user-select:none;">💊 Antibióticos (${atbs.length}) <span style="color:var(--t3);font-weight:400;">▾</span></summary>
+      <div style="padding:12px 14px;">`;
+    atbs.forEach((a,i)=>{
+      h+=`<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;margin-bottom:8px;padding-bottom:8px;${i<atbs.length-1?'border-bottom:1px solid var(--brd2);':''}">
+        <div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:2px;">ATB ${i+1}</label><input id="vac-atb${i}-nom" value="${escHtml(a.nombre||'')}" style="width:100%;border:1px solid rgba(124,58,237,.4);background:var(--s1);color:var(--t1);border-radius:4px;padding:5px 8px;font-size:12px;"></div>
+        <div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:2px;">Dosis</label><input id="vac-atb${i}-dosis" value="${escHtml(a.dosis||'')}" style="width:100%;border:1px solid var(--brd);background:var(--s1);color:var(--t1);border-radius:4px;padding:5px 8px;font-size:12px;"></div>
+        <div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:2px;">Vía</label><select id="vac-atb${i}-via" style="width:100%;border:1px solid var(--brd);background:var(--s1);color:var(--t1);border-radius:4px;padding:5px 8px;font-size:12px;">${['IV','VO','IM','SC','Inhal','Tópica'].map(v=>`<option value="${v}" ${a.via===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      </div>`;
+    });
+    h+=`</div></details>`;
+  }
+
+  // ── Sección Labs ──
+  const L=d.labs||{};
+  const labFields=[['hb','Hb (g/dL)'],['leucocitos','Leucocitos (×10³)'],['plaquetas','Plaquetas (×10³)'],['pcr','PCR (mg/L)'],['procalcitonina','PCT (ng/mL)'],['creatinina','Creatinina (mg/dL)'],['lactato','Lactato (mmol/L)'],['sodio','Sodio (mEq/L)'],['potasio','Potasio (mEq/L)'],['glucosa','Glucosa (mg/dL)'],['bun','BUN (mg/dL)'],['albumina','Albúmina (g/dL)']];
+  const labsConValor=labFields.filter(([k])=>L[k]!=null&&L[k]!=='null');
+  if(labsConValor.length){
+    h+=`<details open style="margin-bottom:12px;border:1px solid var(--brd2);border-radius:8px;overflow:hidden;">
+      <summary style="padding:10px 14px;background:var(--s2);cursor:pointer;font-size:11px;font-weight:700;color:var(--t1);list-style:none;display:flex;justify-content:space-between;user-select:none;">📈 Laboratorios (${labsConValor.length} valores) <span style="color:var(--t3);font-weight:400;">▾</span></summary>
+      <div style="padding:12px 14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">`;
+    labsConValor.forEach(([k,lbl])=>{
+      h+=`<div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:2px;">${lbl}</label><input type="number" step="any" id="vac-lab-${k}" value="${L[k]!=null?L[k]:''}" style="width:100%;border:1px solid rgba(61,155,255,.4);background:var(--s1);color:var(--t1);border-radius:4px;padding:5px 8px;font-size:12px;font-family:var(--mono);"></div>`;
+    });
+    h+=`</div></details>`;
+  }
+
+  // ── Sección Nota de visita ──
+  const N=d.notaVisita||{};
+  const notaTxt=[N.subjetivo,N.objetivo,N.analisis].filter(Boolean).join('\n');
+  const notaPlan=N.plan||'';
+  if(notaTxt||notaPlan){
+    h+=`<details open style="margin-bottom:12px;border:1px solid var(--brd2);border-radius:8px;overflow:hidden;">
+      <summary style="padding:10px 14px;background:var(--s2);cursor:pointer;font-size:11px;font-weight:700;color:var(--t1);list-style:none;display:flex;justify-content:space-between;user-select:none;">🩺 Nota de visita <span style="color:var(--t3);font-weight:400;">▾</span></summary>
+      <div style="padding:12px 14px;">
+        <textarea id="vac-nota-txt" style="width:100%;height:80px;border:1px solid rgba(61,155,255,.4);background:var(--s1);color:var(--t1);border-radius:4px;padding:8px;font-size:12px;resize:vertical;margin-bottom:6px;">${escHtml(notaTxt)}</textarea>
+        <input id="vac-nota-plan" placeholder="Plan PROA" value="${escHtml(notaPlan)}" style="width:100%;border:1px solid var(--brd);background:var(--s1);color:var(--t1);border-radius:4px;padding:6px 8px;font-size:12px;">
+      </div>
+    </details>`;
+  }
+
+  // ── Alertas / Sugerencias ──
+  if((d.alertas?.length||d.sugerencias?.length||d.missing?.length)){
+    h+=`<details style="margin-bottom:12px;border:1px solid var(--brd2);border-radius:8px;overflow:hidden;">
+      <summary style="padding:10px 14px;background:var(--s2);cursor:pointer;font-size:11px;font-weight:700;color:var(--t1);list-style:none;display:flex;justify-content:space-between;user-select:none;">💡 Asesor PROA <span style="color:var(--t3);font-weight:400;">▾</span></summary>
+      <div style="padding:12px 14px;font-size:11px;line-height:1.7;">`;
+    (d.alertas||[]).forEach(x=>{h+=`<div style="color:var(--red);margin-bottom:3px;">🚨 ${escHtml(x)}</div>`;});
+    (d.sugerencias||[]).forEach(x=>{h+=`<div style="color:var(--teal);margin-bottom:3px;">💡 ${escHtml(x)}</div>`;});
+    (d.missing||[]).forEach(x=>{h+=`<div style="color:var(--amber);margin-bottom:3px;">❓ ${escHtml(x)}</div>`;});
+    h+=`</div></details>`;
+  }
+  h+=`</div>
+  <div style="padding:14px 20px;border-top:1px solid var(--brd2);display:flex;gap:8px;flex-wrap:wrap;background:var(--s1);">
+    <button onclick="_vaApplyConfirmed(window._va._pendingData)" style="flex:1;background:linear-gradient(135deg,#7c3aed,#6d28d9);border:none;color:#fff;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;min-width:160px;">✅ Aplicar y guardar todo</button>
+    <button onclick="cerrarModal()" style="background:none;border:1px solid var(--brd);color:var(--t2);border-radius:8px;padding:11px 18px;font-size:13px;cursor:pointer;">Cancelar</button>
+  </div>`;
+  // Guardar datos en variable accesible para Apply
+  window._va._pendingData=d;
+  abrirContenido('✨ Revisión de visita PROA',h,{wide:true});
+};
+
+window._vaApplyConfirmed=async function(d){
+  if(!d)return;
+  cerrarModal();
+  let n=0;
+  const fill=(id,val)=>{if(val==null||val===''||String(val)==='null')return false;const el=document.getElementById(id);if(!el)return false;el.value=String(val);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;};
+  const selOpt=(id,val)=>{if(!val)return false;const el=document.getElementById(id);if(!el||el.tagName!=='SELECT')return false;const v=String(val).toLowerCase().trim();const o=Array.from(el.options).find(op=>op.value===val||op.value.toLowerCase()===v||op.text.toLowerCase().includes(v)||v.includes(op.value.toLowerCase()));if(o){el.value=o.value;el.dispatchEvent(new Event('change',{bubbles:true}));return true;}return false;};
+
+  // ── Leer campos del modal de confirmación (valores editados por el usuario) ──
+  const gvc=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
+  const editedPac={nombre:gvc('vac-nom'),edad:gvc('vac-edad'),expediente:gvc('vac-exp'),cama:gvc('vac-cama'),servicio:gvc('vac-svc'),medico:gvc('vac-medico'),dx:gvc('vac-dx'),focoInf:gvc('vac-focoInf'),peso:gvc('vac-peso'),gravedad:gvc('vac-grav'),accion:gvc('vac-accion'),rev:gvc('vac-rev')};
+
+  // ── Llenar formulario principal (si está abierto) ──
+  if(fill('f-nom',editedPac.nombre))n++;if(fill('f-edad',editedPac.edad))n++;
+  if(fill('f-exp',editedPac.expediente))n++;if(fill('f-cama',editedPac.cama))n++;
+  if(fill('f-medico',editedPac.medico))n++;if(fill('f-dx',editedPac.dx))n++;
+  if(fill('f-peso',editedPac.peso))n++;
+  if(editedPac.focoInf){try{window._cboSel('f-foco-inf',editedPac.focoInf);n++;}catch(_){fill('f-foco-inf',editedPac.focoInf);}}
+  if(selOpt('f-grav',editedPac.gravedad))n++;
+  if(selOpt('f-accion',editedPac.accion))n++;if(selOpt('f-rev',editedPac.rev))n++;
+  if(editedPac.servicio){const sEl=document.getElementById('f-svc');if(sEl){const v=editedPac.servicio.toLowerCase();const o=Array.from(sEl.options).find(op=>op.text.toLowerCase().includes(v)||v.includes(op.value.toLowerCase()));if(o){sEl.value=o.value;n++;}}}
+  if(d.paciente?.notas&&fill('f-notas',d.paciente.notas))n++;
+
+  // ── Creatinina → TFG ──
+  const vcre=gvc('vac-lab-creatinina');
+  if(vcre&&fill('f-creat',vcre)){n++;setTimeout(()=>{try{(window.calcTFG||calcTFG)();}catch(_){}},180);}
+
+  // ── ATB múltiples ──
+  const atbs=(d.atb||[]).filter(a=>a.nombre);
+  if(atbs.length){
+    let rows=document.querySelectorAll('[id^="atb-"][id$="-nom"]').length||0;
+    while(rows<atbs.length){try{addAtbRow();rows++;}catch(_){break;}}
+    atbs.forEach((a,i)=>{
+      const vnom=gvc('vac-atb'+i+'-nom')||a.nombre;
+      const vdos=gvc('vac-atb'+i+'-dosis')||a.dosis;
+      const vvia=gvc('vac-atb'+i+'-via')||a.via;
+      if(fill('atb-'+i+'-nom',vnom))n++;
+      if(fill('atb-'+i+'-dosis',vdos))n++;
+      const vEl=document.getElementById('atb-'+i+'-via');
+      if(vEl&&vvia){const vo=Array.from(vEl.options).find(op=>op.value===vvia);if(vo){vEl.value=vo.value;n++;}}
+    });
+  }
+
+  // ── Microbiología ──
+  if(d.micro){
+    if(selOpt('f-cult',d.micro.cult))n++;
+    if(fill('f-muestra',d.micro.muestra))n++;
+    if(d.micro.organismo){const orgEl=document.getElementById('f-org');if(orgEl){const ov=Array.from(orgEl.options).find(op=>op.text.toLowerCase().includes(d.micro.organismo.toLowerCase())||d.micro.organismo.toLowerCase().includes(op.text.toLowerCase().split(' ')[0]));if(ov){orgEl.value=ov.value;n++;try{inferirFenotipo();}catch(_){}try{mostrarResistenciasIntrinsecas(ov.value);}catch(_){}}}  }
+  }
+
+  // ── Nota de visita → llenar textareas si están visibles ──
+  const notaTxt=gvc('vac-nota-txt');
+  const notaPlan=gvc('vac-nota-plan');
+  if(notaTxt&&fill('nota-visit-txt',notaTxt))n++;
+  if(notaPlan&&fill('nota-plan',notaPlan))n++;
+
+  // ── Guardar labs directamente en Firestore si hay paciente ID ──
+  const pid=window._va.patientId||d._foundPac?.id;
+  if(pid){
+    const labData={fecha:new Date().toISOString().slice(0,10),notas:d.labsNotas||'Registrado por asistente de voz PROA'};
+    const labKeyMap={procalcitonina:'pct',pcr:'pcr',hb:'hb',leucocitos:'leuco',plaquetas:'plaq',creatinina:'creat',lactato:'lac',sodio:'na',potasio:'k',cloro:'cl',calcio:'ca',glucosa:'glu',bun:'bun',albumina:'alb',alt:'alt',ast:'ast',fa:'fa',bt:'bt'};
+    let alguno=false;
+    Object.entries(labKeyMap).forEach(([formK,dbK])=>{
+      const v=gvc('vac-lab-'+formK);
+      if(v){const num=parseFloat(v.replace(',','.'));if(!isNaN(num)){labData[dbK]=num;alguno=true;}}
+    });
+    if(alguno){
+      try{
+        labData.creadoAt=serverTimestamp();labData.creadoPor=U.uid;labData.creadoNombre=window._userName||U.email;
+        await addDoc(collection(db,'hospitals',HOSP,'patients',pid,'labs'),labData);
+        toast('📈 Laboratorios guardados en ficha del paciente');n++;
+      }catch(e){console.warn('[vaApply labs]',e.message);}
+    }
+    // Guardar nota de visita si hay texto
+    if(notaTxt||notaPlan){
+      try{
+        await addDoc(collection(db,'hospitals',HOSP,'patients',pid,'history'),{
+          type:'nota_visita',nota:notaTxt,plan:notaPlan,
+          by:U.email,byNombre:window._userName||U.email,
+          ts:serverTimestamp(),source:'voice',
+        });
+        toast('📝 Nota de visita guardada en expediente');n++;
+      }catch(e){console.warn('[vaApply nota]',e.message);}
+    }
+  }
+
+  // ── Crear nuevo paciente si no existe y se confirmó ──
+  if(d.esNuevoPaciente&&!pid&&editedPac.nombre){
+    try{
+      await addDoc(collection(db,..._pacPath()),{
+        nombre:editedPac.nombre,edad:editedPac.edad||'',sexo:d.paciente?.sexo||'',
+        exp:editedPac.expediente||'',cama:editedPac.cama||'',servicio:editedPac.servicio||'',
+        medico:editedPac.medico||'',dx:editedPac.dx||'',focoInf:editedPac.focoInf||'',
+        gravedad:editedPac.gravedad||'',atb:(d.atb?.[0]?.nombre)||'',
+        dosis:(d.atb?.[0]?.dosis)||'',via:(d.atb?.[0]?.via)||'IV',
+        pol:'libre',aware:'Watch',riesgo:'moderado',
+        ts:serverTimestamp(),updatedBy:U.email,updatedAt:new Date().toISOString(),
+        source:'voice',
+      });
+      toast('➕ Nuevo paciente creado desde asistente de voz');n++;
+    }catch(e){console.warn('[vaApply nuevo pac]',e.message);}
+  }
+
+  // ── Panel asesor ──
+  let ah='';
+  if(d.alertas?.length){ah+='<div style="color:var(--red);font-weight:700;margin-bottom:5px;font-size:11px;">🚨 Alertas:</div>';d.alertas.forEach(x=>{ah+='<div style="color:var(--red);margin-bottom:3px;font-size:10.5px;">• '+x+'</div>';});}
+  if(d.sugerencias?.length){ah+='<div style="color:var(--teal);font-weight:700;margin:6px 0 4px;font-size:11px;">💡 PROA:</div>';d.sugerencias.forEach(x=>{ah+='<div style="color:var(--t2);margin-bottom:3px;font-size:10.5px;">• '+x+'</div>';});}
+  const adv=document.getElementById('va-advisor');
+  if(adv){adv.innerHTML=ah||'<div style="color:var(--teal);font-size:10.5px;">✅ Sin alertas adicionales.</div>';adv.style.display='block';}
+  const st=document.getElementById('va-status');if(st)st.textContent='✅ '+n+' campos completados';
+  toast('✅ '+n+' campos aplicados desde asistente de voz','ok');
+  // Detectar paciente y ofrecer abrir
+  const pm=document.getElementById('va-pac-match');
+  const pacM=d._foundPac;
+  if(pacM&&pm){pm.innerHTML=`<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:15px;">👤</span><div style="flex:1;"><div style="font-weight:700;color:var(--teal);font-size:11px;">Paciente en censo</div><div style="font-size:10px;color:var(--t2);">${escHtml(pacM.nombre)} — ${escHtml(pacM.servicio||'S/S')} — Cama ${escHtml(String(pacM.cama||'—'))}</div></div><button onclick="try{abrirFormPaciente('${pacM.id}');}catch(_){} document.getElementById('va-pac-match').style.display='none';" style="background:var(--teal);border:none;color:#fff;border-radius:5px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">Abrir ↗</button></div>`;pm.style.display='block';}
+  window._va._pendingData=null;
+};
+
+// ── Verificar offline queue y procesar ──────────────────────────────────
+window._vaProcessOfflineQueue=async function(){
+  try{
+    const q=JSON.parse(localStorage.getItem('_va_offline_queue')||'[]');
+    if(!q.length||!navigator.onLine)return;
+    toast('📤 Procesando '+q.length+' grabación(es) guardada(s) sin internet...','am');
+    localStorage.removeItem('_va_offline_queue');
+    // Notificar al usuario — no procesamos automáticamente para no sobrescribir trabajo actual
+    setTimeout(()=>toast('📴 Tienes transcripciones sin procesar. Usa el Asistente de Voz para analizarlas.','am'),2000);
+  }catch(_){}
+};
+
 // Alias para compatibilidad con botón en formulario
 window.abrirDictado=window._vaTogglePanel;
 

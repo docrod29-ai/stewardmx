@@ -1610,3 +1610,104 @@ exports.auditLog = onCall(
     return { logged: true, logId };
   }
 );
+
+// ── 13. whisperTranscribe — Transcripción de audio con OpenAI Whisper ────────
+// POST { audioBase64, mimeType, hospId, uid, durationEstSec }
+// Returns { ok, transcript, durationSec, minutesUsed, cap }
+exports.whisperTranscribe = onRequest(
+  { region: 'us-central1', cors: true, secrets: ['OPENAI_KEY'], timeoutSeconds: 120, memory: '512MiB' },
+  async (req, res) => {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+    const { audioBase64, mimeType, hospId, uid, durationEstSec } = req.body;
+    if (!audioBase64 || !hospId || !uid) {
+      return res.status(400).json({ error: 'audioBase64, hospId y uid son requeridos' });
+    }
+
+    // ── Verificar que el hospital tiene voz habilitada ──
+    let regData = {};
+    try {
+      const regSnap = await db.collection('hospitals_registry').doc(hospId).get();
+      regData = regSnap.exists ? regSnap.data() : {};
+    } catch (e) {
+      console.error('[whisperTranscribe] Error leyendo registry:', e.message);
+    }
+
+    if (!regData.voice_enabled) {
+      return res.status(403).json({
+        error: 'La función de voz no está activada para este hospital. Contacta al equipo PROA de StewardMX.',
+        code: 'VOICE_DISABLED',
+      });
+    }
+
+    const capMin = regData.voice_cap_min === -1 ? Infinity : (regData.voice_cap_min || 300);
+
+    // ── Verificar uso mensual ──
+    const month = new Date().toISOString().slice(0, 7);
+    const usageRef = db.collection('hospitals').doc(hospId).collection('voice_usage').doc(month);
+    let usageData = { minutesUsed: 0, recordings: 0 };
+    try {
+      const usageSnap = await usageRef.get();
+      if (usageSnap.exists) usageData = usageSnap.data();
+    } catch (e) { /* continuar */ }
+
+    if (usageData.minutesUsed >= capMin) {
+      return res.status(402).json({
+        error: `Límite mensual de voz alcanzado (${capMin} min). Contacta al administrador para ampliar el plan.`,
+        code: 'VOICE_CAP_REACHED',
+        minutesUsed: usageData.minutesUsed,
+        cap: capMin,
+      });
+    }
+
+    // ── Llamar a Whisper ──
+    try {
+      const OpenAI = require('openai').default || require('openai');
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_KEY });
+
+      const audioBuffer = Buffer.from(audioBase64, 'base64');
+      const ext = mimeType?.includes('mp4') ? 'm4a'
+               : mimeType?.includes('ogg') ? 'ogg'
+               : mimeType?.includes('wav') ? 'wav'
+               : mimeType?.includes('webm') ? 'webm'
+               : 'webm';
+
+      // OpenAI SDK acepta un File-like object con toFile helper
+      const { toFile } = require('openai');
+      const audioFile = await toFile(audioBuffer, `audio.${ext}`, { type: mimeType || 'audio/webm' });
+
+      const whisperRes = await openai.audio.transcriptions.create({
+        file: audioFile,
+        model: 'whisper-1',
+        language: 'es',
+        response_format: 'verbose_json',
+        prompt: 'Transcripción de visita médica PROA. Términos médicos en español: antibiótico, procalcitonina, meropenem, carbapenem, BLEE, KPC, sepsis, bacteriemia, infección, dosis, servicio, cama, diagnóstico.',
+      });
+
+      const transcript = whisperRes.text || '';
+      const durationSec = whisperRes.duration || durationEstSec || 60;
+      const durationMin = durationSec / 60;
+
+      // ── Actualizar uso ──
+      try {
+        await usageRef.set({
+          minutesUsed: admin.firestore.FieldValue.increment(durationMin),
+          recordings: admin.firestore.FieldValue.increment(1),
+          lastRecordingAt: admin.firestore.FieldValue.serverTimestamp(),
+          month, hospId,
+        }, { merge: true });
+      } catch (e) { console.warn('[whisperTranscribe] Error actualizando uso:', e.message); }
+
+      return res.json({
+        ok: true,
+        transcript,
+        durationSec,
+        minutesUsed: (usageData.minutesUsed || 0) + durationMin,
+        cap: capMin === Infinity ? -1 : capMin,
+      });
+    } catch (e) {
+      console.error('[whisperTranscribe] Error:', e.message);
+      return res.status(502).json({ error: 'Error en transcripción. Intenta de nuevo. ' + e.message });
+    }
+  }
+);

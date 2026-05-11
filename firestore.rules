@@ -209,6 +209,14 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // ── Uso de voz por hospital (tracking Whisper) ───────────────────────
+      // Lectura: admin del hospital o super-admin
+      // Escritura: solo Cloud Function vía admin SDK
+      match /voice_usage/{month} {
+        allow read: if isSuperAdmin() || isHospAdmin(hospId);
+        allow write: if false;
+      }
+
       // Sistema de Farmacia
       match /antibiotic_requests/{reqId} {
         allow read, write: if isSuperAdmin() || isHospMember(hospId);
