@@ -14455,6 +14455,7 @@ window.renderColaPROA = function() {
 let _decisionReqId = null;
 window.abrirDecisionModal = function(reqId) {
   _decisionReqId = reqId;
+  _selectedDecision = null; // reset any leftover selection from a previous modal
   const r = _colaRequests.find(x => x.id === reqId);
   if (!r) return;
   const existing = document.getElementById('decision-modal');

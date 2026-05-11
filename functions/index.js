@@ -283,6 +283,7 @@ async function syncHospitalFHIR(hospId, cfg) {
     const dosis = getDose(mr);
     const via = getRoute(mr);
     const inicio = mr.authoredOn || null;
+    const requester = getRequester(mr);
 
     await docRef.set({
       nombre,
@@ -294,6 +295,7 @@ async function syncHospitalFHIR(hospId, cfg) {
       ehrSource: cfg.ehrName || 'EHR',
       atbs: [{ nom: medNom, dosis, via, inicio }],
       auto_synced: true,
+      requester,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
@@ -354,16 +356,18 @@ exports.cdsHooks = onRequest(
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const hospId = req.query.hospId;
-    if (!hospId) return res.json({ cards: [] });
+    const hospId = (req.query.hospId || '').trim();
+    if (!hospId) return res.status(400).json({ cards: [], error: 'hospId requerido' });
 
-    // Validar token
+    // Validar token — leer cfg una sola vez y reutilizarla en el bloque de censo
     const token = req.headers['x-stewardmx-token'];
     let validToken = false;
+    let cdsHooksCfgData = {};
     try {
       const cfgSnap = await db.doc(`hospitals/${hospId}/ehr_config/main`).get();
       if (cfgSnap.exists) {
-        validToken = cfgSnap.data().webhookToken === token;
+        cdsHooksCfgData = cfgSnap.data();
+        validToken = cdsHooksCfgData.webhookToken === token;
       }
     } catch (e) {
       console.error('[cdsHooks] error validating token:', e.message);
@@ -421,6 +425,25 @@ exports.cdsHooks = onRequest(
         fhirContext: JSON.stringify(body.context || {}),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      // Upsert paciente al CENSO mensual (months/{YYYY-MM}/patients/) para que aparezca
+      // en la tabla principal del equipo PROA, no sólo en la Cola EHR.
+      try {
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        const censoDocId = `ehr_${patientFhirId || fhirMedicationRequestId}`;
+        await db.doc(`hospitals/${hospId}/months/${currentMonth}/patients/${censoDocId}`).set({
+          nombre: patientName,
+          fhirId: patientFhirId || null,
+          fhirMedicationRequestId,
+          ehrSource: cdsHooksCfgData.ehrName || 'EHR',
+          atbs: [{ nom: medicationName, dosis: dosage, via: route, inicio: new Date().toISOString().slice(0, 10) }],
+          auto_synced: true,
+          requester,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      } catch (censoErr) {
+        console.error('[cdsHooks] error upserting censo paciente:', censoErr.message);
+      }
 
       // Notificar al equipo PROA
       await notificarEquipoPROA(
@@ -494,12 +517,14 @@ exports.ehrWebhook = onRequest(
 
     if (!hospId) return res.status(400).json({ ok: false, error: 'hospId requerido' });
 
-    // Validar token
+    // Validar token — leer cfg una sola vez y reutilizarla más abajo
     let validToken = false;
+    let ehrCfgData = {};
     try {
       const cfgSnap = await db.doc(`hospitals/${hospId}/ehr_config/main`).get();
       if (cfgSnap.exists) {
-        validToken = cfgSnap.data().webhookToken === token;
+        ehrCfgData = cfgSnap.data();
+        validToken = ehrCfgData.webhookToken === token;
       }
     } catch (e) {
       console.error('[ehrWebhook] error validating token:', e.message);
@@ -510,10 +535,11 @@ exports.ehrWebhook = onRequest(
     let docId;
     try {
       const fhirMedicationRequestId = isFHIR ? (body.id || `fhir_${Date.now()}`) : `web_${Date.now()}`;
+      const patientFhirId = isFHIR ? (body.subject?.reference?.split('/').pop() || null) : null;
       const docRef = await db.collection(`hospitals/${hospId}/ehr_requests`).add({
         fhirMedicationRequestId,
         patientName,
-        patientFhirId: isFHIR ? (body.subject?.reference?.split('/').pop() || null) : null,
+        patientFhirId,
         medicationName,
         dosage,
         route,
@@ -525,6 +551,25 @@ exports.ehrWebhook = onRequest(
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       docId = docRef.id;
+
+      // Upsert paciente al CENSO mensual (months/{YYYY-MM}/patients/) para que aparezca
+      // en la tabla principal del equipo PROA, no sólo en la Cola EHR.
+      try {
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        const censoDocId = `ehr_${patientFhirId || fhirMedicationRequestId}`;
+        await db.doc(`hospitals/${hospId}/months/${currentMonth}/patients/${censoDocId}`).set({
+          nombre: patientName,
+          fhirId: patientFhirId || null,
+          fhirMedicationRequestId,
+          ehrSource: ehrCfgData.ehrName || 'EHR',
+          atbs: [{ nom: medicationName, dosis: dosage, via: route, inicio: new Date().toISOString().slice(0, 10) }],
+          auto_synced: true,
+          requester,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      } catch (censoErr) {
+        console.error('[ehrWebhook] error upserting censo paciente:', censoErr.message);
+      }
 
       // Notificar equipo PROA
       await notificarEquipoPROA(
