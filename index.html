@@ -791,6 +791,7 @@ async function cargarApp(u,isAdmin){
   }).catch(()=>{getDoc(doc(db,'hospitals',HOSP,'config','main')).then(s=>{if(s.exists()&&s.data().anthropicKey)window._abgApiKey=s.data().anthropicKey;}).catch(()=>{});});
   try{suscribirSolicitudes();}catch(e){console.warn('Solicitudes no disponibles:',e);}
   try{suscribirBloqueosATB();}catch(e){console.warn('Bloqueos ATB no disponibles:',e);}
+  try{window._initColaProa();}catch(e){console.warn('Cola PROA no disponible:',e);}
   const tabU=document.getElementById('tab-usuarios');
   if(tabU)tabU.style.display=window._isAdmin?'':'none';
   if(window._isAdmin)cargarUsuarios();
@@ -14336,6 +14337,274 @@ if(_rtOrig){
   };
 }
 
+// ══════════════════════════════════════════════════════════════
+// COLA DE AUTORIZACIÓN PROA — EHR Integration
+// ══════════════════════════════════════════════════════════════
+
+let _colaUnsub = null;
+let _colaTab = 'pending';
+let _colaRequests = [];
+
+window._initColaProa = function() {
+  if (!HOSP) return;
+  if (_colaUnsub) _colaUnsub();
+  const q = query(
+    collection(db, 'hospitals', HOSP, 'ehr_requests'),
+    orderBy('createdAt', 'desc')
+  );
+  _colaUnsub = onSnapshot(q, snap => {
+    _colaRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderColaPROA();
+    // Actualizar badge de pendientes en la pestaña
+    const pending = _colaRequests.filter(r => r.status === 'pending').length;
+    const badge = document.getElementById('cola-proa-badge');
+    if (badge) { badge.textContent = pending || ''; badge.style.display = pending ? 'inline-block' : 'none'; }
+  }, () => {});
+
+  // Leer estado de última sincronización EHR
+  getDoc(doc(db, 'hospitals', HOSP, 'ehr_config', 'main')).then(snap => {
+    if (!snap.exists()) return;
+    const d = snap.data();
+    const bar = document.getElementById('ehr-sync-status');
+    if (!bar || !d.lastSync) return;
+    const ts = d.lastSync.toDate ? d.lastSync.toDate().toLocaleString('es-MX', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+    const isOk = d.lastSyncStatus === 'ok';
+    bar.style.display = 'block';
+    bar.style.background = isOk ? 'rgba(0,212,168,.08)' : 'rgba(255,77,109,.08)';
+    bar.style.border = isOk ? '1px solid rgba(0,212,168,.2)' : '1px solid rgba(255,77,109,.2)';
+    bar.style.color = isOk ? 'var(--teal)' : 'var(--red)';
+    bar.textContent = isOk
+      ? `✅ Última sync EHR: ${ts} — ${d.lastSyncCount || 0} pacientes sincronizados`
+      : `⚠️ Error en última sync (${ts}): ${d.lastSyncError || 'error desconocido'}`;
+  }).catch(() => {});
+};
+
+window.filterColaTab = function(btn, tab) {
+  _colaTab = tab;
+  document.querySelectorAll('.cola-tab-btn').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = 'var(--t2)'; b.style.borderColor = 'var(--brd)'; b.style.fontWeight = '400';
+  });
+  const colors = { pending: 'var(--amber)', autorizado: 'var(--teal)', rechazado: 'var(--red)', all: 'var(--t2)' };
+  const c = colors[tab] || 'var(--t2)';
+  btn.style.borderColor = c; btn.style.color = c;
+  btn.style.background = tab === 'pending' ? 'rgba(245,166,35,.12)'
+    : tab === 'autorizado' ? 'rgba(0,212,168,.1)'
+    : tab === 'rechazado' ? 'rgba(255,77,109,.1)'
+    : 'rgba(255,255,255,.05)';
+  btn.style.fontWeight = '700';
+  renderColaPROA();
+};
+
+window.renderColaPROA = function() {
+  const el = document.getElementById('cola-proa-list');
+  if (!el) return;
+  const filtered = _colaTab === 'all' ? _colaRequests : _colaRequests.filter(r => r.status === _colaTab);
+  if (!filtered.length) {
+    const msgs = {
+      pending: 'No hay solicitudes pendientes — el EHR enviará notificaciones aquí automáticamente.',
+      autorizado: 'No hay solicitudes autorizadas aún.',
+      rechazado: 'No hay solicitudes rechazadas.',
+      all: 'Aún no hay solicitudes del EHR.',
+    };
+    el.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--t3);">'
+      + '<div style="font-size:36px;opacity:.25;margin-bottom:12px;">📡</div>'
+      + '<div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:6px;">' + (msgs[_colaTab] || '') + '</div>'
+      + '<div style="font-size:11px;line-height:1.7;">Configura el EHR con los datos del botón ⚙️ y compártelos con Sistemas.</div>'
+      + '</div>';
+    return;
+  }
+  const statusLabel = { pending: '🟡 Pendiente', autorizado: '✅ Autorizado', rechazado: '🚫 Rechazado', alternativa: '🔄 Alternativa' };
+  const statusColor = { pending: 'var(--amber)', autorizado: 'var(--teal)', rechazado: 'var(--red)', alternativa: 'var(--blue)' };
+  el.innerHTML = filtered.map(r => {
+    const sc = statusColor[r.status] || 'var(--t3)';
+    const sl = statusLabel[r.status] || r.status;
+    const ts = r.createdAt && r.createdAt.toDate
+      ? r.createdAt.toDate().toLocaleString('es-MX', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+      : '—';
+    const decidedTs = r.decidedAt && r.decidedAt.toDate
+      ? r.decidedAt.toDate().toLocaleString('es-MX', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+      : '';
+    return '<div style="background:var(--s1);border:1px solid var(--brd);border-left:4px solid ' + sc + ';border-radius:8px;padding:14px 16px;margin-bottom:10px;">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
+      + '<span style="font-size:13px;font-weight:700;color:var(--tx);">' + escHtml(r.patientName || 'Paciente') + '</span>'
+      + '<span style="font-size:9px;font-weight:700;padding:2px 8px;border:1px solid ' + sc + ';color:' + sc + ';border-radius:10px;">' + sl + '</span>'
+      + '<span style="font-size:9px;color:var(--t3);">' + escHtml(r.source || 'EHR') + '</span>'
+      + '</div>'
+      + '<div style="font-size:12px;font-weight:600;color:var(--amber);margin-bottom:4px;">💊 ' + escHtml(r.medicationName || 'ATB no especificado') + '</div>'
+      + '<div style="font-size:11px;color:var(--t2);margin-bottom:2px;">'
+      + (r.dosage ? '<span>📏 ' + escHtml(r.dosage) + '</span> · ' : '')
+      + (r.route ? '<span>🔀 ' + escHtml(r.route) + '</span> · ' : '')
+      + '<span>👨‍⚕️ ' + escHtml(r.requester || 'Médico') + '</span>'
+      + (r.service ? ' · <span>🏥 ' + escHtml(r.service) + '</span>' : '')
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--t3);margin-top:4px;">📅 ' + ts + (decidedTs ? ' → Decisión: ' + decidedTs : '') + '</div>'
+      + (r.justificacion ? '<div style="font-size:10.5px;color:var(--t2);margin-top:6px;padding:6px 10px;background:var(--s2);border-radius:4px;border-left:3px solid ' + sc + ';"><b>Justificación PROA:</b> ' + escHtml(r.justificacion) + '</div>' : '')
+      + (r.alternativaMed ? '<div style="font-size:10.5px;color:var(--blue);margin-top:4px;">🔄 Alternativa propuesta: <b>' + escHtml(r.alternativaMed) + '</b></div>' : '')
+      + '</div>'
+      + (r.status === 'pending'
+        ? '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;"><button onclick="abrirDecisionModal(\'' + r.id + '\')" style="background:var(--teal);color:#000;border:none;border-radius:6px;padding:7px 14px;font-size:11px;font-weight:700;cursor:pointer;">⚕ Decidir</button></div>'
+        : '<div style="font-size:10px;color:var(--t3);text-align:right;flex-shrink:0;">' + escHtml(r.decidedByEmail || '') + '</div>')
+      + '</div>'
+      + '</div>';
+  }).join('');
+};
+
+// Modal de decisión PROA
+let _decisionReqId = null;
+window.abrirDecisionModal = function(reqId) {
+  _decisionReqId = reqId;
+  const r = _colaRequests.find(x => x.id === reqId);
+  if (!r) return;
+  const existing = document.getElementById('decision-modal');
+  if (existing) existing.remove();
+  const m = document.createElement('div');
+  m.id = 'decision-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:700;display:flex;align-items:center;justify-content:center;padding:16px;';
+  m.innerHTML = '<div style="background:var(--s1);border:1px solid var(--brd);border-radius:12px;padding:24px;max-width:480px;width:100%;max-height:88vh;overflow-y:auto;">'
+    + '<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:4px;">⚕ Decisión PROA</div>'
+    + '<div style="font-size:11px;color:var(--t3);margin-bottom:16px;">Paciente: <b style="color:var(--t2);">' + escHtml(r.patientName || '—') + '</b> · ATB: <b style="color:var(--amber);">' + escHtml(r.medicationName || '—') + '</b></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">'
+    + '<button onclick="selDecision(this,\'autorizado\')" class="dec-btn" style="padding:10px 8px;border:2px solid var(--brd2);border-radius:8px;background:var(--s2);color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;transition:.15s;">✅ Autorizar</button>'
+    + '<button onclick="selDecision(this,\'rechazado\')" class="dec-btn" style="padding:10px 8px;border:2px solid var(--brd2);border-radius:8px;background:var(--s2);color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;transition:.15s;">🚫 Rechazar</button>'
+    + '<button onclick="selDecision(this,\'alternativa\')" class="dec-btn" style="padding:10px 8px;border:2px solid var(--brd2);border-radius:8px;background:var(--s2);color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;transition:.15s;">🔄 Alternativa</button>'
+    + '</div>'
+    + '<div id="alt-field" style="display:none;margin-bottom:12px;"><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Antibiótico alternativo propuesto</label><input id="alt-med" placeholder="ej. Ceftriaxona 2g IV c/24h" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;"></div>'
+    + '<div id="dur-field" style="display:none;margin-bottom:12px;"><label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Duración autorizada (días)</label><input id="dec-duracion" type="number" min="1" max="90" placeholder="7" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;"></div>'
+    + '<label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Justificación clínica <span style="color:var(--red);">*</span></label>'
+    + '<textarea id="dec-justificacion" rows="3" placeholder="Ej: Bacteriemia por P. aeruginosa MDR con KPC confirmada. No hay alternativa de espectro reducido efectiva..." style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;resize:vertical;margin-bottom:16px;"></textarea>'
+    + '<div style="display:flex;gap:10px;">'
+    + '<button onclick="enviarDecision()" id="btn-enviar-dec" class="btn-main" style="flex:1;padding:10px;" disabled>Enviar decisión</button>'
+    + '<button onclick="document.getElementById(\'decision-modal\').remove()" style="padding:10px 14px;border:1px solid var(--brd2);border-radius:6px;background:transparent;color:var(--t2);font-size:12px;cursor:pointer;">Cancelar</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(m);
+};
+
+let _selectedDecision = null;
+window.selDecision = function(btn, val) {
+  _selectedDecision = val;
+  document.querySelectorAll('.dec-btn').forEach(b => { b.style.borderColor = 'var(--brd2)'; b.style.color = 'var(--t2)'; b.style.background = 'var(--s2)'; });
+  const colors = { autorizado: 'var(--teal)', rechazado: 'var(--red)', alternativa: 'var(--blue)' };
+  btn.style.borderColor = colors[val] || 'var(--teal)'; btn.style.color = colors[val] || 'var(--teal)'; btn.style.background = 'var(--s3)';
+  document.getElementById('alt-field').style.display = val === 'alternativa' ? 'block' : 'none';
+  document.getElementById('dur-field').style.display = val === 'autorizado' ? 'block' : 'none';
+  const btn2 = document.getElementById('btn-enviar-dec');
+  if (btn2) btn2.disabled = false;
+};
+
+window.enviarDecision = async function() {
+  if (!_selectedDecision || !_decisionReqId) return;
+  const just = (document.getElementById('dec-justificacion') || {}).value && document.getElementById('dec-justificacion').value.trim();
+  if (!just) { toast('Escribe una justificación clínica', 'err'); return; }
+  const altMed = (document.getElementById('alt-med') || {}).value && document.getElementById('alt-med').value.trim() || null;
+  const durDias = parseInt((document.getElementById('dec-duracion') || {}).value) || null;
+  const btn = document.getElementById('btn-enviar-dec');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+  try {
+    await updateDoc(doc(db, 'hospitals', HOSP, 'ehr_requests', _decisionReqId), {
+      status: _selectedDecision,
+      decidedBy: U.uid,
+      decidedByEmail: U.email,
+      decidedAt: serverTimestamp(),
+      justificacion: just,
+      alternativaMed: altMed || null,
+      duracionDias: durDias,
+    });
+    // Llamar Cloud Function para push al EHR (no bloquea si falla)
+    try {
+      const { getFunctions, httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js');
+      const fns = getFunctions(app, 'us-central1');
+      await httpsCallable(fns, 'proaDecision')({ hospitalId: HOSP, requestId: _decisionReqId, decision: _selectedDecision, alternativaMed: altMed || null, justificacion: just, duracionDias: durDias });
+    } catch (_e) { /* push EHR falló — actualización local ya fue hecha */ }
+    toast(
+      _selectedDecision === 'autorizado' ? '✅ ATB autorizado y notificado'
+        : _selectedDecision === 'rechazado' ? '🚫 ATB rechazado y notificado'
+        : '🔄 Alternativa propuesta enviada',
+      'ok'
+    );
+    document.getElementById('decision-modal') && document.getElementById('decision-modal').remove();
+    _selectedDecision = null; _decisionReqId = null;
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar decisión'; }
+  }
+};
+
+// EHR Config
+window.abrirConfigEHR = async function() {
+  const modal = document.getElementById('ehr-cfg-modal');
+  if (!modal) return;
+  // Actualizar URLs con el ID real del hospital
+  const whu = document.getElementById('ehr-webhook-url');
+  const cdsu = document.getElementById('ehr-cdshooks-url');
+  if (whu) whu.textContent = 'https://us-central1-stewardmx-1.cloudfunctions.net/ehrWebhook?hospId=' + HOSP;
+  if (cdsu) cdsu.textContent = 'https://us-central1-stewardmx-1.cloudfunctions.net/cdsHooks?hospId=' + HOSP;
+  // Cargar configuración existente
+  try {
+    const snap = await getDoc(doc(db, 'hospitals', HOSP, 'ehr_config', 'main'));
+    if (snap.exists()) {
+      const d = snap.data();
+      const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v || ''; };
+      set('ehr-fhir-base', d.fhirBase);
+      set('ehr-static-token', d.staticToken);
+      set('ehr-client-id', d.clientId);
+      set('ehr-client-secret', d.clientSecret);
+      set('ehr-token-endpoint', d.tokenEndpoint);
+      set('ehr-name', d.ehrName);
+      const cb = document.getElementById('ehr-enabled'); if (cb) cb.checked = !!d.enabled;
+      const td = document.getElementById('ehr-token-display'); if (td) td.textContent = d.webhookToken || '(pendiente de generar)';
+    }
+  } catch (_e) { /* sin config previa */ }
+  modal.style.display = 'flex';
+};
+
+window.guardarConfigEHR = async function() {
+  const get = id => { const el = document.getElementById(id); return el && el.value && el.value.trim() || null; };
+  const cfg = {
+    fhirBase: get('ehr-fhir-base'),
+    staticToken: get('ehr-static-token'),
+    clientId: get('ehr-client-id'),
+    clientSecret: get('ehr-client-secret'),
+    tokenEndpoint: get('ehr-token-endpoint'),
+    ehrName: get('ehr-name'),
+    enabled: !!(document.getElementById('ehr-enabled') && document.getElementById('ehr-enabled').checked),
+    updatedAt: serverTimestamp(),
+  };
+  // Generar webhook token si no existe
+  const snap = await getDoc(doc(db, 'hospitals', HOSP, 'ehr_config', 'main'));
+  if (!snap.exists() || !snap.data().webhookToken) {
+    cfg.webhookToken = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
+  }
+  await setDoc(doc(db, 'hospitals', HOSP, 'ehr_config', 'main'), cfg, { merge: true });
+  toast('✅ Configuración EHR guardada', 'ok');
+  document.getElementById('ehr-cfg-modal').style.display = 'none';
+};
+
+window.regenerarToken = async function() {
+  const newToken = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
+  await setDoc(doc(db, 'hospitals', HOSP, 'ehr_config', 'main'), { webhookToken: newToken }, { merge: true });
+  const td = document.getElementById('ehr-token-display'); if (td) td.textContent = newToken;
+  toast('🔑 Token regenerado — actualiza la configuración en el EHR', 'ok');
+};
+
+window.manualEhrSyncNow = async function() {
+  toast('⏳ Sincronizando con EHR...', 'tl');
+  try {
+    const { getFunctions, httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js');
+    const fns = getFunctions(app, 'us-central1');
+    const r = await httpsCallable(fns, 'manualEhrSync')({ hospitalId: HOSP });
+    toast('✅ Sincronizado: ' + (r.data && r.data.syncedCount || 0) + ' pacientes', 'ok');
+  } catch (e) {
+    if (e.code === 'functions/not-found' || (e.message && e.message.includes('not-found'))) {
+      toast('Sincronización automática no configurada — configura el EHR primero', 'err');
+    } else {
+      toast('Error: ' + (e.message || e), 'err');
+    }
+  }
+};
+
 </script>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
@@ -15511,6 +15780,7 @@ input:focus,select:focus,textarea:focus{
         <span id="alertas24h-badge" style="position:absolute;top:-2px;right:-2px;background:var(--amber);color:#040b12;font-size:8px;width:16px;height:16px;border-radius:50%;display:none;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;">0</span>
       </button>
       <button class="tab-btn" onclick="showView('flujograma',this)" style="color:var(--teal);">🔀 Flujograma</button>
+      <button class="tab-btn" onclick="showView('cola-proa',this)" style="color:var(--amber);position:relative;">⚡ Cola PROA<span id="cola-proa-badge" style="display:none;background:var(--red);color:#fff;border-radius:10px;font-size:9px;padding:1px 6px;margin-left:5px;font-weight:700;"></span></button>
       <button class="tab-btn" onclick="showView('trasplante',this)" style="color:var(--purple);">🫀 Trasplante</button>
       <button class="tab-btn" onclick="abrirActaForm()" style="color:var(--purple);">📄 Acta</button>
       <div class="tab-sep"></div>
@@ -16220,6 +16490,79 @@ input:focus,select:focus,textarea:focus{
     <div id="flujograma-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;"></div>
     <div id="flujograma-content"></div>
   </div></div>
+
+  <!-- VIEW: Cola de Autorización PROA — EHR Integration -->
+  <div class="view" id="view-cola-proa" style="flex:1;overflow:auto;padding:20px;">
+    <div style="max-width:900px;margin:0 auto;">
+      <!-- header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+          <div style="font-size:17px;font-weight:700;color:var(--tx);">⚡ Cola de Autorización PROA</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px;">Solicitudes de antibióticos restringidos — en tiempo real desde el EHR</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="manualEhrSyncNow()" style="background:rgba(0,212,168,.1);border:1px solid rgba(0,212,168,.3);color:var(--teal);border-radius:6px;padding:7px 14px;font-size:11px;cursor:pointer;font-weight:600;">🔄 Sincronizar EHR ahora</button>
+          <button onclick="abrirConfigEHR()" id="btn-cfg-ehr" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);color:var(--purple);border-radius:6px;padding:7px 14px;font-size:11px;cursor:pointer;font-weight:600;">⚙️ Configurar EHR</button>
+        </div>
+      </div>
+      <!-- sync status bar -->
+      <div id="ehr-sync-status" style="display:none;padding:8px 14px;border-radius:6px;font-size:11px;margin-bottom:14px;"></div>
+      <!-- filter tabs -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+        <button onclick="filterColaTab(this,'pending')" class="cola-tab-btn active" data-tab="pending" style="padding:5px 13px;border-radius:20px;border:1px solid var(--amber);background:rgba(245,166,35,.12);color:var(--amber);font-size:11px;font-weight:700;cursor:pointer;">🟡 Pendientes</button>
+        <button onclick="filterColaTab(this,'autorizado')" class="cola-tab-btn" data-tab="autorizado" style="padding:5px 13px;border-radius:20px;border:1px solid var(--brd);background:transparent;color:var(--t2);font-size:11px;cursor:pointer;">✅ Autorizados</button>
+        <button onclick="filterColaTab(this,'rechazado')" class="cola-tab-btn" data-tab="rechazado" style="padding:5px 13px;border-radius:20px;border:1px solid var(--brd);background:transparent;color:var(--t2);font-size:11px;cursor:pointer;">🚫 Rechazados</button>
+        <button onclick="filterColaTab(this,'all')" class="cola-tab-btn" data-tab="all" style="padding:5px 13px;border-radius:20px;border:1px solid var(--brd);background:transparent;color:var(--t2);font-size:11px;cursor:pointer;">Todos</button>
+      </div>
+      <!-- requests list -->
+      <div id="cola-proa-list"></div>
+      <!-- config EHR modal (hidden) -->
+      <div id="ehr-cfg-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:center;justify-content:center;padding:16px;">
+        <div style="background:var(--s1);border:1px solid var(--brd);border-radius:12px;padding:24px;max-width:520px;width:100%;max-height:88vh;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+            <div style="font-size:14px;font-weight:700;color:var(--tx);">⚙️ Configuración EHR / FHIR</div>
+            <button onclick="document.getElementById('ehr-cfg-modal').style.display='none'" style="background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;">✕</button>
+          </div>
+          <div style="font-size:11px;color:var(--t3);margin-bottom:16px;line-height:1.7;">Entrega estos datos al departamento de Sistemas del hospital. Ellos configuran el EHR para enviar solicitudes aquí automáticamente.</div>
+          <!-- webhook info (readonly — for hospital IT) -->
+          <div style="background:var(--s2);border:1px solid var(--brd2);border-radius:8px;padding:14px;margin-bottom:16px;">
+            <div style="font-size:11px;font-weight:700;color:var(--teal);margin-bottom:10px;">📋 Datos para el departamento de Sistemas</div>
+            <div style="font-size:10px;color:var(--t3);margin-bottom:4px;">URL Webhook (para cualquier EHR):</div>
+            <div style="font-family:monospace;font-size:10px;background:var(--s3);padding:6px 10px;border-radius:4px;color:var(--teal);word-break:break-all;margin-bottom:10px;" id="ehr-webhook-url">https://us-central1-stewardmx-1.cloudfunctions.net/ehrWebhook?hospId=HOSP_ID</div>
+            <div style="font-size:10px;color:var(--t3);margin-bottom:4px;">URL CDS Hooks (para EHRs compatibles como Epic/Cerner):</div>
+            <div style="font-family:monospace;font-size:10px;background:var(--s3);padding:6px 10px;border-radius:4px;color:var(--purple);word-break:break-all;margin-bottom:10px;" id="ehr-cdshooks-url">https://us-central1-stewardmx-1.cloudfunctions.net/cdsHooks?hospId=HOSP_ID</div>
+            <div style="font-size:10px;color:var(--t3);margin-bottom:4px;">Token de autenticación (X-StewardMX-Token):</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <div style="font-family:monospace;font-size:10px;background:var(--s3);padding:6px 10px;border-radius:4px;color:var(--amber);flex:1;word-break:break-all;" id="ehr-token-display">—</div>
+              <button onclick="regenerarToken()" style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);color:var(--amber);border-radius:4px;padding:5px 10px;font-size:10px;cursor:pointer;flex-shrink:0;">Regenerar</button>
+            </div>
+          </div>
+          <!-- FHIR pull config (optional) -->
+          <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:10px;">🔄 Sincronización automática desde EHR (opcional)</div>
+          <div style="font-size:10px;color:var(--t3);margin-bottom:10px;line-height:1.6;">Si el EHR tiene un servidor FHIR R4 accesible, StewardMX puede obtener los pacientes automáticamente cada hora sin que el EHR tenga que enviar nada.</div>
+          <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">URL del servidor FHIR R4</label>
+          <input id="ehr-fhir-base" placeholder="https://ehr.myhospital.mx/fhir/r4" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;margin-bottom:10px;">
+          <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Token estático (si el EHR usa token fijo)</label>
+          <input id="ehr-static-token" placeholder="Bearer eyJ..." type="password" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;margin-bottom:10px;">
+          <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Client ID (SMART on FHIR OAuth2)</label>
+          <input id="ehr-client-id" placeholder="stewardmx-proa" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;margin-bottom:10px;">
+          <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Client Secret (SMART on FHIR OAuth2)</label>
+          <input id="ehr-client-secret" placeholder="••••••••" type="password" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;margin-bottom:10px;">
+          <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Token Endpoint (OAuth2)</label>
+          <input id="ehr-token-endpoint" placeholder="https://ehr.myhospital.mx/oauth2/token" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;margin-bottom:10px;">
+          <label style="font-size:11px;color:var(--t2);display:block;margin-bottom:4px;">Nombre del EHR (para mostrar en pacientes)</label>
+          <input id="ehr-name" placeholder="ej. MedScript, Medilink, Epic..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s1);color:var(--tx);font-size:11px;margin-bottom:16px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);cursor:pointer;"><input type="checkbox" id="ehr-enabled"> Activar sincronización automática</label>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:18px;">
+            <button onclick="guardarConfigEHR()" class="btn-main" style="flex:1;padding:10px;">💾 Guardar configuración</button>
+            <button onclick="document.getElementById('ehr-cfg-modal').style.display='none'" style="padding:10px 16px;border:1px solid var(--brd2);border-radius:6px;background:transparent;color:var(--t2);font-size:12px;cursor:pointer;">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- VIEW: Trasplante / Hemato -->
   <div class="view" id="view-trasplante"><div style="flex:1;overflow:auto;padding:20px;">

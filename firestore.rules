@@ -167,6 +167,22 @@ service cloud.firestore {
       match /certificaciones/{id}   { allow read, write: if isSuperAdmin() || isHospMember(hospId); }
       match /alertas_atendidas/{id} { allow read, write: if isSuperAdmin() || isHospMember(hospId); }
 
+      // ── EHR Integration ──────────────────────────────────────────────
+      // Configuración del EHR / FHIR (solo admin o super-admin)
+      match /ehr_config/{docId} {
+        allow read: if isSuperAdmin() || isHospAdmin(hospId);
+        allow write: if isSuperAdmin() || isHospAdmin(hospId);
+      }
+      // Cola de solicitudes de ATBs provenientes del EHR (todo el equipo PROA)
+      match /ehr_requests/{reqId} {
+        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+      }
+      // Log de sincronizaciones EHR (solo lectura para admins; escritura exclusiva de Cloud Functions via Admin SDK)
+      match /ehr_sync_log/{logId} {
+        allow read: if isSuperAdmin() || isHospAdmin(hospId);
+        allow write: if false; // solo Cloud Functions (admin SDK)
+      }
+
       // Catch-all para cualquier otra colección que pueda agregarse en el futuro
       match /{anyCol}/{anyDoc} {
         allow read, write: if isSuperAdmin() || isHospMember(hospId);

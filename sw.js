@@ -1,4 +1,4 @@
-const CACHE = 'stewardmx-v52';
+const CACHE = 'stewardmx-v53';
 const SHELL = ['/guia.html', '/manifest.json', '/icons/icon-192.svg', '/icons/icon-512.svg', '/index.html'];
 
 self.addEventListener('install', e => {
