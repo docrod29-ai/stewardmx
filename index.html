@@ -12226,6 +12226,83 @@ const _FLU_DATA=[
     {tipo:'proceso',color:'var(--purple)',txt:'Ver módulo Trasplante/Hemato para protocolo completo'},
     {tipo:'fin',txt:'PROA + Infectología: co-manejo en TODO paciente trasplantado con infección'},
   ]},
+
+  // ─── Circuito PROA Integral ───────────────────────────────────────────────
+  {id:'circuito-proa',label:'🔄 Circuito PROA',color:'var(--purple)',
+   pasos:[
+    {tipo:'inicio',txt:'Médico prescribe antibiótico → arranca el Circuito PROA'},
+
+    // ── Paso 1: Médico prescriptor ───────────────────────────────────────
+    {tipo:'actor',icon:'👨‍⚕️',nombre:'Médico Prescriptor',rol:'Piso · Urgencias · UCI · Consulta externa',color:'var(--blue)'},
+    {tipo:'proceso',color:'var(--blue)',txt:'Prescripción formal: ATB · dosis · vía · duración · diagnóstico'},
+    {tipo:'sub',txt:'• Orden electrónica o receta manuscrita firmada (NOM-004-SSA3-2012)'},
+    {tipo:'sub',txt:'• Indicar si es empírico, dirigido por cultivo o profilaxis quirúrgica'},
+    {tipo:'sub',txt:'• Primer paso: consultar si el ATB está en la lista de uso restringido institucional'},
+    {tipo:'decision',txt:'¿ATB está en lista de uso restringido por política PROA?'},
+    {tipo:'branches',
+      si:{color:'var(--amber)',titulo:'RESTRINGIDO → Solicitud PROA',subs:['Farmacia bloquea la primera dosis automáticamente','Sistema genera folio de solicitud con fecha y hora','Notificación a Infectología: urgente ≤ 2 h / electiva ≤ 24 h','Médico recibe aviso: "ATB pendiente de autorización PROA"']},
+      no:{color:'var(--teal)',titulo:'LIBRE PRESCRIPCIÓN → Dispensa directa',subs:['Farmacia valida dosis, vía y compatibilidad (seguridad)','PROA monitorea en censo de forma pasiva','Revisión en pase de visita D1–D3 según política local']}},
+
+    // ── Paso 2: Farmacia ─────────────────────────────────────────────────
+    {tipo:'actor',icon:'🏥',nombre:'Farmacia',rol:'Validación · Bloqueo · Liberación · Trazabilidad NOM-024',color:'var(--teal)'},
+    {tipo:'proceso',color:'var(--teal)',txt:'Farmacia recibe prescripción y aplica verificación de seguridad'},
+    {tipo:'sub',txt:'• Verifica: dosis, diluyente, velocidad de infusión, compatibilidad IV'},
+    {tipo:'sub',txt:'• Detecta alergias documentadas en expediente — alerta si hay cruce'},
+    {tipo:'sub',txt:'• Confirma si ATB está en lista restringida institucional'},
+    {tipo:'sub',txt:'• ATB restringido: bloquea y registra solicitud con folio (NOM-024-SSA3-2012)'},
+    {tipo:'sub',txt:'• Emergencia vital: habilita dosis de rescate y notifica a PROA simultáneamente'},
+
+    // ── Paso 3: Infectología / PROA ─────────────────────────────────────
+    {tipo:'actor',icon:'🩺',nombre:'Infectología / PROA',rol:'Evaluación clínica · Autorización · Documentación en expediente',color:'var(--purple)'},
+    {tipo:'proceso',color:'var(--purple)',txt:'PROA recibe solicitud → evalúa ≤ 24 h (electiva) · ≤ 2 h (urgente / UCI)'},
+    {tipo:'sub',txt:'• Diagnóstico: ¿infección documentada, probable o solo colonización?'},
+    {tipo:'sub',txt:'• Microbiología: cultivos previos, antibiograma, epidemiología local'},
+    {tipo:'sub',txt:'• Indicación: empírico justificado / dirigido por cultivo / profilaxis quirúrgica'},
+    {tipo:'sub',txt:'• ¿Existe alternativa de menor espectro con misma eficacia clínica?'},
+    {tipo:'sub',txt:'• Ajuste renal (TFG CKD-EPI 2021) · Ajuste hepático · Interacciones relevantes'},
+    {tipo:'sub',txt:'• Política AWaRe OMS: Watch o Reserve → justificación reforzada obligatoria'},
+    {tipo:'decision',txt:'¿PROA autoriza el antibiótico solicitado?'},
+    {tipo:'branches',
+      si:{color:'var(--teal)',titulo:'✅ LIBERAR — Autorización PROA',subs:['PROA documenta autorización en expediente (NOM-004 + NOM-024)','Especifica: ATB · dosis · vía · duración máxima autorizada','Define plan de revisión obligatorio: D3 · D5 · D7','Envía orden a Farmacia con folio de autorización sellado']},
+      no:{color:'var(--red)',titulo:'🚫 RESTRINGIR — ATB no autorizado',subs:['PROA notifica al médico con justificación clínica escrita','Propone alternativa terapéutica equivalente (nombre + dosis)','Farmacia mantiene bloqueo y documenta el rechazo con folio','Médico puede solicitar revisión si aporta nueva evidencia clínica']}},
+
+    // ── Paso 4: Almacén / Preparación ───────────────────────────────────
+    {tipo:'actor',icon:'📦',nombre:'Almacén / Farmacéutico Preparador',rol:'Existencias · Preparación unitaria · Suministro al servicio',color:'var(--amber)'},
+    {tipo:'proceso',color:'var(--amber)',txt:'Almacén recibe orden de liberación de Farmacia con folio PROA'},
+    {tipo:'sub',txt:'• Verifica existencias: ¿hay stock suficiente del ATB autorizado?'},
+    {tipo:'sub',txt:'• Sin stock → activa protocolo de sustitución: notifica a Farmacia y a PROA'},
+    {tipo:'sub',txt:'• Con stock → prepara dosis unitaria: concentración · diluyente · volumen final'},
+    {tipo:'sub',txt:'• Etiqueta completa: paciente · servicio · cama · dosis · vía · hora máxima de administración'},
+    {tipo:'sub',txt:'• Registra salida en sistema con folio de solicitud PROA (trazabilidad NOM-024)'},
+    {tipo:'sub',txt:'• Traslada al servicio en cadena de frío si aplica (ej. anfotericina, insulina)'},
+
+    // ── Paso 5: Enfermería ───────────────────────────────────────────────
+    {tipo:'actor',icon:'💉',nombre:'Enfermería',rol:'Administración segura · Registro · Reporte de RAM',color:'var(--red)'},
+    {tipo:'proceso',color:'var(--red)',txt:'Enfermería recibe ATB y aplica los 5 Correctos antes de administrar'},
+    {tipo:'sub',txt:'• ✔ Paciente correcto — verifica pulsera + nombre completo'},
+    {tipo:'sub',txt:'• ✔ Medicamento correcto — ATB coincide con orden y autorización PROA'},
+    {tipo:'sub',txt:'• ✔ Dosis correcta — según orden, etiqueta y peso del paciente'},
+    {tipo:'sub',txt:'• ✔ Vía correcta — IV lenta / VO / IM según indicación y acceso'},
+    {tipo:'sub',txt:'• ✔ Hora correcta — dentro de ventana PK/PD (ej. β-lactámico c/4-8 h)'},
+    {tipo:'sub',txt:'• Documenta administración en expediente NOM-004 con hora exacta'},
+    {tipo:'sub',txt:'• Reporta RAM (eritema, broncoespasmo, anafilaxia) de inmediato al médico y PROA'},
+
+    // ── Paso 6: Seguimiento PROA ─────────────────────────────────────────
+    {tipo:'actor',icon:'🩺',nombre:'Infectología / PROA — Seguimiento Programado',rol:'Revisión D3 · D5 · D7 · Decisión terapéutica · Cierre del ciclo',color:'var(--purple)'},
+    {tipo:'proceso',color:'var(--purple)',txt:'Revisión D3 — Evaluación de respuesta clínica y microbiológica'},
+    {tipo:'sub',txt:'• Respuesta clínica: temperatura · frecuencia cardíaca · leucocitos · PCR / procalcitonina'},
+    {tipo:'sub',txt:'• Cultivo disponible: ¿organismo identificado? ¿antibiograma completo?'},
+    {tipo:'sub',txt:'• TFG actualizada: ¿cambió? → ajustar dosis o intervalo si aplica'},
+    {tipo:'sub',txt:'• Revisa alertas AWaRe · DOT acumulado · costo farmacológico del episodio'},
+    {tipo:'sub',txt:'• Evalúa switch IV → VO si: afebril 24–48 h · tolera VO · sin bacteriemia activa'},
+    {tipo:'decision',txt:'Día 3 / D5 / D7 — ¿Cuál es la decisión terapéutica?'},
+    {tipo:'triple',
+      a:{color:'var(--amber)',titulo:'🟡 CONTINUAR',subs:['D3: respuesta aún insuficiente pero evolución estable','Cultivos pendientes o positivo en tratamiento activo','Documentar justificación y fijar próxima revisión en 48 h','Médico y PROA de acuerdo en continuar el esquema actual']},
+      b:{color:'var(--teal)',titulo:'🟢 DESESCALAR',subs:['Cultivo + sensible a ATB de menor espectro AWaRe-Access','Afebril 24–48 h + mejoría clínica y de laboratorio objetiva','Switch IV→VO si aplica: reduce IAAS, costo y estancia','PROA documenta cambio en expediente y notifica a Farmacia']},
+      c:{color:'var(--red)',titulo:'🔴 SUSPENDER',subs:['Duración planificada completada (ej. NAC 5 d · ITU 7 d)','Cultivo negativo + clínica favorable en D5–D7','Infección descartada por panel diagnóstico o evolución','PROA cierra el episodio y registra indicadores (DOT, DDD)']}},
+
+    {tipo:'fin',txt:'✅ Ciclo cerrado · Indicadores actualizados · NOM-045 cumplida · Farmacia libera insumos restantes'},
+  ]},
 ];
 window.renderFlujograma=function(){
   const tabsCont=document.getElementById('flujograma-tabs');
@@ -12278,6 +12355,36 @@ window.renderFlujograma=function(){
       html+=`<div style="text-align:center;margin-top:6px;">
         <div style="display:inline-block;background:rgba(0,212,168,.08);border:2px solid var(--teal);border-radius:8px;padding:10px 24px;font-size:12px;font-weight:700;color:var(--teal);">${escHtml(p.txt)}</div>
       </div>`;
+    } else if(p.tipo==='actor'){
+      // Banner de actor — identifica quién realiza la siguiente acción
+      const ac=p.color||'var(--t2)';
+      html+=`<div style="display:flex;align-items:center;gap:10px;margin:16px 0 3px;padding:9px 14px;border-radius:8px;border:1.5px solid var(--brd);background:var(--s1);">
+        <span style="font-size:22px;line-height:1;flex-shrink:0;">${escHtml(p.icon)}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;font-weight:700;color:${ac};letter-spacing:.2px;">${escHtml(p.nombre)}</div>
+          <div style="font-size:10px;color:var(--t3);margin-top:1px;">${escHtml(p.rol)}</div>
+        </div>
+        <span style="font-size:9px;font-weight:700;padding:2px 8px;border:1px solid ${ac};color:${ac};border-radius:10px;flex-shrink:0;letter-spacing:.4px;">ACTOR</span>
+      </div>`;
+    } else if(p.tipo==='triple'){
+      // Decisión triple: 3 columnas de resultado (CONTINUAR / DESESCALAR / SUSPENDER)
+      const [ta,tb,tc]=[p.a,p.b,p.c];
+      html+=`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;">
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(148px,1fr));gap:8px;margin:6px 0;min-width:460px;">
+          <div style="background:var(--s2);border:1px solid var(--brd2);border-top:3px solid ${ta.color};border-radius:6px;padding:10px;">
+            <div style="font-size:10.5px;font-weight:700;color:${ta.color};margin-bottom:7px;text-align:center;letter-spacing:.2px;">${escHtml(ta.titulo)}</div>
+            ${ta.subs.map(s=>`<div style="font-size:9.5px;color:var(--t2);line-height:1.55;margin-bottom:4px;padding-left:8px;border-left:2px solid ${ta.color};">${escHtml(s)}</div>`).join('')}
+          </div>
+          <div style="background:var(--s2);border:1px solid var(--brd2);border-top:3px solid ${tb.color};border-radius:6px;padding:10px;">
+            <div style="font-size:10.5px;font-weight:700;color:${tb.color};margin-bottom:7px;text-align:center;letter-spacing:.2px;">${escHtml(tb.titulo)}</div>
+            ${tb.subs.map(s=>`<div style="font-size:9.5px;color:var(--t2);line-height:1.55;margin-bottom:4px;padding-left:8px;border-left:2px solid ${tb.color};">${escHtml(s)}</div>`).join('')}
+          </div>
+          <div style="background:var(--s2);border:1px solid var(--brd2);border-top:3px solid ${tc.color};border-radius:6px;padding:10px;">
+            <div style="font-size:10.5px;font-weight:700;color:${tc.color};margin-bottom:7px;text-align:center;letter-spacing:.2px;">${escHtml(tc.titulo)}</div>
+            ${tc.subs.map(s=>`<div style="font-size:9.5px;color:var(--t2);line-height:1.55;margin-bottom:4px;padding-left:8px;border-left:2px solid ${tc.color};">${escHtml(s)}</div>`).join('')}
+          </div>
+        </div>
+      </div>${arr}`;
     }
   });
   html+=`</div>`;
