@@ -409,6 +409,141 @@ const DX_LIST=[
   'Citomegalovirus en inmunocompetente (síndrome mononucleósico)',
   'Epstein-Barr (mononucleosis infecciosa complicada)',
   'Parvovirus B19 — crisis aplásica / artritis','Adenovirus — neumonitis en adulto',
+  // ══ PATÓGENOS MDR / XDR ESPECÍFICOS (PROA crítico) ══
+  'Bacteriemia por KPC (K. pneumoniae productora de carbapenemasa KPC)',
+  'Bacteriemia por NDM (metalo-β-lactamasa New Delhi)',
+  'Bacteriemia por OXA-48 / OXA-23 (carbapenemasa tipo OXA)',
+  'Bacteriemia por VIM/IMP (metalo-β-lactamasa clase B)',
+  'Bacteriemia por Enterobacterales MDR (BLEE + resistencia a FQ)',
+  'Bacteriemia por CRAB (Acinetobacter baumannii resistente a carbapenems)',
+  'Bacteriemia por CRPA (Pseudomonas aeruginosa resistente a carbapenems)',
+  'Bacteriemia por Stenotrophomonas maltophilia',
+  'Bacteriemia por Candida auris — resistente a equinocandinas',
+  'Infección por MRSA — bacteriemia de alto riesgo (bacteriemia SA)',
+  'Infección por VRE vanA (vancomicina/teicoplanina resistente)',
+  'Infección por VRE vanB (solo vancomicina resistente)',
+  'Infección por Clostridioides difficile — cepa hipervirulenta NAP1/027',
+  'Infección por Aspergillus fumigatus resistente a azoles (TR34/L98H)',
+  'Infección osteoarticular por MDR — fracaso a tratamiento previo',
+  'Neumonía por CRAB (Acinetobacter MDR) — en UCI / VAP',
+  'ITU por Klebsiella pneumoniae KPC — pielonefritis',
+  'Peritonitis por Candida auris (postquirúrgico)',
+  // ══ INFECCIONES VIRALES EMERGENTES / TROPICALES MEXICO ══
+  'Dengue hemorrágico / Dengue grave — serotipos 1-4 circulantes MX',
+  'Chikungunya — fase aguda artrítica grave','Chikungunya — fase crónica artritis persistente',
+  'Zika — complicaciones neurológicas (síndrome Guillain-Barré)',
+  'Fiebre por virus del Nilo Occidental (WNV) — neuroinvasivo',
+  'Encefalitis equina venezolana / Encefalitis de San Luis',
+  'Rickettsiosis por R. rickettsii (FMMR) — grave/sistémica',
+  'Rickettsia typhi (tifus murino) — con complicaciones hepáticas',
+  'Ehrlichiosis (A. phagocytophilum / E. chaffeensis)',
+  'Leptospirosis — síndrome de Weil con falla renal aguda',
+  'Fiebre manchada de las Montañas Rocosas / Rickettsia spp. MX',
+  'Mpox (Viruela del mono) — lesiones diseminadas / complicadas',
+  'COVID-19 + coinfección Aspergillus (CAPA) — confirmada / probable',
+  'COVID-19 + sobreinfección S. aureus / MRSA',
+  'COVID-19 — síndrome inflamatorio multisistémico adulto (MIS-A)',
+  'Síndrome post-COVID + infección bacteriana sobreagregada',
+  'Infección por Hantavirus — sin síndrome pulmonar / forma renal',
+  // ══ IAAS — ESPECÍFICAS POR TIPO DE CIRUGÍA ══
+  'ISQ — cirugía cardiovascular (bypass coronario / válvula)',
+  'ISQ — cirugía digestiva alta (gastrectomía / esofagectomía)',
+  'ISQ — cirugía colorrectal (colectomía / anterior baja)',
+  'ISQ — cirugía hepatobiliar (hepatectomía / Whipple)',
+  'ISQ — cirugía urológica (cistectomía / nefrectomía / prostatectomía)',
+  'ISQ — cirugía ginecológica (histerectomía abdominal / laparoscópica)',
+  'ISQ — cirugía ortopédica (prótesis total cadera / rodilla)',
+  'ISQ — cirugía espinal (discectomía / artrodesis / fusión)',
+  'ISQ — neurocirugía (craneotomía / resección tumoral)',
+  'ISQ — cirugía de mama (mastectomía / implante)',
+  'ISQ — cirugía bariátrica (manga / bypass — dehiscencia + infección)',
+  'ISQ — cirugía de trasplante (riñón / hígado / corazón)',
+  'IAAS — Neumonía en paciente con COVID-19 (HA-COVID-19-pneumonia)',
+  'IAAS — Infección por Clostridioides difficile nosocomial (≥ 3 días ingreso)',
+  'IAAS — Bacteriemia por Gram negativo MDR — brote nosocomial',
+  'IAAS — Fungemia por C. auris — brote en UCI',
+  // ══ PEDIÁTRICO ESPECÍFICO ══
+  'Epiglotitis por H. influenzae — pediátrico no vacunado',
+  'Tos ferina (B. pertussis) — lactante < 6 meses / grave',
+  'Difteria (C. diphtheriae) — complicaciones sistémicas',
+  'Meningitis bacteriana pediátrica — SGB en lactante',
+  'Artritis séptica pediátrica — MRSA comunitario',
+  'Osteomielitis pediátrica — compleja / cronicidad',
+  'Infección por adenovirus — neumonitis pediátrica grave',
+  'RSV — insuficiencia respiratoria lactante (bronquiolitis grave)',
+  'Impétigo ampolloso neonatal (S. aureus exfoliatina)',
+  'Botulismo del lactante (C. botulinum — miel)',
+  'Fiebre escarlatina complicada (Streptococcus pyogenes)',
+  'Fiebre de Kawasaki — forma atípica (diagnóstico diferencial séptico)',
+  'Síndrome de shock tóxico estreptocócico pediátrico',
+  'Listeriosis neonatal — meningitis tardía',
+  'Enterocolitis necrosante grado IIIB — con perforación',
+  'Absceso retrofaríngeo pediátrico — extensión mediastínica',
+  'Artritis reactiva post-estreptocócica vs artritis séptica',
+  // ══ ONCOLOGÍA ESPECÍFICA ══
+  'Mucositis NCI grado IV + sepsis de origen oral',
+  'Tiflitis / Enterocolitis neutropénica — perforación',
+  'Neumonía por Pneumocystis en oncología (sin profilaxis)',
+  'Infección en inmunodepresión por CAR-T — síndrome CRS + NF',
+  'Bacteriemia en blinatumomab / inotuzumab — aplasia prolongada',
+  'Fusariosis diseminada — leucemia en aplasia',
+  'Aspergilosis sinusal invasiva — leucemia / linfoma',
+  'Mucormicosis cutánea post-quimio (Mucor / Rhizopus)',
+  'Candidiasis hepatoesplénica crónica (candidiasis diseminada tardía)',
+  'Infección de catéter PORT — bacteriemia por Bacillus / Micrococcus',
+  'Infección de CVC en quimioterapia — S. epidermidis MRCNS',
+  'Neumonía viral por metapneumovirus en oncología',
+  'Reactivación de HBV en rituximab / obinutuzumab sin profilaxis',
+  'EBV PTLD (sínd. linfoproliferativo post-trasplante) — monomorfo',
+  'Adenovirus diseminado — trasplante hematopoyético',
+  // ══ REUMATOLOGÍA + INFECCIÓN (DILEMA PROA) ══
+  'Septic monoarthritis vs gota pseudoséptica (DDX)',
+  'Artritis séptica en AR con biológico (anti-TNF / tocilizumab)',
+  'Absceso epidural espinal en LES con IS intensa',
+  'Pneumocystis en vasculitis ANCA + ciclofosfamida',
+  'Reactivación TB en anti-TNF (infliximab / adalimumab)',
+  'Reactivación TB en anti-JAK (ruxolitinib / baricitinib)',
+  'Infección grave en miopatía inflamatoria + IS combinada',
+  'Listeria monocytogenes en LES (linfopenia + esteroides)',
+  // ══ ICU / CRITICOS ESPECÍFICO ══
+  'Shock séptico refractario — disfunción suprarrenal relativa (CIRCI)',
+  'ARDS infeccioso + shock séptico (Sepsis-3 + Berlín)',
+  'Candidemia en UCI — catéter CVC + NP',
+  'Neumonía aspirativa + absceso pulmonar — intubado',
+  'Sinusitis nosocomial — asociada a sonda nasogástrica/nasoenteral',
+  'Infección de herida en traqueostomía percutánea',
+  'Mediastinitis descende — extensión de Ludwig / angina',
+  'Shock séptico biliar — colangitis grave Tokio III',
+  'Peritonitis terciaria — Candida + Enterococcus resistente',
+  'Endocarditis nosocomial en catéter CVC — S. aureus MRSA',
+  'Bacteriemia polimicrobiana (>1 patógeno) — sin foco obvio',
+  'Infección por Candida krusei / C. glabrata — resistente a azoles',
+  // ══ MISCELÁNEA AMPLIADA ══
+  'Fiebre Q crónica (Coxiella burnetii) — endocarditis / hepatitis',
+  'Actinomicosis cervicofacial / abdominal','Actinomicosis pélvica (DIU)',
+  'Nocardiosis pulmonar en inmunocompetente',
+  'Infección por Capnocytophaga canimorsus (mordedura perro)',
+  'Pasteurella multocida — celulitis por mordedura de gato/perro',
+  'Infección por Eikenella corrodens (mordedura humana)',
+  'Infección por Bartonella henselae — enfermedad por arañazo de gato',
+  'Angiomatosis bacilar (Bartonella — VIH)',
+  'Vibrio vulnificus — celulitis necrotizante (mariscos / agua salada)',
+  'Aeromonas hydrophila — miositis / celulitis en agua dulce',
+  'Erysipelothrix rhusiopathiae — erisipeloide (manipulación pescado)',
+  'Infección por Francisella tularensis — forma ulceroglandular',
+  'Fiebre recurrente por Borrelia (piojos / garrapatas)',
+  'Infección por micobacteria no tuberculosa (M. abscessus — piel)',
+  'Infección por Sporothrix schenckii — linfocutánea',
+  'Dermatomicosis profunda — cromomicosis (Fonsecaea / Cladophialophora)',
+  'Lacaziosis (Lobomycosis) — queloides tropicales',
+  'Prototecosis (Prototheca — algas no fotosintéticas) — inmunocomprometido',
+  'Infección por Pneumocystis jirovecii — en biológicos (sin profilaxis)',
+  'Profilaxis post-exposición a Neisseria meningitidis (contacto directo)',
+  'Evaluación infección vs colonización — portador MRSA nasal',
+  'Evaluación infección vs colonización — BLEE en orina',
+  'Descolonización MRSA (mupirocina nasal + clorhexidina) — protocolo',
+  'Solicitud de restricción de uso de antibiótico (stewardship)',
+  'Discordancia clínica: microbiología positiva sin infección (DDX)',
 ];
 
 
@@ -1759,6 +1894,33 @@ window.guardar=async()=>{
     urgenciasSofa:parseInt(gv('f-urgencias-sofa')||'0')||(window._sofaGateScore||0),
     ts:serverTimestamp(),updatedBy:U.email,updatedAt:new Date().toISOString()
   };
+  // ── GATE: Reserve AWaRe → justificación obligatoria ──
+  const reserveRows=[];
+  document.querySelectorAll('.atb-row').forEach(row=>{
+    const id=row.id;
+    if(!id)return;
+    const nomSel=document.getElementById(id+'-nom')?.value||'';
+    if(!nomSel)return;
+    const atbDef=ATBX.find(a=>a.n===nomSel);
+    if(atbDef&&atbDef.aw==='Reserve'){
+      const jus=(document.getElementById(id+'-reserve-jus')?.value||'').trim();
+      if(jus.length<50)reserveRows.push({id,nom:nomSel,jus});
+    }
+  });
+  if(reserveRows.length>0){
+    const nombres=reserveRows.map(r=>r.nom).join(', ');
+    const confirmMsg='🔴 ANTIBIÓTICO(S) RESERVE sin justificación clínica completa:\n\n'+nombres+'\n\nDebes documentar la justificación clínica (mín. 50 caracteres) en el campo de cada antibiótico Reserve antes de guardar.\n\nHaz clic en la sección roja del ATB Reserve para completarla.';
+    toast('Reserve ATB sin justificación — ver campo rojo debajo del ATB','rd');
+    window._guardarBusy=false;
+    if(btnGuardar){btnGuardar.disabled=false;btnGuardar.style.opacity='';}
+    // Scroll to first offending row
+    const firstRow=document.getElementById(reserveRows[0].id);
+    if(firstRow){firstRow.scrollIntoView({behavior:'smooth',block:'center'});}
+    const jField=document.getElementById(reserveRows[0].id+'-reserve-jus');
+    if(jField){jField.style.borderColor='rgba(255,77,109,.8)';jField.focus();}
+    sfx&&sfx.error&&sfx.error();
+    return;
+  }
   // ── GATE: Urgencias + ATB amplio espectro → requiere criterios de sepsis ──
   const svcActual=(data.servicio||'').toLowerCase();
   const esUrgencias=svcActual.includes('urgencia')||svcActual.includes('urgenc');
@@ -3560,8 +3722,31 @@ function buildAtbRow(idx,nombre,dosis,via,pol,aware,finicio,ffin,indclin,tolvo){
   h+='<div class="fg"><label>Política</label><select id="'+id+'-pol">'+['libre','vigilado','restringido'].map(v2=>'<option value="'+v2+'"'+(pol===v2?' selected':'')+'>'+v2+'</option>').join('')+'</select></div>';
   h+='<div class="fg"><label>Fecha inicio ATB</label><input id="'+id+'-finicio" type="date" value="'+(finicio||new Date().toISOString().slice(0,10))+'"></div>';
   h+='<div class="fg"><label>Fecha fin ATB</label><input id="'+id+'-ffin" type="date" value="'+(ffin||'')+'"></div>';
-  h+='<div class="fg"><label>Indicación clínica</label><select id="'+id+'-indclin"><option value="">—Seleccionar—</option>'+['ITU','NAC','NAVM/VAP','Bacteriemia/Sepsis','SSTI/Infección piel','Endocarditis','Meningitis/SNC','IAB/Peritonitis','Neutropenia febril','Profilaxis qx','Profilaxis médica','Empirico sin foco','Otra'].map(v2=>'<option value="'+v2+'"'+(indclin===v2?' selected':'')+'>'+v2+'</option>').join('')+'</select></div>';
+  const indclinOpts=['ITU — baja (cistitis)','ITU — alta (pielonefritis)','ITU — CAUTI','Urosepsis','NAC — leve','NAC — grave (UCI/CURB≥3)','NAVM/VAP','Traqueobronquitis nosocomial','Neumonía nosocomial (HAP)','Bacteriemia primaria sin foco','Bacteriemia S. aureus (SAB)','Bacteriemia Gram negativo','Candidemia','CLABSI (bacteriemia por CVC)','Sepsis — foco en estudio','Choque séptico','SSTI — celulitis','SSTI — absceso','SSTI — fascitis necrotizante','Pie diabético','Herida quirúrgica (ISQ)','Endocarditis (válvula nativa)','Endocarditis (prótesis)','Endocarditis (CIED)','Meningitis bacteriana','Absceso cerebral','Ventriculitis / DVE','IAB — peritonitis','IAB — absceso intraabdominal','Colangitis / colecistitis','C. difficile','Osteomielitis','Artritis séptica','Espondilodiscitis','IAP (infección prótesis articular)','Neutropenia febril — alto riesgo (MASCC<21)','Neutropenia febril — bajo riesgo (MASCC≥21)','Profilaxis quirúrgica','Profilaxis PBE','Profilaxis antifúngica','Profilaxis CMV','Profilaxis PCP','Profilaxis anti-TB (LTBI)','Profilaxis post-exposición (PPE VIH)','Desescalada dirigida (antibiograma)','Switch IV→VO (desescalada)','Empírico sin foco documentado','Solicitud de PROA / optimización','Otra (especificar en notas)'];
+  h+='<div class="fg" style="grid-column:1/-1;"><label>Indicación clínica *</label><select id="'+id+'-indclin" style="font-size:11px;"><option value="">—Seleccionar indicación—</option>'+indclinOpts.map(v2=>'<option value="'+v2+'"'+(indclin===v2?' selected':'')+'>'+v2+'</option>').join('')+'</select></div>';
   h+='<div class="fg"><label>¿Tolera vía oral?</label><select id="'+id+'-tolvo"><option value="">NS</option><option value="sí"'+(tolvo==='sí'?' selected':'')+'>Sí</option><option value="no"'+(tolvo==='no'?' selected':'')+'>No</option></select></div>';
+  h+='</div>';
+  // ── AWaRe indicator + Reserve mandatory gate ──
+  const initAw=aware||'Watch';
+  const awColor=initAw==='Access'?'var(--teal)':initAw==='Watch'?'var(--amber)':'var(--red)';
+  h+='<div id="'+id+'-aware-bar" style="display:flex;align-items:center;gap:8px;margin-top:6px;padding:5px 8px;border-radius:4px;background:'+(initAw==='Reserve'?'rgba(255,77,109,.08)':initAw==='Watch'?'rgba(255,152,0,.06)':'rgba(0,212,168,.06)')+';border:1px solid '+(initAw==='Reserve'?'rgba(255,77,109,.25)':initAw==='Watch'?'rgba(255,152,0,.2)':'rgba(0,212,168,.2)') +'">';
+  h+='<span style="font-family:var(--mono);font-size:9px;color:var(--t3);">AWaRe OMS:</span>';
+  h+='<span id="'+id+'-aware-badge" style="font-size:11px;font-weight:700;color:'+awColor+';">'+initAw+'</span>';
+  h+='<span id="'+id+'-aware-desc" style="font-size:10px;color:var(--t2);">'+( initAw==='Access'?'— Primera línea recomendada':initAw==='Watch'?'— Vigilado. Riesgo de resistencia':' — RESERVE. Solo sin alternativas')+' </span>';
+  h+='</div>';
+  // Reserve gate
+  const isRes=initAw==='Reserve';
+  h+='<div id="'+id+'-reserve-wrap" style="display:'+(isRes?'block':'none')+';margin-top:8px;background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.35);border-radius:6px;padding:10px 12px;">';
+  h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">';
+  h+='<span style="font-size:14px;">🔴</span>';
+  h+='<span style="font-size:11px;font-weight:700;color:var(--red);">ANTIBIÓTICO RESERVE — OMS AWaRe</span>';
+  h+='<span style="font-size:9px;background:rgba(255,77,109,.15);color:var(--red);padding:2px 8px;border-radius:10px;font-family:var(--mono);white-space:nowrap;">AUTORIZACIÓN FARMACIA OBLIGATORIA</span>';
+  h+='</div>';
+  h+='<div style="font-size:10.5px;color:var(--t2);margin-bottom:8px;line-height:1.55;">Los antibióticos <b>Reserve</b> deben usarse <b>únicamente</b> cuando opciones de menor impacto ecológico son ineficaces o contraindicadas. Requiere justificación documentada y notificación a PROA/Farmacia. <span style="color:var(--red);">⚠ Sin justificación no se puede guardar.</span></div>';
+  h+='<label style="font-size:10px;font-weight:700;color:var(--red);display:block;margin-bottom:4px;">Justificación clínica * (mandatorio para Reserve)</label>';
+  h+='<textarea id="'+id+'-reserve-jus" rows="3" placeholder="Ej: Bacteriemia por K. pneumoniae KPC documentada (antibiograma 12/05/2026: resistente a todos los β-lactámicos excepto ceftazidima/avibactam MIC ≤8). Sin alternativas activas. Discutido con Infectología/PROA el DD/MM/AAAA." style="width:100%;box-sizing:border-box;background:var(--s1);border:1px solid rgba(255,77,109,.4);border-radius:4px;color:var(--t1);padding:7px 9px;font-size:10.5px;resize:vertical;min-height:56px;line-height:1.4;" oninput="window._updateResJusCounter&&window._updateResJusCounter(\''+id+'\')">'+(isRes?'':'')+'</textarea>';
+  h+='<div id="'+id+'-jus-counter" style="font-size:9px;color:var(--t3);text-align:right;margin-top:2px;">0 / 50 caracteres mínimo</div>';
+  h+='<button type="button" onclick="window._notifReserveWA&&window._notifReserveWA(\''+id+'\')" style="margin-top:7px;width:100%;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);color:#25D366;border-radius:5px;padding:7px;font-size:11px;font-weight:700;cursor:pointer;">📱 Notificar Farmacia / PROA por WhatsApp</button>';
   h+='</div>';
   // Renal dose table (hidden by default)
   const renalData=nombre?ATBX_RENAL[nombre]:null;
@@ -3589,6 +3774,44 @@ function buildAtbRow(idx,nombre,dosis,via,pol,aware,finicio,ffin,indclin,tolvo){
   atbRowCount=Math.max(atbRowCount,idx+1);
   return h;
 }
+
+window._updateResJusCounter=function(id){
+  const ta=document.getElementById(id+'-reserve-jus');
+  const counter=document.getElementById(id+'-jus-counter');
+  if(!ta||!counter)return;
+  const len=ta.value.trim().length;
+  const ok=len>=50;
+  counter.textContent=len+' / 50 caracteres mínimo';
+  counter.style.color=ok?'var(--teal)':'var(--red)';
+  ta.style.borderColor=ok?'rgba(0,212,168,.5)':'rgba(255,77,109,.5)';
+};
+
+window._notifReserveWA=function(id){
+  const nom=document.getElementById(id+'-nom')?.value||'—';
+  const jus=(document.getElementById(id+'-reserve-jus')?.value||'').trim();
+  const pac=(document.getElementById('f-nom')?.value||document.getElementById('f-nombre')?.value||'Paciente').trim();
+  const serv=(document.getElementById('f-svc')?.value||document.getElementById('f-servicio')?.value||'—').trim();
+  const cama=(document.getElementById('f-cama')?.value||'—').trim();
+  const fechaHoy=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const medico=HInfo?.nombre||U?.email||'Médico';
+  if(!jus||jus.length<20){
+    toast('Completa la justificación clínica antes de notificar a Farmacia','am');
+    document.getElementById(id+'-reserve-jus')?.focus();
+    return;
+  }
+  const msg='*🔴 PROA — Solicitud Antibiótico RESERVE*\n'
+    +'━━━━━━━━━━━━━━━━━━━━━━━\n'
+    +'*Antibiótico:* '+nom+' [OMS RESERVE]\n'
+    +'*Paciente:* '+pac+'\n'
+    +'*Servicio:* '+serv+' · Cama: '+cama+'\n'
+    +'━━━━━━━━━━━━━━━━━━━━━━━\n'
+    +'*Justificación clínica:*\n'+jus+'\n'
+    +'━━━━━━━━━━━━━━━━━━━━━━━\n'
+    +'*Solicitante:* '+medico+'\n'
+    +'*Fecha:* '+fechaHoy+'\n'
+    +'_PROA requiere autorización de Farmacia para continuar._';
+  window.open('https://wa.me?text='+encodeURIComponent(msg),'_blank');
+};
 
 window.addAtbRow=function(){
   const list=document.getElementById('atb-list');
@@ -3621,6 +3844,22 @@ window.onAtbSelect=function(id){
   if(viaSel&&atbDef.v.length>0)viaSel.value=atbDef.v[0];
   // Auto-set política
   if(polSel)polSel.value=atbDef.pol||'libre';
+  // ── Update AWaRe banner dynamically ──
+  const aw=atbDef.aw||'Watch';
+  const awBar=document.getElementById(id+'-aware-bar');
+  const awBadge=document.getElementById(id+'-aware-badge');
+  const awDesc=document.getElementById(id+'-aware-desc');
+  const reserveWrap=document.getElementById(id+'-reserve-wrap');
+  if(awBar){
+    awBar.style.background=aw==='Access'?'rgba(0,212,168,.06)':aw==='Watch'?'rgba(255,152,0,.06)':'rgba(255,77,109,.08)';
+    awBar.style.borderColor=aw==='Access'?'rgba(0,212,168,.2)':aw==='Watch'?'rgba(255,152,0,.2)':'rgba(255,77,109,.25)';
+  }
+  if(awBadge){
+    awBadge.textContent=aw;
+    awBadge.style.color=aw==='Access'?'var(--teal)':aw==='Watch'?'var(--amber)':'var(--red)';
+  }
+  if(awDesc)awDesc.textContent=aw==='Access'?'— Primera línea recomendada':aw==='Watch'?'— Vigilado. Riesgo de resistencia':' — RESERVE. Solo sin alternativas';
+  if(reserveWrap)reserveWrap.style.display=aw==='Reserve'?'block':'none';
   // Rebuild renal dose table for new ATB
   _rebuildRenalTable(id,nom);
   syncAtbField();
