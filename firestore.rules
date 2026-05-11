@@ -47,12 +47,12 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
            in ['PROA', 'Infectología'];
     }
-    // Usuario tiene rol Farmacia en el hospital
+    // Usuario tiene rol Farmacéutico en el hospital
     function isHospFarmacia(hospId) {
       return isAuth()
         && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
-           == 'Farmacia';
+           == 'Farmacéutico';
     }
     // Usuario tiene rol Medico en el hospital
     function isHospMedico(hospId) {
@@ -218,7 +218,8 @@ service cloud.firestore {
         allow write:          if isSuperAdmin() || isHospAdmin(hospId);
       }
       match /atb_blocks/{blockId} {
-        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+        allow read: if isSuperAdmin() || isHospMember(hospId);
+        allow write: if isSuperAdmin() || isHospAdmin(hospId) || isHospPROA(hospId) || isHospFarmacia(hospId);
       }
 
       // Resto de colecciones del hospital (contactos, profilaxis, certificaciones, alertas…)

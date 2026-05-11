@@ -1976,6 +1976,46 @@ window.guardar=async()=>{
         toast('🔔 Alerta PROA 24h registrada — '+data.servicio,'am');
       }catch(e){console.warn('[24h alert]',e);}
     }
+    // ── Auto-solicitud Farmacia: ATB restringido / Reserve ──
+    // Cuando pol='restringido' o ATB AWaRe Reserve: crear solicitud automáticamente
+    // si no existe ya una pendiente para este paciente+ATB.
+    const _atbNombreAuto=(data.atb||atbListData[0]?.nombre||atbListData[0]?.n||'').trim();
+    const _esReserve=data.aware==='Reserve'||(atbListData||[]).some(a=>a.aware==='Reserve'||a.aw==='Reserve');
+    const _esRestringido=data.pol==='restringido'||_esReserve;
+    if(_esRestringido && _atbNombreAuto){
+      const _yaSol=SOLICITUDES.some(s=>
+        s.status==='pendiente'&&
+        (s.antibiotico||'').toLowerCase()===_atbNombreAuto.toLowerCase()&&
+        ((_savedPid&&s.patientId===_savedPid)||(!s.patientId&&s.pacienteNombre===nom))
+      );
+      if(!_yaSol){
+        try{
+          await addDoc(collection(db,'hospitals',HOSP,'antibiotic_requests'),{
+            antibiotico:_atbNombreAuto,
+            dosis:atbListData[0]?.dosis||data.dosis||'',
+            via:atbListData[0]?.via||data.via||'IV',
+            indicacion:data.dx||data.indicacion||'',
+            pacienteNombre:nom,
+            patientId:_savedPid||'',
+            cama:data.cama||'',
+            servicio:data.servicio||'',
+            medico:data.medico||'',
+            aware:data.aware||'',
+            pol:data.pol||'',
+            status:'pendiente',
+            urgente:_esReserve,
+            autoCreated:true,
+            solicitadoPor:U.uid,
+            solicitadoEmail:U.email,
+            solicitadoNombre:window._userName||U.displayName||U.email,
+            solicitadoAt:serverTimestamp(),
+            month:currentMonth,
+          });
+          const _tieneBloqGlobal=BLOQUEOS.some(b=>b.atb&&b.atb.toLowerCase()===_atbNombreAuto.toLowerCase());
+          if(!_tieneBloqGlobal)toast('📤 Solicitud enviada a Farmacia — ATB '+(data.pol==='restringido'?'restringido':'Reserve'),'am');
+        }catch(e){console.warn('[auto-solicitud farmacia]',e.message);}
+      }
+    }
     // ── Alerta de bloqueo farmacia ──
     // Si el ATB prescrito está bloqueado por farmacia Y no tiene solicitud liberada activa,
     // mostrar aviso y ofrecer crear solicitud de autorización.
@@ -9368,8 +9408,8 @@ function _fechaCorta(ts){
 }
 
 function _cardBase(s){
-  const colores={pendiente:'var(--amber)',liberado:'var(--teal)',denegado:'var(--red)'};
-  const iconos={pendiente:'⏳',liberado:'✅',denegado:'❌'};
+  const colores={pendiente:'var(--amber)',liberado:'var(--teal)',denegado:'var(--red)',dispensado:'var(--teal)'};
+  const iconos={pendiente:'⏳',liberado:'✅',denegado:'❌',dispensado:'💊'};
   return{sc:colores[s.status]||'var(--t3)',si:iconos[s.status]||'●'};
 }
 
@@ -9393,6 +9433,7 @@ window.renderSolicitudesFarmacia=function(){
   const pend=SOLICITUDES.filter(s=>s.status==='pendiente').length;
   const lib=SOLICITUDES.filter(s=>s.status==='liberado').length;
   const den=SOLICITUDES.filter(s=>s.status==='denegado').length;
+  const disp=SOLICITUDES.filter(s=>s.status==='dispensado').length;
   const bloq=BLOQUEOS.length;
   const sStats=document.getElementById('farm-stats');
   if(sStats)sStats.innerHTML=`
@@ -9407,6 +9448,10 @@ window.renderSolicitudesFarmacia=function(){
     <div class="farm-stat-chip" onclick="setFarmFiltro('denegado')" style="cursor:pointer;">
       <span style="font-size:18px;font-family:var(--mono);font-weight:700;color:var(--red);">${den}</span>
       <span style="font-size:9px;color:var(--t3);margin-top:2px;">DENEGADOS</span>
+    </div>
+    <div class="farm-stat-chip" onclick="setFarmFiltro('dispensado')" style="cursor:pointer;border-color:rgba(0,212,168,.3);">
+      <span style="font-size:18px;font-family:var(--mono);font-weight:700;color:var(--teal);">${disp}</span>
+      <span style="font-size:9px;color:var(--t3);margin-top:2px;">DISPENSADOS</span>
     </div>
     <div class="farm-stat-chip" onclick="setFarmTab('bloqueos')" style="cursor:pointer;border-color:rgba(167,139,250,.3);">
       <span style="font-size:18px;font-family:var(--mono);font-weight:700;color:var(--purple);">${bloq}</span>
@@ -9432,11 +9477,12 @@ window.renderSolicitudesFarmacia=function(){
     const isPend=s.status==='pendiente';
     const esBloqueado=window._atbBloqueados.has((s.antibiotico||'').toLowerCase().trim());
     const bloqueoLine=esBloqueado?`<span style="font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(167,139,250,.15);color:var(--purple);margin-left:6px;">🔒 BLOQUEADO POR FARMACIA</span>`:'';
+    const autoTag=s.autoCreated?`<span style="font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:10px;background:rgba(61,155,255,.1);color:var(--blue);margin-left:4px;" title="Solicitud creada automáticamente por el sistema">AUTO</span>`:'';
     return`<div class="user-card" style="flex-direction:column;align-items:flex-start;gap:8px;border-left:3px solid ${sc};margin-bottom:10px;">
       <div style="display:flex;align-items:center;gap:10px;width:100%;">
         <span style="font-size:22px;">${si}</span>
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;font-size:14px;">${escHtml(s.antibiotico||'—')}${s.urgente?' <span style="font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(255,77,109,.15);color:var(--red);">🚨 URGENTE</span>':''}${durLine}${bloqueoLine}</div>
+          <div style="font-weight:700;font-size:14px;">${escHtml(s.antibiotico||'—')}${s.urgente?' <span style="font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(255,77,109,.15);color:var(--red);">🚨 URGENTE</span>':''}${durLine}${bloqueoLine}${autoTag}</div>
           <div style="font-size:11px;color:var(--t3);">${escHtml(s.dosis||'Sin dosis')} · <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(s.cama||'—')}</div>
         </div>
         <div style="font-family:var(--mono);font-size:10px;padding:3px 12px;border-radius:12px;color:${sc};border:1px solid ${sc};white-space:nowrap;">${s.status.toUpperCase()}</div>
@@ -9447,6 +9493,8 @@ window.renderSolicitudesFarmacia=function(){
         <div style="font-size:10px;color:var(--t3);">Solicitado: ${_fechaCorta(s.solicitadoAt)} · por ${escHtml(s.solicitadoNombre||s.solicitadoEmail||'—')}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           ${isPend&&puedeRevisar?`<button class="btn-sm btn-sm-teal" onclick="abrirRevision('${s.id}','liberar')" style="font-size:11px;padding:3px 10px;">✅ Liberar / Dispensar</button><button class="btn-sm" style="border-color:rgba(255,77,109,.4);color:var(--red);font-size:11px;padding:3px 10px;" onclick="abrirRevision('${s.id}','denegar')">❌ Denegar</button>`:''}
+          ${s.status==='liberado'&&!s.dispensadoAt&&window._isFarmaceutico?`<button class="btn-sm" style="border-color:rgba(0,212,168,.5);color:var(--teal);font-size:11px;padding:3px 12px;background:rgba(0,212,168,.1);" onclick="confirmarDispensacion('${s.id}')">💊 Confirmar dispensación</button>`:''}
+          ${s.dispensadoAt?`<span style="font-size:10px;color:var(--teal);font-family:var(--mono);padding:3px 8px;border:1px solid rgba(0,212,168,.3);border-radius:10px;">💊 Dispensado ${_fechaCorta(s.dispensadoAt)}</span>`:''}
           ${puedeEliminar?`<button onclick="borrarSolicitud('${s.id}')" style="background:none;border:1px solid rgba(255,77,109,.3);color:var(--red);border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;">🗑</button>`:''}
         </div>
       </div>
@@ -9841,6 +9889,22 @@ window.abrirNuevoBloqueo=async()=>{
   document.getElementById('blq-atb').addEventListener('change',function(){
     document.getElementById('blq-otro-wrap').style.display=this.value==='__otro'?'':'none';
   });
+};
+
+// ── Confirmar dispensación (Farmacéutico cierra el circuito) ──
+window.confirmarDispensacion=async(id)=>{
+  if(!window._isFarmaceutico&&!window._isAdmin){toast('Solo Farmacia puede confirmar la dispensación','rd');return;}
+  if(!confirm('¿Confirmar que el ATB fue dispensado al paciente?\n\nEsta acción queda registrada en el expediente de farmacia.'))return;
+  try{
+    await setDoc(doc(db,'hospitals',HOSP,'antibiotic_requests',id),{
+      dispensadoAt:serverTimestamp(),
+      dispensadoPor:U.uid,
+      dispensadoNombre:window._userName||U.displayName||U.email,
+      dispensadoEmail:U.email,
+      status:'dispensado',
+    },{merge:true});
+    toast('💊 Dispensación confirmada y registrada ✓');
+  }catch(e){toast('Error: '+e.message,'rd');}
 };
 
 window.guardarBloqueoATB=async()=>{
@@ -16169,7 +16233,7 @@ input:focus,select:focus,textarea:focus{
       </div>
     </div>
     <!-- Stats grid -->
-    <div id="farm-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;"></div>
+    <div id="farm-stats" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;"></div>
     <!-- Sub-tabs: Solicitudes | Bloqueos -->
     <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid var(--brd);">
       <button class="farm-subtab active" data-tab="solicitudes" onclick="setFarmTab('solicitudes')" style="padding:8px 18px;background:none;border:none;border-bottom:2px solid var(--teal);color:var(--teal);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:-1px;">
@@ -16187,6 +16251,7 @@ input:focus,select:focus,textarea:focus{
         <button class="farm-filtro-btn" data-f="pendiente" onclick="setFarmFiltro('pendiente')" style="font-size:11px;padding:4px 12px;border:1px solid rgba(255,190,0,.3);background:rgba(255,190,0,.06);border-radius:12px;color:var(--amber);cursor:pointer;">⏳ Pendientes</button>
         <button class="farm-filtro-btn" data-f="liberado" onclick="setFarmFiltro('liberado')" style="font-size:11px;padding:4px 12px;border:1px solid rgba(0,212,168,.3);background:rgba(0,212,168,.06);border-radius:12px;color:var(--teal);cursor:pointer;">✅ Liberados</button>
         <button class="farm-filtro-btn" data-f="denegado" onclick="setFarmFiltro('denegado')" style="font-size:11px;padding:4px 12px;border:1px solid rgba(255,77,109,.3);background:rgba(255,77,109,.06);border-radius:12px;color:var(--red);cursor:pointer;">❌ Denegados</button>
+        <button class="farm-filtro-btn" data-f="dispensado" onclick="setFarmFiltro('dispensado')" style="font-size:11px;padding:4px 12px;border:1px solid rgba(0,212,168,.3);background:rgba(0,212,168,.06);border-radius:12px;color:var(--teal);cursor:pointer;">💊 Dispensados</button>
       </div>
       <div id="farm-sol-list"><div style="color:var(--t3);text-align:center;padding:40px;">Cargando solicitudes…</div></div>
     </div>
