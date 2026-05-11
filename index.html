@@ -12291,26 +12291,21 @@ window._dictActive=false;
 window._dictRecog=null;
 
 window.abrirDictado=function(){
-  const modal=document.getElementById('modal');
-  const mBody=document.getElementById('modal-body');
-  const mTitle=document.getElementById('modal-title');
-  if(!modal||!mBody)return;
   window._dictFinal='';window._dictActive=false;
-  mTitle.textContent='🎙️ Dictado Inteligente — Llenado con IA';
-  mBody.innerHTML='<div style="padding:16px;">'
+  const html='<div style="padding:4px 0 8px;">'
     +'<div style="text-align:center;margin-bottom:16px;">'
-    +'<div id="dict-mic" onclick="window._dictToggle()" style="width:80px;height:80px;border-radius:50%;background:var(--s2);border:3px solid var(--brd2);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:38px;cursor:pointer;transition:all .3s;">🎙️</div>'
-    +'<div id="dict-st" style="font-size:12px;color:var(--t2);">Toca el micrófono para comenzar</div>'
-    +'<div style="font-size:10.5px;color:var(--t3);margin-top:4px;">Habla naturalmente — incluye nombre, edad, servicio, diagnóstico, antibióticos...</div>'
+    +'<div id="dict-mic" onclick="window._dictToggle()" style="width:84px;height:84px;border-radius:50%;background:var(--s2);border:3px solid var(--brd2);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:40px;cursor:pointer;transition:all .3s;user-select:none;">🎙️</div>'
+    +'<div id="dict-st" style="font-size:12px;color:var(--t2);font-weight:600;">Toca el micrófono para comenzar</div>'
+    +'<div style="font-size:10.5px;color:var(--t3);margin-top:4px;">Habla con el paciente — incluye nombre, edad, servicio, diagnóstico, antibióticos...</div>'
     +'</div>'
-    +'<div id="dict-live" style="min-height:90px;max-height:180px;overflow-y:auto;background:var(--s2);border:1px solid var(--brd2);border-radius:7px;padding:10px;font-size:11.5px;color:var(--t2);line-height:1.6;margin-bottom:12px;white-space:pre-wrap;font-style:italic;"></div>'
+    +'<div id="dict-live" style="min-height:90px;max-height:200px;overflow-y:auto;background:var(--s2);border:1px solid var(--brd2);border-radius:7px;padding:10px;font-size:11.5px;color:var(--t2);line-height:1.6;margin-bottom:12px;white-space:pre-wrap;font-style:italic;">El texto aparecerá aquí en tiempo real...</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
     +'<button id="dict-proc" onclick="window._dictProcesar()" style="background:rgba(167,139,250,.12);border:1px solid var(--purple);color:var(--purple);border-radius:6px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">✨ Llenar campos con IA</button>'
     +'<button onclick="window._dictLimpiar()" style="background:var(--s2);border:1px solid var(--brd2);color:var(--t2);border-radius:6px;padding:10px;font-size:12px;cursor:pointer;">🗑 Limpiar</button>'
     +'</div>'
-    +'<div style="font-size:10px;color:var(--t3);text-align:center;line-height:1.5;">La IA extrae automáticamente: nombre, edad, sexo, servicio, diagnóstico,<br>gravedad, antibióticos, microorganismo, foco, notas y más.</div>'
+    +'<div style="font-size:10px;color:var(--t3);text-align:center;line-height:1.5;">La IA extrae: nombre, edad, sexo, servicio, diagnóstico,<br>gravedad, antibióticos, microorganismo, foco infeccioso y más.</div>'
     +'</div>';
-  modal.classList.add('active');
+  abrirContenido('🎙️ Dictado Inteligente — Llenado con IA', html);
 };
 
 window._dictToggle=function(){if(window._dictActive)window._dictStop();else window._dictStart();};
