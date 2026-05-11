@@ -12364,11 +12364,13 @@ window._dictProcesar=async function(){
   const st=document.getElementById('dict-st');
   if(st)st.textContent='IA procesando el texto...';
   try{
-    const sys='Eres un asistente clínico para StewardMX, sistema PROA de hospital en México. Analiza el relato clínico y extrae datos del paciente. Devuelve SOLO JSON válido sin markdown:\n{"nombre":string|null,"edad":number|null,"sexo":"Masculino"|"Femenino"|null,"exp":string|null,"servicio":string|null,"cama":string|null,"medico":string|null,"dx":string|null,"focoInf":string|null,"gravedad":"Leve"|"Moderada"|"Grave"|"Crítica"|null,"via":"VO"|"IV"|"IM"|null,"atb":string|null,"organismo":string|null,"cult":"Positivo"|"Negativo"|"Pendiente"|null,"muestra":string|null,"renal":"Normal"|"ERC"|"Lesión renal aguda"|null,"notas":string|null}\nOmite campos no mencionados (null). Sé literal con nombres propios. Diagnóstico en términos médicos precisos.';
-    const res=await llamarAnthropicSeguro([{role:'user',content:texto}],sys,600,'claude-haiku-4-5');
+    const sys='Eres un extractor de datos clínicos para un hospital en México. Tu ÚNICA tarea es devolver un JSON. NO escribas ningún texto antes ni después del JSON. NO uses markdown ni backticks. La respuesta debe comenzar exactamente con { y terminar exactamente con }.\n\nEsquema (usa null para campos no mencionados):\n{"nombre":string|null,"edad":number|null,"sexo":"Masculino"|"Femenino"|null,"exp":string|null,"servicio":string|null,"cama":string|null,"medico":string|null,"dx":string|null,"focoInf":string|null,"gravedad":"Leve"|"Moderada"|"Grave"|"Crítica"|null,"via":"VO"|"IV"|"IM"|null,"atb":string|null,"organismo":string|null,"cult":"Positivo"|"Negativo"|"Pendiente"|null,"muestra":string|null,"renal":"Normal"|"ERC"|"Lesión renal aguda"|null,"notas":string|null}';
+    const res=await llamarAnthropicSeguro([{role:'user',content:texto}],sys,700,'claude-sonnet-4-5');
     const raw=res?.content?.[0]?.text||'';
-    const m=raw.match(/\{[\s\S]*?\}/);
-    if(!m)throw new Error('Respuesta no contiene JSON');
+    // Strip markdown code fences if present, then match outermost JSON object
+    const cleaned=raw.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'').trim();
+    const m=cleaned.match(/\{[\s\S]*\}/); // greedy — first { to last }
+    if(!m)throw new Error('La IA no devolvió JSON. Respuesta: '+cleaned.substring(0,80));
     const d=JSON.parse(m[0]);
     const fill=(id,val)=>{if(val==null)return;const el=document.getElementById(id);if(el)el.value=val;};
     const sel=(id,val)=>{if(!val)return;const el=document.getElementById(id);if(!el)return;const o=Array.from(el.options).find(o=>o.value===val||o.text===val||o.text.includes(val));if(o)el.value=o.value;};
