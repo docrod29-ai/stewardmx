@@ -189,7 +189,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
 <nav id="sidebar">
   <div class="sidebar-top">
     <div class="sidebar-logo">StewardMX</div>
-    <div class="sidebar-sub">Guía completa de usuario v2.0</div>
+    <div class="sidebar-sub">Guía completa de usuario v2.1</div>
     <input id="search-inp" type="search" placeholder="Buscar en la guía…" oninput="buscarGuia(this.value)">
   </div>
   <div class="sidebar-nav" id="nav-items">
@@ -203,6 +203,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
     <a class="nav-link" href="#s-expediente" onclick="navClick(this)"><span class="ico">🗂</span>Expediente del paciente</a>
     <a class="nav-link" href="#s-notas" onclick="navClick(this)"><span class="ico">🩺</span>Pase de visita y notas</a>
     <span class="nav-group-lbl">Herramientas clínicas</span>
+    <a class="nav-link" href="#s-voz" onclick="navClick(this)"><span class="ico">🎙️</span>Asistente de Voz IA</a>
     <a class="nav-link" href="#s-atb" onclick="navClick(this)"><span class="ico">💊</span>Antibióticos y dosis renales</a>
     <a class="nav-link" href="#s-cultivos" onclick="navClick(this)"><span class="ico">🧫</span>Cultivos y Microbiología</a>
     <a class="nav-link" href="#s-alertas" onclick="navClick(this)"><span class="ico">🚨</span>Alertas PROA</a>
@@ -224,13 +225,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
 
   <!-- HERO -->
   <div class="hero">
-    <div class="hero-chip">Guía de usuario · 2025</div>
+    <div class="hero-chip">Guía de usuario · 2026 · v2.1</div>
     <h1>Bienvenido a <span>StewardMX</span></h1>
     <p>Todo lo que necesitas saber para registrar pacientes, gestionar antibióticos, interpretar alertas y coordinar con tu equipo — explicado paso a paso.</p>
     <div class="hero-chips">
       <div class="hc tc">✅ Sin descargas</div>
       <div class="hc am">📴 Funciona sin internet</div>
       <div class="hc bl">📱 iPhone · Android · PC</div>
+      <div class="hc tc">🎙️ Dictado con IA</div>
     </div>
   </div>
 
@@ -259,6 +261,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
         <tr><td>🩺 <strong>Pase de visita</strong></td><td>Escribe una nota clínica en cada visita y queda guardada en el expediente.</td></tr>
         <tr><td>📢 <strong>WhatsApp</strong></td><td>Manda mensajes directamente a Farmacia, Microbiología o el médico tratante.</td></tr>
         <tr><td>📊 <strong>Reportes</strong></td><td>DOT, AWaRe, prevalencia de MDR, DDD — para tu informe mensual de PROA.</td></tr>
+        <tr><td>🎙️ <strong>Asistente de Voz IA</strong></td><td>Habla con el paciente y la IA llena automáticamente todos los campos del formulario, calcula la TFG y sugiere acciones PROA.</td></tr>
       </tbody>
     </table>
   </div>
@@ -465,7 +468,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
       </div>
     </div>
 
-    <h3 style="font-size:15px;font-weight:700;color:var(--tx);margin:24px 0 14px;">Paso a paso para registrarlo:</h3>
+    <div class="callout tip">
+      <div class="co-ico">🎙️</div>
+      <p><strong>Alternativa rápida: usa el Asistente de Voz</strong><br>
+      En lugar de llenar el formulario campo por campo, toca el botón morado <strong>🎙️</strong> en la esquina inferior derecha, habla con el paciente y toca <strong>"✨ Llenar con IA"</strong>. La IA llena todos los campos automáticamente en segundos, incluyendo la TFG. <a href="#s-voz" style="color:var(--teal);">Ver guía completa del asistente de voz →</a></p>
+    </div>
+
+    <h3 style="font-size:15px;font-weight:700;color:var(--tx);margin:24px 0 14px;">Paso a paso para registrarlo (manualmente):</h3>
 
     <div class="steps">
       <div class="step">
@@ -693,9 +702,177 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
     </div>
   </div>
 
-  <!-- 8. ATB Y DOSIS RENALES -->
+  <!-- 8. ASISTENTE DE VOZ IA -->
+  <div class="section" id="s-voz" data-title="Asistente voz IA dictado micrófono llenar formulario TFG paciente">
+    <span class="sec-num">08 — Asistente de Voz IA</span>
+    <h2 class="sec-title">Asistente de Voz con Inteligencia Artificial</h2>
+    <p class="sec-lead">Habla con tu paciente con naturalidad — StewardMX escucha la conversación y llena automáticamente todos los campos del formulario: datos del paciente, antibióticos, creatinina (con TFG calculada), microbiología, inmunosupresión, tipo de visita y más.</p>
+
+    <div class="callout tip">
+      <div class="co-ico">🎙️</div>
+      <p><strong>¿Para qué sirve?</strong><br>
+      Elimina la necesidad de escribir durante la visita. Toca el botón morado, habla con el paciente, y al terminar toca <strong>"✨ Llenar con IA"</strong> — la IA extrae todos los datos y los llena en el formulario en segundos.</p>
+    </div>
+
+    <h3 style="font-size:15px;font-weight:700;color:var(--tx);margin:24px 0 14px;">Cómo usar el Asistente de Voz paso a paso:</h3>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Toca el botón morado 🎙️ en la esquina inferior derecha</div>
+          <div class="step-desc">
+            El botón morado flotante siempre está visible en cualquier pantalla de la app.<br>
+            Al tocarlo se abre el panel del Asistente Clínico IA.<br><br>
+            <span class="tag pu">Nota:</span> Funciona en Chrome o Edge en PC y Android. En iPhone usa Safari.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Toca el micrófono en el panel para empezar a grabar</div>
+          <div class="step-desc">
+            Al tocar el micrófono:
+            <ul style="margin:8px 0 0 16px;font-size:12px;color:var(--t2);line-height:2;">
+              <li>El botón morado cambia a <span class="tag rd">🔴 rojo pulsante</span> — indica que está grabando</li>
+              <li>Aparece una animación de ondas de audio dentro del panel</li>
+              <li>El texto de la transcripción aparece en tiempo real mientras hablas</li>
+            </ul>
+            Si el navegador pide permiso para el micrófono, toca <strong>"Permitir"</strong>.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Habla con el paciente o dicta la información clínica</div>
+          <div class="step-desc">
+            La IA entiende conversación médica natural. No necesitas usar palabras clave especiales. Ejemplo de lo que puedes decir:<br><br>
+            <div style="background:var(--s1);border:1px solid var(--brd);border-radius:6px;padding:14px;font-size:12px;line-height:1.85;color:var(--t1);font-style:italic;margin-top:8px;">
+              "Paciente Rodríguez García Juan, 68 años, masculino. Expediente 2025-4821. Está en Medicina Interna en la cama 14, a cargo del Doctor Martínez. Tiene diagnóstico de neumonía nosocomial, gravedad grave. Le tomamos hemocultivo ayer. Tiene creatinina de 1.35 y pesa 82 kilos. Está recibiendo Meropenem dos gramos cada ocho horas intravenoso. Acción PROA: mantener. Revisión en 48 horas."
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Toca "⏸" para pausar o "🗑 Limpiar" para borrar y empezar de nuevo</div>
+          <div class="step-desc">Puedes pausar y reanudar la grabación cuantas veces necesites. La transcripción se acumula. Para borrar todo y empezar de nuevo, toca "🗑 Limpiar".</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">Toca "✨ Llenar con IA" cuando termines de hablar</div>
+          <div class="step-desc">
+            La IA analiza toda la transcripción y:<br>
+            <ul style="margin:8px 0 0 16px;font-size:12px;color:var(--t2);line-height:2.1;">
+              <li>Llena el nombre, expediente, edad, sexo, peso, servicio, cama, médico</li>
+              <li>Selecciona el diagnóstico, gravedad, foco infeccioso, inmunosupresión</li>
+              <li>Llena <strong>creatinina</strong> → calcula <strong>TFG automáticamente</strong> (CKD-EPI 2021)</li>
+              <li>Asigna el <strong>tipo de visita</strong> (seguimiento, interconsulta, urgente, trasplante)</li>
+              <li>Llena todos los <strong>antibióticos mencionados</strong> (nombre, dosis, vía) — soporta múltiples ATBs</li>
+              <li>Registra cultivo, muestra y microorganismo (si se menciona)</li>
+              <li>Selecciona la acción PROA, duración planeada y próxima revisión</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <div class="step-title">Revisa las alertas y sugerencias PROA en el panel</div>
+          <div class="step-desc">
+            Debajo de los botones aparece el panel asesor con:
+            <table class="guide-tbl" style="margin:10px 0 0">
+              <tr><td><span class="tag rd">🚨 Alertas</span></td><td>Situaciones clínicas críticas detectadas en la conversación.</td></tr>
+              <tr><td><span class="tag tc">💡 PROA</span></td><td>Recomendaciones de stewardship basadas en los datos extraídos.</td></tr>
+              <tr><td><span class="tag am">❓ Preguntar</span></td><td>Campos importantes no mencionados que debes preguntar al paciente (según NOM-004).</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-body">
+          <div class="step-title">Si el paciente ya existe en el censo: aparece botón "Abrir ↗"</div>
+          <div class="step-desc">La IA busca el nombre dictado en todos tus pacientes activos. Si encuentra coincidencia, aparece un banner verde con el nombre, servicio y cama, y un botón para abrir su ficha directamente sin buscar en el censo.</div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-size:15px;font-weight:700;color:var(--tx);margin:28px 0 14px;">Comandos de voz — mientras grabas puedes decir:</h3>
+    <table class="guide-tbl">
+      <thead><tr><th>Comando de voz</th><th>Acción inmediata</th></tr></thead>
+      <tbody>
+        <tr><td><code>«guardar»</code></td><td>Guarda el paciente actual automáticamente.</td></tr>
+        <tr><td><code>«nuevo paciente»</code></td><td>Abre el formulario de nuevo paciente.</td></tr>
+        <tr><td><code>«limpiar»</code> / <code>«borrar todo»</code></td><td>Borra la transcripción y reinicia la grabación.</td></tr>
+        <tr><td><code>«analizar»</code> / <code>«llenar formulario»</code></td><td>Ejecuta el análisis con IA (igual que tocar el botón).</td></tr>
+        <tr><td><code>«cancelar»</code> / <code>«cerrar formulario»</code></td><td>Cierra el formulario actual sin guardar.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout info">
+      <div class="co-ico">🧮</div>
+      <p><strong>TFG automática (CKD-EPI 2021)</strong><br>
+      Si mencionas la creatinina sérica en cualquier parte de la conversación (ej. <em>"creatinina de 1.8"</em>), la IA extrae el valor numérico, lo llena en el campo correspondiente y llama automáticamente al calculador CKD-EPI 2021 con la edad y el sexo del paciente. El resultado aparece en el campo TFG con su categoría (G1–G5 o diálisis).</p>
+    </div>
+
+    <div class="callout warn">
+      <div class="co-ico">⚠️</div>
+      <p><strong>Requisito: API Key de Anthropic configurada</strong><br>
+      El análisis con IA usa Claude (Anthropic). Para que funcione, el administrador del hospital debe configurar la API Key en <strong>Administración → Configuración de IA</strong>. Si no está configurada, el micrófono graba pero el botón "Llenar con IA" mostrará un aviso.</p>
+    </div>
+
+    <div class="callout tip">
+      <div class="co-ico">📱</div>
+      <p><strong>En dispositivos móviles</strong><br>
+      El panel se adapta al tamaño de la pantalla. En iPhone y Android el panel ocupa casi todo el ancho. El botón morado se coloca en la esquina inferior derecha para no tapar el contenido. La transcripción funciona igual que en PC — incluso con el teclado virtual abierto.</p>
+    </div>
+
+    <div class="example-box" style="margin-top:24px">
+      <div class="example-header">
+        <div class="ico">🎙️</div>
+        <div>
+          <div class="lbl">Ejemplo real de dictado</div>
+          <div class="name">Paciente con IAVM en UCI — dictado completo en 45 segundos</div>
+        </div>
+      </div>
+      <div style="background:var(--s1);border:1px solid var(--brd);border-radius:8px;padding:16px;font-size:12px;line-height:1.9;color:var(--t1);font-style:italic;margin-bottom:16px;">
+        "Paciente González Torres, masculino de 54 años. Está en UCI en la cama 3. Médico el Doctor Reyes. Tiene diagnóstico de infección asociada a ventilador mecánico, gravedad crítica. Le tomamos BAL ayer, resultado positivo a Pseudomonas aeruginosa. Tiene creatinina de 2.1, peso 75 kilos. Está en tratamiento con Ceftazidima-avibactam 2.5 gramos cada ocho horas intravenoso y Amikacina 1500 miligramos cada veinticuatro horas intravenoso. Bacteriemia sospechada. Acción PROA: mantener, revisión en 48 horas. El paciente tiene trasplante renal."
+      </div>
+      <p style="font-size:12px;font-weight:700;color:var(--tx);margin-bottom:10px;">Campos llenados automáticamente por la IA:</p>
+      <div class="form-mock">
+        <div class="fm-field"><div class="fm-label">Nombre</div><div class="fm-value">González Torres</div></div>
+        <div class="fm-field"><div class="fm-label">Edad / Sexo</div><div class="fm-value">54 años · Masculino</div></div>
+        <div class="fm-field"><div class="fm-label">Servicio / Cama</div><div class="fm-value">UCI · Cama 3</div></div>
+        <div class="fm-field"><div class="fm-label">Médico</div><div class="fm-value">Dr. Reyes</div></div>
+        <div class="fm-field fm-full"><div class="fm-label">Diagnóstico</div><div class="fm-value">Infección asociada a ventilador mecánico (IAVM)</div></div>
+        <div class="fm-field"><div class="fm-label">Gravedad</div><div class="fm-value" style="color:var(--red);">Crítica</div></div>
+        <div class="fm-field"><div class="fm-label">Inmunosupresión</div><div class="fm-value">Trasplante</div></div>
+        <div class="fm-field"><div class="fm-label">Creatinina</div><div class="fm-value">2.1 mg/dL</div></div>
+        <div class="fm-field"><div class="fm-label">TFG (auto-calculado)</div><div class="fm-value" style="color:var(--red);">TFG 28 mL/min (G4 — Severa ↓)</div></div>
+        <div class="fm-field"><div class="fm-label">Peso</div><div class="fm-value">75 kg</div></div>
+        <div class="fm-field"><div class="fm-label">ATB 1</div><div class="fm-value">Ceftazidima-avibactam · 2.5g c/8h IV</div></div>
+        <div class="fm-field"><div class="fm-label">ATB 2</div><div class="fm-value">Amikacina · 1500mg c/24h IV</div></div>
+        <div class="fm-field"><div class="fm-label">Cultivo / Muestra</div><div class="fm-value">Positivo · BAL</div></div>
+        <div class="fm-field"><div class="fm-label">Microorganismo</div><div class="fm-value">Pseudomonas aeruginosa</div></div>
+        <div class="fm-field"><div class="fm-label">Bacteriemia</div><div class="fm-value">Sospecha</div></div>
+        <div class="fm-field"><div class="fm-label">Acción · Revisión</div><div class="fm-value">Mantener · 48h</div></div>
+      </div>
+      <div class="alert-mock rd" style="margin-top:12px">
+        <div class="alert-title">🚨 Alerta sugerida por IA</div>
+        <div class="alert-body">Pseudomonas aeruginosa en UCI con TFG 28 mL/min. Considerar ajuste de dosis de Amikacina por función renal reducida. Verificar niveles pico/valle si hay disponibilidad.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. ATB Y DOSIS RENALES -->
   <div class="section" id="s-atb" data-title="Antibióticos dosis renales TFG PK/PD">
-    <span class="sec-num">08 — Antibióticos</span>
+    <span class="sec-num">09 — Antibióticos</span>
     <h2 class="sec-title">Sistema de antibióticos y dosis renales</h2>
     <p class="sec-lead">StewardMX incluye un catálogo de más de 80 antibióticos y antifúngicos con dosis basadas en literatura (IDSA, ESCMID, Sanford Guide), incluyendo ajuste por función renal para más de 30 fármacos.</p>
 
@@ -758,9 +935,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
     </div>
   </div>
 
-  <!-- 9. CULTIVOS -->
+  <!-- 10. CULTIVOS -->
   <div class="section" id="s-cultivos" data-title="Cultivos microbiología antibiograma resultado QFB">
-    <span class="sec-num">09 — Microbiología</span>
+    <span class="sec-num">10 — Microbiología</span>
     <h2 class="sec-title">Cultivos y comunicación con Microbiología</h2>
     <p class="sec-lead">El seguimiento de cultivos es uno de los pilares del PROA. StewardMX te alerta automáticamente cuando un resultado está pendiente y te permite contactar al microbiólogo o QFB directamente por WhatsApp.</p>
 
@@ -842,9 +1019,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
     </div>
   </div>
 
-  <!-- 10. ALERTAS -->
+  <!-- 11. ALERTAS -->
   <div class="section" id="s-alertas" data-title="Alertas PROA stewardship qué hacer">
-    <span class="sec-num">10 — Alertas</span>
+    <span class="sec-num">11 — Alertas</span>
     <h2 class="sec-title">Las Alertas PROA — qué significan y qué hacer</h2>
     <p class="sec-lead">StewardMX genera alertas automáticas según el estado de cada paciente. Las alertas aparecen en el panel lateral derecho y en el badge rojo/ámbar del menú.</p>
 
@@ -930,9 +1107,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
     </div>
   </div>
 
-  <!-- 11. FARMACIA -->
+  <!-- 12. FARMACIA -->
   <div class="section" id="s-farmacia" data-title="Farmacia autorización antibiótico restringido solicitud">
-    <span class="sec-num">11 — Farmacia</span>
+    <span class="sec-num">12 — Farmacia</span>
     <h2 class="sec-title">Farmacia y autorizaciones de ATB restringido</h2>
     <p class="sec-lead">Los antibióticos de categoría <span class="tag rd">Reserve</span> están bloqueados y requieren autorización de Farmacia (o Infectología, según tu hospital) antes de que puedan dispensarse.</p>
 
@@ -982,9 +1159,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
     </div>
   </div>
 
-  <!-- 12. WHATSAPP -->
+  <!-- 13. WHATSAPP -->
   <div class="section" id="s-whatsapp" data-title="WhatsApp notificaciones contactos mensajes">
-    <span class="sec-num">12 — WhatsApp</span>
+    <span class="sec-num">13 — WhatsApp</span>
     <h2 class="sec-title">Notificaciones WhatsApp</h2>
     <p class="sec-lead">StewardMX puede abrir WhatsApp con mensajes pre-armados para Farmacia, el médico tratante, el microbiólogo o el grupo del equipo. Tú solo tocas "Enviar" en WhatsApp.</p>
 
@@ -1025,9 +1202,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
     </div>
   </div>
 
-  <!-- 13. OFFLINE -->
+  <!-- 14. OFFLINE -->
   <div class="section" id="s-offline" data-title="Sin internet offline trabajar desconectado">
-    <span class="sec-num">13 — Offline</span>
+    <span class="sec-num">14 — Offline</span>
     <h2 class="sec-title">Trabajar sin internet</h2>
     <p class="sec-lead">StewardMX funciona sin conexión a internet. Puedes agregar y editar pacientes en zonas sin señal — los cambios se guardan en tu dispositivo y se sincronizan automáticamente al reconectar.</p>
 
@@ -1079,9 +1256,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
     </div>
   </div>
 
-  <!-- 14. FAQ -->
-  <div class="section" id="s-faq" data-title="Preguntas frecuentes dudas problemas">
-    <span class="sec-num">14 — FAQ</span>
+  <!-- 15. FAQ -->
+  <div class="section" id="s-faq" data-title="Preguntas frecuentes dudas problemas voz IA dictado">
+    <span class="sec-num">15 — FAQ</span>
     <h2 class="sec-title">Preguntas frecuentes</h2>
 
     <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
@@ -1130,6 +1307,27 @@ body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.
       <details style="background:var(--s2);border:1px solid var(--brd);border-radius:8px;overflow:hidden">
         <summary style="padding:14px 18px;cursor:pointer;font-weight:600;color:var(--tx);font-size:13px;list-style:none;display:flex;justify-content:space-between;align-items:center;">¿Cómo genero la nota PROA para el expediente? <span style="color:var(--teal);">+</span></summary>
         <div style="padding:0 18px 14px;font-size:13px;color:var(--t2);line-height:1.7;">Abre la ficha del paciente → pestaña <strong>"📋 Expediente"</strong>. La nota PROA se genera automáticamente con todos los datos: diagnóstico, organismo, mecanismos de resistencia, ATB, días, acción y recomendaciones. Puedes copiarla al portapapeles o exportarla como PDF desde tu navegador.</div>
+      </details>
+
+      <details style="background:var(--s2);border:1px solid var(--brd);border-radius:8px;overflow:hidden">
+        <summary style="padding:14px 18px;cursor:pointer;font-weight:600;color:var(--tx);font-size:13px;list-style:none;display:flex;justify-content:space-between;align-items:center;">El asistente de voz no funciona / no pide permiso de micrófono <span style="color:var(--teal);">+</span></summary>
+        <div style="padding:0 18px 14px;font-size:13px;color:var(--t2);line-height:1.7;">
+          El dictado usa la Web Speech API — requiere:<br><br>
+          1. Navegador compatible: <strong>Chrome 89+</strong> o <strong>Edge 89+</strong> en PC y Android. En iPhone usa <strong>Safari</strong>.<br>
+          2. Conexión a internet activa (la transcripción se procesa en los servidores del navegador).<br>
+          3. Permiso de micrófono concedido — si no apareció el diálogo de permiso, ve a la configuración del navegador → Privacidad → Permisos de micrófono → permite la URL de StewardMX.<br>
+          4. Si usas la app como PWA instalada: el permiso debe haberse concedido en el navegador base (Chrome/Safari) antes de instalar.
+        </div>
+      </details>
+
+      <details style="background:var(--s2);border:1px solid var(--brd);border-radius:8px;overflow:hidden">
+        <summary style="padding:14px 18px;cursor:pointer;font-weight:600;color:var(--tx);font-size:13px;list-style:none;display:flex;justify-content:space-between;align-items:center;">El botón "Llenar con IA" dice "Configura la API Key" <span style="color:var(--teal);">+</span></summary>
+        <div style="padding:0 18px 14px;font-size:13px;color:var(--t2);line-height:1.7;">El análisis de la transcripción usa el modelo Claude de Anthropic. El administrador del hospital debe configurar la clave API en <strong>Menú → Administración del hospital → Configuración de IA → API Key de Anthropic</strong>. Sin esta clave la grabación funciona pero el análisis automático no está disponible.</div>
+      </details>
+
+      <details style="background:var(--s2);border:1px solid var(--brd);border-radius:8px;overflow:hidden">
+        <summary style="padding:14px 18px;cursor:pointer;font-weight:600;color:var(--tx);font-size:13px;list-style:none;display:flex;justify-content:space-between;align-items:center;">¿La IA escucha en tiempo real o solo cuando toco "Llenar"? <span style="color:var(--teal);">+</span></summary>
+        <div style="padding:0 18px 14px;font-size:13px;color:var(--t2);line-height:1.7;">La <strong>transcripción</strong> (texto de lo que dices) es en tiempo real — aparece mientras hablas. El <strong>análisis con IA</strong> (extracción de datos y llenado de campos) solo ocurre cuando tocas "✨ Llenar con IA". Así tienes control total: puedes revisar la transcripción antes de que la IA la analice, corregirla si hay errores, y decidir cuándo aplicar el análisis.</div>
       </details>
 
     </div>
