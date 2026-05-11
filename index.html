@@ -2900,6 +2900,10 @@ function abrirFormPaciente(p){
   const ck=(mid,val)=>val?'checked':'';
 
   let html='';
+  // Voice dictation button row
+  html+='<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px;gap:8px;">'
+      +'<button type="button" onclick="window.abrirDictado()" style="display:flex;align-items:center;gap:6px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.4);color:var(--purple);border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">🎙️ Dictado con IA</button>'
+      +'</div>';
   // Tab bar
   html+='<div class="form-tabs"><button class="ftab active" onclick="swFTab(this,\'ft-datos\')">Paciente</button><button class="ftab" onclick="swFTab(this,\'ft-atb\')">Antimicrobianos</button><button class="ftab" onclick="swFTab(this,\'ft-micro\')">Microbiología</button><button class="ftab" onclick="swFTab(this,\'ft-abg\')">Antibiograma</button><button class="ftab" onclick="swFTab(this,\'ft-proa\')">Decisión PROA</button><button class="ftab" onclick="swFTab(this,\'ft-ic\')">🔄 Interconsulta</button></div>';
 
@@ -12281,6 +12285,349 @@ window.renderFlujograma=function(){
   cont.innerHTML=html;
 };
 
+// ══ DICTADO POR VOZ ══
+window._dictFinal='';
+window._dictActive=false;
+window._dictRecog=null;
+
+window.abrirDictado=function(){
+  const modal=document.getElementById('modal');
+  const mBody=document.getElementById('modal-body');
+  const mTitle=document.getElementById('modal-title');
+  if(!modal||!mBody)return;
+  window._dictFinal='';window._dictActive=false;
+  mTitle.textContent='🎙️ Dictado Inteligente — Llenado con IA';
+  mBody.innerHTML='<div style="padding:16px;">'
+    +'<div style="text-align:center;margin-bottom:16px;">'
+    +'<div id="dict-mic" onclick="window._dictToggle()" style="width:80px;height:80px;border-radius:50%;background:var(--s2);border:3px solid var(--brd2);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:38px;cursor:pointer;transition:all .3s;">🎙️</div>'
+    +'<div id="dict-st" style="font-size:12px;color:var(--t2);">Toca el micrófono para comenzar</div>'
+    +'<div style="font-size:10.5px;color:var(--t3);margin-top:4px;">Habla naturalmente — incluye nombre, edad, servicio, diagnóstico, antibióticos...</div>'
+    +'</div>'
+    +'<div id="dict-live" style="min-height:90px;max-height:180px;overflow-y:auto;background:var(--s2);border:1px solid var(--brd2);border-radius:7px;padding:10px;font-size:11.5px;color:var(--t2);line-height:1.6;margin-bottom:12px;white-space:pre-wrap;font-style:italic;"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
+    +'<button id="dict-proc" onclick="window._dictProcesar()" style="background:rgba(167,139,250,.12);border:1px solid var(--purple);color:var(--purple);border-radius:6px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">✨ Llenar campos con IA</button>'
+    +'<button onclick="window._dictLimpiar()" style="background:var(--s2);border:1px solid var(--brd2);color:var(--t2);border-radius:6px;padding:10px;font-size:12px;cursor:pointer;">🗑 Limpiar</button>'
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--t3);text-align:center;line-height:1.5;">La IA extrae automáticamente: nombre, edad, sexo, servicio, diagnóstico,<br>gravedad, antibióticos, microorganismo, foco, notas y más.</div>'
+    +'</div>';
+  modal.classList.add('active');
+};
+
+window._dictToggle=function(){if(window._dictActive)window._dictStop();else window._dictStart();};
+
+window._dictStart=function(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('Dictado requiere Chrome o Edge','am');return;}
+  const r=new SR();
+  r.continuous=true;r.interimResults=true;r.lang='es-MX';
+  r.onresult=function(e){
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal)window._dictFinal+=e.results[i][0].transcript+' ';
+      else interim+=e.results[i][0].transcript;
+    }
+    const el=document.getElementById('dict-live');
+    if(el)el.textContent=window._dictFinal+interim;
+  };
+  r.onerror=function(e){
+    window._dictActive=false;
+    const mic=document.getElementById('dict-mic');
+    if(mic){mic.style.background='var(--s2)';mic.style.borderColor='var(--brd2)';}
+    const st=document.getElementById('dict-st');
+    if(st)st.textContent='Error: '+e.error+'. Verifica permisos de micrófono.';
+  };
+  r.onend=function(){if(window._dictActive)r.start();};
+  r.start();window._dictRecog=r;window._dictActive=true;
+  const mic=document.getElementById('dict-mic');
+  if(mic){mic.style.background='rgba(255,77,109,.12)';mic.style.borderColor='var(--red)';}
+  const st=document.getElementById('dict-st');
+  if(st)st.textContent='🔴 Escuchando... toca para pausar';
+};
+
+window._dictStop=function(){
+  window._dictActive=false;
+  if(window._dictRecog){try{window._dictRecog.stop();}catch(_){}window._dictRecog=null;}
+  const mic=document.getElementById('dict-mic');
+  if(mic){mic.style.background='var(--s2)';mic.style.borderColor='var(--teal)';}
+  const st=document.getElementById('dict-st');
+  if(st)st.textContent='⏸ Pausado — toca el mic para continuar o procesa con IA';
+};
+
+window._dictLimpiar=function(){
+  window._dictFinal='';window._dictStop();
+  const el=document.getElementById('dict-live');if(el)el.textContent='';
+  const st=document.getElementById('dict-st');if(st)st.textContent='Toca el micrófono para comenzar';
+};
+
+window._dictProcesar=async function(){
+  const texto=(window._dictFinal||(document.getElementById('dict-live')?.textContent||'')).trim();
+  if(!texto){toast('Habla primero antes de procesar','am');return;}
+  if(!window._anthropicProxyURL&&!window._abgApiKey){toast('Configura API Key de Anthropic en Administración del hospital','am');return;}
+  window._dictStop();
+  const btn=document.getElementById('dict-proc');
+  if(btn){btn.disabled=true;btn.textContent='⌛ Analizando...';}
+  const st=document.getElementById('dict-st');
+  if(st)st.textContent='IA procesando el texto...';
+  try{
+    const sys='Eres un asistente clínico para StewardMX, sistema PROA de hospital en México. Analiza el relato clínico y extrae datos del paciente. Devuelve SOLO JSON válido sin markdown:\n{"nombre":string|null,"edad":number|null,"sexo":"Masculino"|"Femenino"|null,"exp":string|null,"servicio":string|null,"cama":string|null,"medico":string|null,"dx":string|null,"focoInf":string|null,"gravedad":"Leve"|"Moderada"|"Grave"|"Crítica"|null,"via":"VO"|"IV"|"IM"|null,"atb":string|null,"organismo":string|null,"cult":"Positivo"|"Negativo"|"Pendiente"|null,"muestra":string|null,"renal":"Normal"|"ERC"|"Lesión renal aguda"|null,"notas":string|null}\nOmite campos no mencionados (null). Sé literal con nombres propios. Diagnóstico en términos médicos precisos.';
+    const res=await llamarAnthropicSeguro([{role:'user',content:texto}],sys,600,'claude-haiku-4-5');
+    const raw=res?.content?.[0]?.text||'';
+    const m=raw.match(/\{[\s\S]*?\}/);
+    if(!m)throw new Error('Respuesta no contiene JSON');
+    const d=JSON.parse(m[0]);
+    const fill=(id,val)=>{if(val==null)return;const el=document.getElementById(id);if(el)el.value=val;};
+    const sel=(id,val)=>{if(!val)return;const el=document.getElementById(id);if(!el)return;const o=Array.from(el.options).find(o=>o.value===val||o.text===val||o.text.includes(val));if(o)el.value=o.value;};
+    fill('f-nom',d.nombre);fill('f-edad',d.edad);fill('f-exp',d.exp);fill('f-cama',d.cama);
+    fill('f-medico',d.medico);fill('f-dx',d.dx);fill('f-foco',d.focoInf);fill('f-notas',d.notas);
+    fill('f-organismo',d.organismo);fill('f-muestra',d.muestra);
+    sel('f-sexo',d.sexo);sel('f-grav',d.gravedad);sel('f-via',d.via);
+    sel('f-renal',d.renal);sel('f-cult',d.cult);
+    // Try ATB in nombre field of first ATB row
+    if(d.atb){const atbEl=document.getElementById('atb-0-nom');if(atbEl)atbEl.value=d.atb;}
+    // Try servicio dropdown or input
+    const svcEl=document.getElementById('f-servicio')||document.getElementById('f-svc');
+    if(svcEl&&d.servicio){if(svcEl.tagName==='SELECT')sel('f-servicio',d.servicio);else svcEl.value=d.servicio;}
+    const filled=Object.values(d).filter(v=>v!=null).length;
+    if(st)st.textContent='✅ '+filled+' campos llenados correctamente';
+    if(btn){btn.disabled=false;btn.textContent='✨ Llenar campos con IA';}
+    toast('✅ '+filled+' campos completados por IA','ok');
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='✨ Llenar campos con IA';}
+    if(st)st.textContent='Error: '+e.message;
+    toast('Error IA dictado: '+e.message,'rd');
+  }
+};
+
+// ══ WORD EXPORT HELPER ══
+function _txWordExport(titulo,bodyHTML,pac){
+  const nom=(pac?.nombre||'paciente').replace(/[^a-zA-ZÁÉÍÓÚáéíóúñÑ0-9 ]/g,'').replace(/\s+/g,'_');
+  const fecha=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const content='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">'
+    +'<head><meta charset="UTF-8"><style>'
+    +'body{font-family:Calibri,sans-serif;font-size:11pt;color:#222;line-height:1.5;margin:2cm;}'
+    +'h1{font-size:16pt;color:#1a3a5c;margin-bottom:4px;}'
+    +'h2{font-size:13pt;color:#1a3a5c;border-bottom:2px solid #1a3a5c;padding-bottom:3px;margin-top:18px;margin-bottom:8px;}'
+    +'h3{font-size:12pt;margin:14px 0 4px;color:#2c5282;}'
+    +'table{border-collapse:collapse;width:100%;margin:8px 0;font-size:10pt;}'
+    +'td,th{border:1px solid #aaa;padding:5px 9px;}'
+    +'th{background:#1a3a5c;color:white;font-weight:bold;text-align:left;}'
+    +'tr:nth-child(even){background:#f2f6fc;}'
+    +'ul,ol{margin:6px 0;padding-left:20px;}li{margin-bottom:4px;font-size:10.5pt;line-height:1.5;}'
+    +'.badge-red{color:#cc0000;font-weight:bold;}.badge-am{color:#b45309;font-weight:bold;}.badge-ok{color:#065f46;font-weight:bold;}'
+    +'.footer{font-size:9pt;color:#666;margin-top:24px;border-top:1px solid #ccc;padding-top:8px;}'
+    +'</style></head><body>'
+    +'<h1>'+titulo+'</h1>'
+    +'<p style="color:#666;font-size:10pt;margin-top:2px;">Programa de Optimización de Antimicrobianos (PROA) — Infectología · StewardMX</p>'
+    +(pac?'<table style="width:100%;border:none;margin:8px 0;"><tr>'
+      +'<td style="border:none;padding:2px 0;font-size:10pt;"><b>Paciente:</b> '+(pac.nombre||'—')+'</td>'
+      +'<td style="border:none;padding:2px 0;font-size:10pt;"><b>Servicio:</b> '+(pac.servicio||'—')+'</td></tr><tr>'
+      +'<td style="border:none;padding:2px 0;font-size:10pt;"><b>Médico:</b> '+(pac.medico||'—')+'</td>'
+      +'<td style="border:none;padding:2px 0;font-size:10pt;"><b>Fecha:</b> '+fecha+'</td>'
+      +'</tr></table><hr>':'<hr>')
+    +bodyHTML
+    +'<div class="footer"><b>Referencias:</b> IDSA 2024 · ESCMID 2023 · AST-IDCOP 2023 · KDIGO 2024 · WHO AMS 2023 · NOM-045-SSA2-2005<br>'
+    +'<span style="color:#999;">Generado por StewardMX — Sistema PROA | '+(pac?.nombre||'')+'  | '+new Date().toISOString()+'</span></div>'
+    +'</body></html>';
+  const blob=new Blob([content],{type:'application/msword'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=titulo.replace(/[^a-zA-ZÁÉÍÓÚáéíóúñÑ0-9]/g,'_')+'_'+nom+'_'+new Date().toISOString().slice(0,10)+'.doc';
+  a.click();URL.revokeObjectURL(url);
+  toast('Documento Word generado ✓','ok');
+}
+
+// Word export for tx-tipo tab
+window._txTipoWordExport=function(){
+  const tipoSOT=document.querySelector('input[name="tx-tipo-sot-r"]:checked')?.value||'No seleccionado';
+  const tipoTCMH=document.querySelector('input[name="tx-tipo-tcmh-r"]:checked')?.value||'No seleccionado';
+  const fase=document.querySelector('input[name="tx-fase-r"]:checked')?.value||'No seleccionada';
+  const gvhd=document.querySelector('input[name="tx-gvhd-r"]:checked')?.value||'No aplica';
+  const checkedLabels=[];
+  document.querySelectorAll('[id^="txis_"][id$="_cb"]:checked').forEach(cb=>{
+    const lbl=cb.closest('label');
+    if(lbl)checkedLabels.push(lbl.textContent.trim());
+  });
+  const det=document.getElementById('tx-inmuno-detail')?.innerText||'';
+  let body='<h2>Tipo y Fase de Trasplante</h2>'
+    +'<table><tr><th>Campo</th><th>Selección</th></tr>'
+    +'<tr><td>Tipo SOT</td><td>'+tipoSOT+'</td></tr>'
+    +'<tr><td>Tipo TCMH/Hemato</td><td>'+tipoTCMH+'</td></tr>'
+    +'<tr><td>Fase post-trasplante</td><td>'+fase+'</td></tr>'
+    +'<tr><td>GVHD</td><td>'+gvhd+'</td></tr>'
+    +'</table>'
+    +'<h2>Inmunosupresores Activos</h2>'
+    +(checkedLabels.length?'<ul>'+checkedLabels.map(l=>'<li>'+l+'</li>').join('')+'</ul>':'<p>Ninguno seleccionado en este momento.</p>')
+    +'<h2>Evaluación de Riesgo por Agente</h2>'
+    +'<p>'+det.replace(/\n/g,'<br>')+'</p>'
+    +'<h2>Referencia: Riesgo por clase de inmunosupresor</h2>'
+    +'<table><tr><th>Agente</th><th>Riesgo</th><th>Infecciones principales</th><th>Profilaxis clave</th></tr>'
+    +'<tr><td>Tacrolimus / Ciclosporina</td><td class="badge-red">ALTO</td><td>CMV, BK, Candida, Aspergillus</td><td>Valganciclovir, cotrimoxazol, monitoreo CMV PCR</td></tr>'
+    +'<tr><td>Timoglobulina (ATG)</td><td class="badge-red">MUY ALTO</td><td>CMV, EBV, hongos, PCP, bacterias</td><td>Letermovir/valganciclovir, cotrimoxazol, aciclovir</td></tr>'
+    +'<tr><td>Micofenolato / Azatioprina</td><td class="badge-am">MODERADO</td><td>CMV, infecciones virales</td><td>Cotrimoxazol, monitoreo BHC</td></tr>'
+    +'<tr><td>Rituximab / Anti-CD20</td><td class="badge-red">ALTO</td><td>PCP, HBV reactivación, encapsulados</td><td>Cotrimoxazol, entecavir si HBc+, IgG basal</td></tr>'
+    +'<tr><td>Prednisona ≥20mg/d × >4sem</td><td class="badge-red">ALTO</td><td>PCP, TB, Aspergillus, Strongyloides</td><td>Cotrimoxazol OBLIGATORIO, ivermectina si sero+</td></tr>'
+    +'<tr><td>Ruxolitinib / JAK</td><td class="badge-am">MODERADO-ALTO</td><td>VZV, TB, hongos</td><td>Aciclovir, cotrimoxazol si IS adicional</td></tr>'
+    +'<tr><td>CAR-T / Biespecíficos</td><td class="badge-red">MUY ALTO</td><td>CRS + NF, hongos invasores</td><td>G-CSF, antifúngico preemptivo, monitoreo CRS</td></tr>'
+    +'</table>';
+  const pac=window._txCurrentPac||null;
+  _txWordExport('Evaluación de Riesgo Infeccioso — Tipo y Fase de Trasplante',body,pac);
+};
+
+// Word export for tx-profilaxis tab
+window._txProfWordExport=function(){
+  const el=document.getElementById('pf-recs');
+  const content=el?el.innerText:'(Completar laboratorios para generar recomendaciones)';
+  const body='<h2>Laboratorios Clave para Profilaxis</h2>'
+    +'<table><tr><th>Estudio</th><th>Resultado</th></tr>'
+    +['pf_cmv_r:CMV IgG Receptor','pf_cmv_d:CMV IgG Donador','pf_ebv:EBV IgG','pf_hbsag:HBsAg','pf_hbc:Anti-HBc total','pf_hcv:Anti-HCV / HCV RNA','pf_hbv_dna:HBV DNA','pf_qft:QFT/IGRA (TB)','pf_chagas:Chagas IgG','pf_toxo:Toxoplasma IgG','pf_strongy:Strongyloides IgG','pf_histo:Histoplasma Ag urinario','pf_g6pd:G6PD']
+    .map(s=>{const[id,lbl]=s.split(':');const v=document.getElementById(id)?.value||'—';return '<tr><td>'+lbl+'</td><td>'+v+'</td></tr>';}).join('')
+    +'</table>'
+    +'<h2>Recomendaciones Automáticas de Profilaxis</h2>'
+    +'<div style="font-size:10.5pt;line-height:1.6;">'+content.replace(/\n/g,'<br>')+'</div>'
+    +'<h2>Referencia Rápida: Profilaxis Estándar en Trasplante</h2>'
+    +'<table><tr><th>Infección</th><th>Agente</th><th>Dosis</th><th>Duración</th></tr>'
+    +'<tr><td>PCP (Pneumocystis)</td><td>Cotrimoxazol TMP-SMX DS</td><td>1 tab VO TID × 3 días/semana</td><td>≥6 meses SOT / hasta D+180 TCMH</td></tr>'
+    +'<tr><td>CMV (D+/R-)</td><td>Letermovir (TCMH) / Valganciclovir (SOT)</td><td>480 mg QD / 900 mg QD</td><td>Hasta D+100 (TCMH); 6 meses SOT riñón</td></tr>'
+    +'<tr><td>VZV / HSV</td><td>Aciclovir / Valaciclovir</td><td>400 mg BID / 500 mg QD</td><td>Todo el período IS relevante</td></tr>'
+    +'<tr><td>Aspergillus (TCMH GVHD)</td><td>Voriconazol / Posaconazol</td><td>200 mg BID / 300 mg QD</td><td>Mientras GVHD activa + IS alta</td></tr>'
+    +'<tr><td>HBV (HBsAg+ o HBc+)</td><td>Entecavir / Tenofovir</td><td>0.5–1 mg QD</td><td>Toda la IS + 12–18 meses post</td></tr>'
+    +'</table>';
+  _txWordExport('Profilaxis en Trasplante — Recomendaciones',body,window._txCurrentPac||null);
+};
+
+// Word export for tx-patogenos tab
+window._txPatWordExport=function(){
+  const body='<h2>Patógenos por Fase Post-Trasplante</h2>'
+    +'<table><tr><th>Fase</th><th>Patógenos Principales</th></tr>'
+    +'<tr><td><b style="color:#cc0000;">SOT &lt;1 mes</b></td><td>Bacterias (enterobacterias, Pseudomonas), Candida (hepático/renal), HSV reactivación, ISQ</td></tr>'
+    +'<tr><td><b style="color:#b45309;">SOT 1–6 meses</b></td><td>CMV (principal), EBV/PTLD, VZV, PCP, Aspergillus, Nocardia, Listeria</td></tr>'
+    +'<tr><td><b style="color:#065f46;">SOT &gt;6 meses</b></td><td>VZV zóster, NAC comunitaria, Criptococo, Leishmania, BK virus/nefropatía</td></tr>'
+    +'<tr><td><b style="color:#cc0000;">TCMH Pre-engraftment &lt;30d</b></td><td>Gram negativos (Pseudomonas, enterobacterias), Gram+ (Streptococcus viridans, S. epidermidis CVC), Candida, HSV mucositis</td></tr>'
+    +'<tr><td><b style="color:#b45309;">TCMH Post-engraftment 30–100d</b></td><td>CMV (principal, alta mortalidad), Aspergillus IPA, RSV/parainfluenza/metapneumovirus, PCP, EBV/PTLD</td></tr>'
+    +'<tr><td><b style="color:#065f46;">TCMH Tardío &gt;100d</b></td><td>VZV frecuente, Streptococcus pneumoniae/H. influenzae (asplenia funcional), Criptococo (GVHD), Toxoplasma (alogénico)</td></tr>'
+    +'</table>'
+    +'<h2>Recomendaciones de Vigilancia Microbiológica</h2>'
+    +'<ul>'
+    +'<li>CMV PCR cuantitativa semanal desde Día 0 a 6 meses (mínimo)</li>'
+    +'<li>EBV PCR mensual los primeros 3 meses en TCMH alogénico</li>'
+    +'<li>Beta-D-glucano + Galactomanano semanal en neutropenia prolongada (&gt;7 días)</li>'
+    +'<li>BHC con diferencial semanal hasta engraftment estable</li>'
+    +'<li>Hemocultivos periférico + CVC si fiebre ≥38.3°C (SIEMPRE antes de antibiótico)</li>'
+    +'<li>Urocultivo si síntomas urinarios o catéter vesical</li>'
+    +'</ul>';
+  _txWordExport('Patógenos por Fase — Guía de Vigilancia Microbiológica',body,window._txCurrentPac||null);
+};
+
+// Word export for tx-cmv tab
+window._txCMVWordExport=function(){
+  const body='<h2>Estratificación de Riesgo CMV</h2>'
+    +'<table><tr><th>Combinación D/R</th><th>Riesgo</th><th>Estrategia</th></tr>'
+    +'<tr><td>D+ / R−</td><td class="badge-red">MUY ALTO (&gt;50% viremia)</td><td>Profilaxis universal: Letermovir 480 mg QD (TCMH) / Valganciclovir 900 mg QD (SOT) × 6–12 meses</td></tr>'
+    +'<tr><td>D+ / R+</td><td class="badge-am">ALTO (20–40%)</td><td>Profilaxis o pre-emptiva (PCR CMV semanal; tratar si &gt;1000 UI/mL)</td></tr>'
+    +'<tr><td>D− / R+</td><td class="badge-am">MODERADO (10–20%)</td><td>Pre-emptiva: PCR semanal; tratar si &gt;500–1000 UI/mL</td></tr>'
+    +'<tr><td>D− / R−</td><td class="badge-ok">BAJO (&lt;3%)</td><td>Sin profilaxis CMV. Aciclovir estándar para VZV/HSV. Hemoderivados CMV-negativos.</td></tr>'
+    +'</table>'
+    +'<h2>Tratamiento de Enfermedad CMV</h2>'
+    +'<table><tr><th>Escenario</th><th>Tratamiento</th><th>Duración</th></tr>'
+    +'<tr><td>Primera línea — viremia asintomática o leve</td><td>Valganciclovir 900 mg VO BID</td><td>Hasta 2 PCR negativas c/1 sem</td></tr>'
+    +'<tr><td>Enfermedad moderada/grave</td><td>Ganciclovir 5 mg/kg IV BID</td><td>2–3 semanas, luego VO</td></tr>'
+    +'<tr><td>CMV refractario (PCR no baja) o resistencia</td><td>Maribavir 400 mg VO BID (IDSA 2024)</td><td>8 semanas</td></tr>'
+    +'<tr><td>Resistencia UL97/UL54 confirmada</td><td>Foscarnet 60 mg/kg IV TID o Cidofovir (con probenecid)</td><td>Según respuesta virológica</td></tr>'
+    +'</table>'
+    +'<h2>Definiciones de Falla y Resistencia</h2>'
+    +'<ul>'
+    +'<li><b>Falla virológica:</b> PCR no disminuye ≥1 log₁₀ a las 2 semanas de tratamiento adecuado</li>'
+    +'<li><b>Resistencia probable:</b> Viremia persistente a pesar de dosis correctas y adherencia</li>'
+    +'<li><b>Resistencia confirmada:</b> Mutaciones en UL97 o UL54 por genotipificación</li>'
+    +'<li><b>CMV refractario:</b> Aumento de viremia o sin respuesta clínica × 2 semanas</li>'
+    +'</ul>'
+    +'<p><b>Referencia principal:</b> Marty FM et al. NEJM 2017 (letermovir PREVENT) · Avery RK et al. NEJM 2022 (maribavir SOLSTICE) · IDSA CMV Guidelines 2024 · KDIGO 2024</p>';
+  _txWordExport('Monitoreo y Tratamiento CMV en Trasplante',body,window._txCurrentPac||null);
+};
+
+// Word export for tx-neutropenia tab
+window._txNeutWordExport=function(){
+  const masccScoreEl=document.getElementById('mascc-result-neu');
+  const cisneScoreEl=document.getElementById('cisne-result-neu');
+  const masccText=masccScoreEl?masccScoreEl.innerText:'No calculado';
+  const cisneText=cisneScoreEl?cisneScoreEl.innerText:'No calculado';
+  const body='<h2>Definición de Neutropenia Febril</h2>'
+    +'<ul><li>ANC &lt; 500 cells/µL (o &lt;1000 con caída esperada ≤500)</li>'
+    +'<li>Fiebre ≥ 38.3°C en única toma O ≥ 38.0°C por ≥ 1 hora</li></ul>'
+    +'<h2>MASCC Score — Resultado del paciente</h2>'
+    +'<p style="font-size:11pt;">'+masccText.replace(/\n/g,'<br>')+'</p>'
+    +'<table><tr><th>Item MASCC</th><th>Puntos</th></tr>'
+    +'<tr><td>Sin síntomas / síntomas leves</td><td>5</td></tr>'
+    +'<tr><td>Sin hipotensión (PAS ≥90 mmHg)</td><td>5</td></tr>'
+    +'<tr><td>Sin EPOC activa</td><td>4</td></tr>'
+    +'<tr><td>Tumor sólido o hematológico sin IFI previa</td><td>4</td></tr>'
+    +'<tr><td>Sin deshidratación que requiere fluidos IV</td><td>3</td></tr>'
+    +'<tr><td>Paciente ambulatorio al inicio</td><td>3</td></tr>'
+    +'<tr><td>Edad &lt;60 años</td><td>2</td></tr>'
+    +'<tr><td><b>MÁXIMO</b></td><td><b>26</b></td></tr>'
+    +'</table>'
+    +'<p><b>Interpretación MASCC:</b> ≥21 puntos = BAJO RIESGO (~1% mortalidad) — considerar manejo ambulatorio + ATB oral. &lt;21 = ALTO RIESGO (~40% mortalidad) — hospitalización + ATB IV urgente.</p>'
+    +'<h2>CISNE Score — Resultado del paciente</h2>'
+    +'<p style="font-size:11pt;">'+cisneText.replace(/\n/g,'<br>')+'</p>'
+    +'<table><tr><th>Item CISNE</th><th>Puntos</th><th>Complicaciones serias</th></tr>'
+    +'<tr><td>Score 0</td><td>0</td><td class="badge-ok">Muy bajo — 0.36%</td></tr>'
+    +'<tr><td>Score 1–2</td><td>1–2</td><td class="badge-ok">Bajo — 6.2%</td></tr>'
+    +'<tr><td>Score 3–4</td><td>3–4</td><td class="badge-am">Intermedio — 22%</td></tr>'
+    +'<tr><td>Score ≥5</td><td>≥5</td><td class="badge-red">Alto — 36%</td></tr>'
+    +'</table>'
+    +'<h2>Manejo Empírico Según Riesgo</h2>'
+    +'<table><tr><th>Riesgo</th><th>Lugar de manejo</th><th>ATB empírico</th></tr>'
+    +'<tr><td class="badge-ok">BAJO (MASCC≥21, CISNE 0)</td><td>Ambulatorio (si soporte en casa)</td><td>Amoxicilina-clavulanato 875/125 mg VO TID + Ciprofloxacino 500 mg VO BID</td></tr>'
+    +'<tr><td class="badge-am">INTERMEDIO (MASCC≥21, CISNE 1–4)</td><td>Hospitalización ± oral</td><td>Cefepime 2g IV c/8h o Piperacilina-Tazobactam 4.5g IV c/6h</td></tr>'
+    +'<tr><td class="badge-red">ALTO (MASCC&lt;21, CISNE≥5)</td><td>Hospital + UCI si sepsis</td><td>Piperacilina-Tazobactam 4.5g IV c/6h. Si Pseudomonas: Cefepime o Meropenem. Si MRSA: añadir Vancomicina.</td></tr>'
+    +'</table>'
+    +'<p><b>Referencias:</b> Freifeld AG et al. CID 2011 (MASCC) · Carmona-Bayonas A et al. JCO 2015 (CISNE) · IDSA Febrile Neutropenia 2010 · ESMO 2023</p>';
+  _txWordExport('Neutropenia Febril — MASCC · CISNE · Plan de Manejo',body,window._txCurrentPac||null);
+};
+
+// Word export for tx-24h tab
+window._tx24hWordExport=function(){
+  const nom=window._txCurrentPac?.nombre||'—';
+  const svc=window._txCurrentPac?.servicio||'—';
+  const body='<h2>Protocolo 24h — ATB Amplio Espectro en Trasplante</h2>'
+    +'<div style="background:#fff3cd;border:2px solid #ffc107;border-radius:4px;padding:12px;margin:10px 0;">'
+    +'<b>Paciente:</b> '+nom+' · <b>Servicio:</b> '+svc
+    +'</div>'
+    +'<h2>Regla de Oro</h2>'
+    +'<ul>'
+    +'<li>ATB amplio espectro en trasplantado requiere aviso a PROA / Infectología en <b>≤24 horas</b></li>'
+    +'<li>Fin de semana: el residente de guardia de Medicina Interna avala con nombre y firma</li>'
+    +'<li>Lunes: alerta urgente al infectólogo + valoración formal ≤ 8 horas</li>'
+    +'</ul>'
+    +'<h2>Checklist — Residente de Guardia</h2>'
+    +'<table><tr><th>Acción</th><th>Responsable</th><th>✓</th></tr>'
+    +'<tr><td>Documentar signos de sepsis en expediente (qSOFA, SOFA)</td><td>Residente guardia</td><td></td></tr>'
+    +'<tr><td>Hemocultivos × 2 ANTES del primer ATB</td><td>Residente guardia</td><td></td></tr>'
+    +'<tr><td>Anotar nombre, firma y matrícula del residente que avala</td><td>Residente guardia</td><td></td></tr>'
+    +'<tr><td>Registrar ATB, dosis, vía y fecha de inicio en expediente</td><td>Residente guardia</td><td></td></tr>'
+    +'<tr><td>Notificar al infectólogo por WA (mensaje como registro)</td><td>Residente guardia</td><td></td></tr>'
+    +'<tr><td>Documentar GVHD activa o neutropenia si aplica</td><td>Residente guardia</td><td></td></tr>'
+    +'<tr><td>Solicitar cultivos dirigidos según foco sospechado</td><td>Residente guardia</td><td></td></tr>'
+    +'</table>'
+    +'<h2>ATB Empírico de Primera Línea en Trasplante Hospitalizado</h2>'
+    +'<table><tr><th>Escenario</th><th>ATB</th><th>Dosis</th></tr>'
+    +'<tr><td>Neutropenia febril sin foco</td><td>Piperacilina-Tazobactam</td><td>4.5g IV c/6h</td></tr>'
+    +'<tr><td>Sospecha Pseudomonas / neutropenia ≥7d</td><td>Cefepime</td><td>2g IV c/8h</td></tr>'
+    +'<tr><td>Neutropenia + shock séptico</td><td>Meropenem</td><td>1–2g IV c/8h</td></tr>'
+    +'<tr><td>MRSA colonización / CVC / mucositis grave</td><td>+Vancomicina</td><td>25–30 mg/kg IV carga, luego AUC-guided</td></tr>'
+    +'<tr><td>Antifúngico si fiebre &gt;4d sin respuesta ATB</td><td>Micafungin o AnfoB-L</td><td>100 mg IV QD / 3 mg/kg IV QD</td></tr>'
+    +'</table>'
+    +'<h2>Firma de Aval — Residente de Guardia</h2>'
+    +'<table style="width:100%;border:none;"><tr>'
+    +'<td style="border:none;padding:4px 0;width:50%;"><b>Nombre y matrícula:</b><br><br><br>'
+    +'<span style="border-top:1px solid #333;display:block;width:80%;padding-top:4px;font-size:9pt;color:#666;">Residente / Médico Interno de Guardia</span></td>'
+    +'<td style="border:none;padding:4px 0;width:50%;"><b>Fecha y hora:</b><br><br><br>'
+    +'<span style="border-top:1px solid #333;display:block;width:80%;padding-top:4px;font-size:9pt;color:#666;">'+new Date().toLocaleDateString('es-MX')+'</span></td>'
+    +'</tr></table>';
+  _txWordExport('Protocolo 24h — ATB Amplio Espectro en Trasplante',body,window._txCurrentPac||null);
+};
+
 // ══════════════════════════════════════════════════════
 // MÓDULO TRASPLANTE / HEMATOLOGÍA
 // ══════════════════════════════════════════════════════
@@ -12316,6 +12663,7 @@ window.renderTrasplantePac=function(pid){
   if(!cont)return;
   if(!window._txSubTab)window._txSubTab='tx-tipo';
   const p=pid?PACS.find(x=>x.id===pid):null;
+  window._txCurrentPac=p;
   const sub=window._txSubTab;
   // Re-render subtabs with updated active state
   const subCont=document.getElementById('trasplante-subtabs');
@@ -12527,6 +12875,7 @@ function _renderTxTipo(p){
       det.innerHTML=h;
     };
   })();<\/script>`;
+  html+=`<div style="margin-top:14px;"><button onclick="window._txTipoWordExport()" style="width:100%;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);color:var(--blue);border-radius:6px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px;">📄 Generar Word — Riesgo Infeccioso por Inmunosupresión</button></div>`;
   return html;
 }
 
@@ -12667,6 +13016,7 @@ function _renderTxProfilaxis(p){
   };
   window._txProfRec();
   })();<\/script>`;
+  html+=`<button onclick="window._txProfWordExport()" style="width:100%;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);color:var(--blue);border-radius:6px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px;">📄 Generar Word — Recomendaciones de Profilaxis</button>`;
   return html;
 }
 
@@ -12683,6 +13033,7 @@ function _renderTxPatogenos(p){
   lineas.forEach(l=>{
     html+=_txCard(l.titulo,`<ul style="margin:0;padding-left:18px;">${l.items.map(i=>`<li style="font-size:11px;color:var(--t2);margin-bottom:4px;line-height:1.5;">${escHtml(i)}</li>`).join('')}</ul>`,l.color);
   });
+  html+=`<button onclick="window._txPatWordExport()" style="width:100%;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);color:var(--blue);border-radius:6px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px;">📄 Generar Word — Patógenos por Fase</button>`;
   return html;
 }
 
@@ -12857,6 +13208,7 @@ function _renderTxCMV(p){
       </div>
     </div>
   </div>`;
+  html+=`<button onclick="window._txCMVWordExport()" style="width:100%;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);color:var(--blue);border-radius:6px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px;">📄 Generar Word — Monitoreo CMV</button>`;
   return html;
 }
 
@@ -13537,13 +13889,14 @@ function _renderTxNeutropenia(p){
     </div>
   `,'var(--blue)');
 
+  html+=`<div style="margin-top:14px;"><button onclick="window._txNeutWordExport()" style="width:100%;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);color:var(--blue);border-radius:6px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px;">📄 Generar Word — MASCC · CISNE · Plan de Manejo NF</button></div>`;
   return html;
 }
 
 function _renderTxProtocolo24h(p){
   const nomPac=p?.nombre||'—';
   const svcPac=p?.servicio||'—';
-  return _txCard('🚨 Protocolo 24h — ATB Amplio Espectro en Trasplante',`
+  let h24=_txCard('🚨 Protocolo 24h — ATB Amplio Espectro en Trasplante',`
     <div style="background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.2);border-radius:6px;padding:12px;margin-bottom:14px;">
       <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px;">Regla de oro: ATBs de amplio espectro en paciente trasplantado</div>
       <ul style="margin:0;padding-left:16px;">
@@ -13560,6 +13913,8 @@ function _renderTxProtocolo24h(p){
     </div>
     <button onclick="(function(){const msg='*PROA — Notificación Urgente Trasplante*\\n\\nPaciente: ${escJs(nomPac)}\\nServicio: ${escJs(svcPac)}\\n\\nSe inició ATB de amplio espectro en paciente trasplantado.\\nRequiere valoración por infectología.\\n\\nCubierto por residente de guardia.\\n\\n— '+('${escJs(HInfo.nombre||'')}');window.open('https://wa.me?text='+encodeURIComponent(msg),'_blank');})()" style="width:100%;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.3);color:#25D366;border-radius:6px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">📱 Notificar al infectólogo por WhatsApp</button>
   `,'var(--red)');
+  h24+=`<button onclick="window._tx24hWordExport()" style="width:100%;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);color:var(--blue);border-radius:6px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px;">📄 Generar Word — Checklist Protocolo 24h</button>`;
+  return h24;
 }
 
 // ── 2. WEB AUDIO SOUND SYSTEM (subtle UI feedback) ──
