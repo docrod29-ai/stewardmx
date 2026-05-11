@@ -885,3 +885,728 @@ exports.manualEhrSync = onCall(
     return { ok: errors.length === 0, syncedCount, errors };
   }
 );
+
+// ════════════════════════════════════════════════════════════════════
+// ── 8. lisSync — HTTP POST: recibe resultados del LIS (laboratorio) ──
+// Justificación clínica: los SIL (Sistemas de Información de
+// Laboratorio) envían antibiogramas de forma asíncrona. La lógica
+// CRDT garantiza que las notas clínicas del médico nunca se
+// sobreescriben por datos del laboratorio si el médico actualizó
+// el registro DESPUÉS de que se tomó la muestra.
+// Compatible con el esquema FHIR DiagnosticReport R4.
+// ════════════════════════════════════════════════════════════════════
+exports.lisSync = onRequest(
+  { region: 'us-central1', cors: true, timeoutSeconds: 60 },
+  async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, X-StewardMX-Token, Authorization');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
+
+    const {
+      hospId, patientId, specimenType, organism,
+      antibiogram, collectedAt, reportedAt,
+    } = req.body || {};
+
+    if (!hospId || !patientId) {
+      return res.status(400).json({ ok: false, error: 'hospId y patientId son requeridos' });
+    }
+
+    // ── Validar token contra ehr_config/main ─────────────────────────
+    const token = req.headers['x-stewardmx-token'];
+    let validToken = false;
+    try {
+      const cfgSnap = await db.doc(`hospitals/${hospId}/ehr_config/main`).get();
+      if (cfgSnap.exists) {
+        validToken = cfgSnap.data().webhookToken === token;
+      }
+    } catch (e) {
+      console.error('[lisSync] error validando token:', e.message);
+    }
+    if (!validToken) {
+      return res.status(401).json({ ok: false, error: 'Token inválido' });
+    }
+
+    // ── Lógica CRDT: detectar conflicto clínico vs. laboratorio ──────
+    // Si el médico actualizó el registro clínico DESPUÉS de que se
+    // tomó la muestra → fusionar (lab nunca sobreescribe estado clínico).
+    // Si no hay actualización posterior a la toma → sobreescribir.
+    let resolution = 'overwritten';
+    let patientData = null;
+
+    // Buscar el paciente en el mes actual
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const patRef = db.doc(`hospitals/${hospId}/months/${currentMonth}/patients/${patientId}`);
+
+    try {
+      const patSnap = await patRef.get();
+      if (patSnap.exists) {
+        patientData = patSnap.data();
+        const collectedTs = collectedAt ? new Date(collectedAt).getTime() : 0;
+        const clinicalUpdatedTs = patientData.updatedAt?.toMillis
+          ? patientData.updatedAt.toMillis()
+          : (patientData.updatedAt || 0);
+
+        // Conflict: physician updated AFTER lab collected
+        const hasPhysicianUpdate = patientData.accion || patientData.gravedad;
+        if (hasPhysicianUpdate && clinicalUpdatedTs > collectedTs) {
+          resolution = 'merged';
+        }
+      }
+    } catch (e) {
+      console.error('[lisSync] error leyendo paciente:', e.message);
+    }
+
+    // ── Construir schema FHIR DiagnosticReport compatible ────────────
+    const labId = `DR_${patientId}_${Date.now()}`;
+    const labData = {
+      resourceType: 'DiagnosticReport',
+      fhirId: labId,
+      status: 'final',
+      category: [{
+        coding: [{
+          system: 'http://hl7.org/fhir/v2/0074',
+          code: 'MB',
+          display: 'Microbiology',
+        }],
+      }],
+      specimenType: specimenType || null,
+      organism: organism || null,
+      antibiogram: (antibiogram || []).map(a => ({
+        drug: a.drug || null,
+        mic: a.mic || null,
+        interpretation: a.interpretation || null,
+        atcCode: null,
+      })),
+      collectedAt: collectedAt || null,
+      reportedAt: reportedAt || null,
+      syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+      source: 'LIS',
+      conflictResolution: resolution,
+    };
+
+    // ── Guardar lab en subcolección patients/{patId}/labs/{labId} ────
+    try {
+      await db.doc(`hospitals/${hospId}/patients/${patientId}/labs/${labId}`).set(labData);
+    } catch (e) {
+      console.error('[lisSync] error guardando lab:', e.message);
+      return res.status(500).json({ ok: false, error: 'Error guardando laboratorio' });
+    }
+
+    // ── Fusionar o sobreescribir en el censo mensual ─────────────────
+    const censoUpdate = {
+      lisLastSync: admin.firestore.FieldValue.serverTimestamp(),
+      lisOrganism: organism || null,
+      lisSpecimen: specimenType || null,
+      lisCollectedAt: collectedAt || null,
+      lisReportedAt: reportedAt || null,
+    };
+
+    // Solo sobreescribir organismo/antibiograma si no hay conflicto clínico
+    if (resolution === 'overwritten') {
+      censoUpdate.bact = organism || null;
+    }
+
+    try {
+      await patRef.set(censoUpdate, { merge: true });
+    } catch (e) {
+      console.error('[lisSync] error actualizando censo:', e.message);
+    }
+
+    // ── Registrar en lis_queue si hay conflicto ───────────────────────
+    if (resolution === 'merged') {
+      try {
+        await db.collection(`hospitals/${hospId}/lis_queue`).add({
+          conflictType: 'physician_update_after_collection',
+          resolution: 'merged',
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          patientId,
+          data: { organism, antibiogram, collectedAt, reportedAt },
+        });
+      } catch (e) {
+        console.error('[lisSync] error registrando lis_queue:', e.message);
+      }
+    }
+
+    // ── Disparar verificación de biomarcadores ────────────────────────
+    try {
+      // Llamada interna — reutilizamos la lógica de checkBiomarkerAlerts
+      await _checkBiomarkerAlertsInternal(hospId, patientId);
+    } catch (e) {
+      console.error('[lisSync] error en checkBiomarkerAlerts:', e.message);
+    }
+
+    return res.json({ ok: true, patientId, resolution, labId });
+  }
+);
+
+// ════════════════════════════════════════════════════════════════════
+// ── 9. calcBenchmarks — Programado: 1° de cada mes a las 02:00 ──────
+// Justificación clínica: los benchmarks anónimos de prescripción
+// crean normas sociales (nudging) que reducen el uso innecesario
+// de antibióticos de amplio espectro. La anonimización via SHA-256
+// previene la identificación del médico mientras permite seguimiento
+// longitudinal (JAMA Internal Medicine 2016, Meeker et al.).
+// ════════════════════════════════════════════════════════════════════
+exports.calcBenchmarks = onSchedule(
+  { schedule: '0 2 1 * *', region: 'us-central1', timeoutSeconds: 540 },
+  async () => {
+    const crypto = require('crypto');
+    console.info('[calcBenchmarks] Iniciando cálculo mensual de benchmarks');
+
+    // Mes anterior (YYYY-MM)
+    const now = new Date();
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const targetMonth = prevMonth.toISOString().slice(0, 7);
+
+    // Lista de hospitales activos
+    let registrySnap;
+    try {
+      registrySnap = await db.collection('hospitals_registry').where('activo', '==', true).get();
+    } catch (e) {
+      console.error('[calcBenchmarks] Error leyendo hospitals_registry:', e.message);
+      return;
+    }
+
+    // ATBs de amplio espectro (ATC J01D + carbapenémicos + Watch/Reserve)
+    const BROAD_SPECTRUM = [
+      'meropenem', 'imipenem', 'ertapenem', 'doripenem',
+      'piperacilina', 'piperacillin', 'tazobactam',
+      'cefepime', 'ceftazidima', 'ceftazidime',
+      'vancomicina', 'vancomycin', 'linezolid', 'daptomicina', 'daptomycin',
+      'colistina', 'colistin', 'tigeciclina', 'tigecycline',
+      'caspofungin', 'micafungin', 'anidulafungin',
+    ];
+    const CARBAPENEM = ['meropenem', 'imipenem', 'ertapenem', 'doripenem'];
+    const WATCH_LIST = [
+      'vancomicina', 'vancomycin', 'linezolid', 'daptomicina', 'daptomycin',
+      'colistina', 'colistin', 'tigeciclina', 'tigecycline',
+      'caspofungin', 'micafungin',
+    ];
+    const RESERVE_LIST = ['colistina', 'colistin', 'fosfomicina', 'fosfomycin', 'ceftazidima-avibactam'];
+
+    const isBroadSpectrum = (atbs) => atbs.some(a =>
+      BROAD_SPECTRUM.some(kw => (a.nom || '').toLowerCase().includes(kw))
+    );
+    const isCarbapenem = (atbs) => atbs.some(a =>
+      CARBAPENEM.some(kw => (a.nom || '').toLowerCase().includes(kw))
+    );
+    const isWatch = (atbs) => atbs.some(a =>
+      WATCH_LIST.some(kw => (a.nom || '').toLowerCase().includes(kw))
+    );
+    const isReserve = (atbs) => atbs.some(a =>
+      RESERVE_LIST.some(kw => (a.nom || '').toLowerCase().includes(kw))
+    );
+
+    const promises = registrySnap.docs.map(async (regDoc) => {
+      const hospId = regDoc.id;
+      try {
+        // Leer todos los pacientes del mes anterior
+        const patientsSnap = await db
+          .collection(`hospitals/${hospId}/months/${targetMonth}/patients`)
+          .get();
+
+        if (patientsSnap.empty) return;
+
+        // Agrupar por servicio y por médico
+        const serviceMap = {};  // { service → { totalPatients, totalDOT, broadSpectrum, carbapenem, watch, reserve, desescalada, organisms } }
+        const physicianMap = {}; // { hashedUid → { service, prescriptions, broadSpectrum, watch, totalDOT, carbapenemCount } }
+
+        patientsSnap.forEach(doc => {
+          const p = doc.data();
+          const atbs = p.atbs || [];
+          if (!atbs.length) return;
+
+          const svc = p.svc || p.servicio || 'Sin servicio';
+          const dot = parseInt(p.dot || 0);
+          const medico = p.medico || p.requester || null;
+
+          // ── Agregar por servicio ───────────────────────────────────
+          if (!serviceMap[svc]) {
+            serviceMap[svc] = {
+              totalPatients: 0, totalDOT: 0,
+              broadSpectrum: 0, carbapenem: 0,
+              watch: 0, reserve: 0, desescalada: 0,
+              organisms: {},
+            };
+          }
+          const svcData = serviceMap[svc];
+          svcData.totalPatients++;
+          svcData.totalDOT += dot;
+          if (isBroadSpectrum(atbs)) svcData.broadSpectrum++;
+          if (isCarbapenem(atbs)) svcData.carbapenem++;
+          if (isWatch(atbs)) svcData.watch++;
+          if (isReserve(atbs)) svcData.reserve++;
+          if (p.accion === 'desescalada' || p.accion === 'Desescalada') svcData.desescalada++;
+          const org = p.bact || p.organismo || null;
+          if (org) {
+            svcData.organisms[org] = (svcData.organisms[org] || 0) + 1;
+          }
+
+          // ── Agregar por médico (hash anónimo) ─────────────────────
+          if (medico) {
+            const hashedMedico = crypto
+              .createHash('sha256')
+              .update(medico + hospId)
+              .digest('hex')
+              .slice(0, 16);
+
+            if (!physicianMap[hashedMedico]) {
+              physicianMap[hashedMedico] = {
+                hashedMedico,
+                service: svc,
+                totalPrescriptions: 0,
+                broadSpectrum: 0,
+                watch: 0,
+                totalDOT: 0,
+                carbapenemCount: 0,
+              };
+            }
+            const phData = physicianMap[hashedMedico];
+            phData.totalPrescriptions++;
+            phData.totalDOT += dot;
+            if (isBroadSpectrum(atbs)) phData.broadSpectrum++;
+            if (isWatch(atbs)) phData.watch++;
+            if (isCarbapenem(atbs)) phData.carbapenemCount++;
+          }
+        });
+
+        // ── Calcular tasas y construir arrays finales ─────────────────
+        const services = Object.entries(serviceMap).map(([service, d]) => {
+          const n = d.totalPatients || 1;
+          const topOrganisms = Object.entries(d.organisms)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([org, count]) => ({ org, count }));
+          return {
+            service,
+            totalPatients: d.totalPatients,
+            totalDOT: d.totalDOT,
+            avgDOT: d.totalDOT / n,
+            broadSpectrumRate: (d.broadSpectrum / n) * 100,
+            carbapenemRate: (d.carbapenem / n) * 100,
+            watchRate: (d.watch / n) * 100,
+            reserveRate: (d.reserve / n) * 100,
+            desescalationRate: (d.desescalada / n) * 100,
+            topOrganisms,
+          };
+        });
+
+        const physicians = Object.values(physicianMap).map(d => {
+          const n = d.totalPrescriptions || 1;
+          return {
+            hashedMedico: d.hashedMedico,
+            service: d.service,
+            totalPrescriptions: d.totalPrescriptions,
+            broadSpectrumRate: (d.broadSpectrum / n) * 100,
+            watchRate: (d.watch / n) * 100,
+            avgDOT: d.totalDOT / n,
+            carbapenemCount: d.carbapenemCount,
+          };
+        });
+
+        // ── Escribir benchmark al Firestore (admin SDK, ignora regla write:false) ──
+        await db.doc(`hospitals/${hospId}/benchmarks/${targetMonth}`).set({
+          services,
+          physicians,
+          generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          month: targetMonth,
+          totalPatients: patientsSnap.size,
+        });
+
+        console.info(`[calcBenchmarks] ${hospId}: benchmark ${targetMonth} generado — ${services.length} servicios, ${physicians.length} médicos`);
+      } catch (e) {
+        console.error(`[calcBenchmarks] ${hospId}: error:`, e.message);
+      }
+    });
+
+    await Promise.allSettled(promises);
+    console.info('[calcBenchmarks] Cálculo global completado');
+  }
+);
+
+// ════════════════════════════════════════════════════════════════════
+// ── HELPER INTERNO: lógica de biomarcadores (reutilizable) ───────────
+// ════════════════════════════════════════════════════════════════════
+async function _checkBiomarkerAlertsInternal(hospitalId, patientId) {
+  // Leer todos los labs del paciente ordenados por fecha descendente
+  const labsSnap = await db
+    .collection(`hospitals/${hospitalId}/patients/${patientId}/labs`)
+    .orderBy('collectedAt', 'desc')
+    .get();
+
+  let pctPeak = null;
+  let pctLatest = null;
+  let crpPeak = null;
+  let crpLatest = null;
+
+  labsSnap.forEach(doc => {
+    const lab = doc.data();
+    if (doc.id === 'biomarker_alert') return; // skip meta doc
+
+    // PCT (Procalcitonina)
+    if (lab.pct != null) {
+      const val = parseFloat(lab.pct);
+      if (!isNaN(val)) {
+        if (pctLatest === null) pctLatest = val; // first = latest (desc order)
+        if (pctPeak === null || val > pctPeak) pctPeak = val;
+      }
+    }
+    // CRP (Proteína C reactiva)
+    if (lab.crp != null) {
+      const val = parseFloat(lab.crp);
+      if (!isNaN(val)) {
+        if (crpLatest === null) crpLatest = val;
+        if (crpPeak === null || val > crpPeak) crpPeak = val;
+      }
+    }
+  });
+
+  // Leer DOT del paciente en el censo mensual
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  let dot = 0;
+  try {
+    const patSnap = await db
+      .doc(`hospitals/${hospitalId}/months/${currentMonth}/patients/${patientId}`)
+      .get();
+    if (patSnap.exists) dot = parseInt(patSnap.data().dot || 0);
+  } catch (_) { /* no bloquea */ }
+
+  // ── Evaluar condiciones de alerta ───────────────────────────────
+  const pctDropPct = (pctPeak && pctLatest != null)
+    ? Math.round(((pctPeak - pctLatest) / pctPeak) * 100)
+    : null;
+
+  const pctDropAlert = (
+    pctPeak != null && pctLatest != null &&
+    pctLatest < pctPeak * 0.2 && // >80% de caída
+    dot >= 3
+  );
+
+  const crpNormalizedAlert = (
+    crpLatest != null && crpPeak != null &&
+    crpLatest < 10 &&
+    crpLatest < crpPeak * 0.5 &&
+    dot >= 5
+  );
+
+  let alertLevel = 'none';
+  let recommendation = 'Sin datos suficientes para recomendación de cese.';
+
+  if (pctDropAlert && crpNormalizedAlert) {
+    alertLevel = 'strong';
+    recommendation =
+      'RECOMENDACIÓN FUERTE: Considerar suspensión de ATB. ' +
+      `PCT redujo ${pctDropPct}% desde el pico (NPV 99% resolución infecciosa, guías IDSA/SHEA). ` +
+      `CRP normalizada (${crpLatest} mg/L). DOT: ${dot} días. Evaluar con el equipo clínico.`;
+  } else if (pctDropAlert) {
+    alertLevel = 'moderate';
+    recommendation =
+      'RECOMENDACIÓN MODERADA: PCT redujo >80% desde el pico. ' +
+      `Considerar desescalada o suspensión según contexto clínico. DOT: ${dot} días.`;
+  } else if (crpNormalizedAlert) {
+    alertLevel = 'moderate';
+    recommendation =
+      'RECOMENDACIÓN MODERADA: CRP normalizada (<10 mg/L). ' +
+      `Evaluar suspensión de ATB si hay mejoría clínica. DOT: ${dot} días.`;
+  }
+
+  const alertObj = {
+    type: 'biomarker_cessation',
+    pct_peak: pctPeak,
+    pct_latest: pctLatest,
+    pct_drop_pct: pctDropPct,
+    crp_peak: crpPeak,
+    crp_latest: crpLatest,
+    dot,
+    alert_level: alertLevel,
+    recommendation,
+    generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  // Guardar alerta en labs/biomarker_alert (doc especial del paciente)
+  await db
+    .doc(`hospitals/${hospitalId}/patients/${patientId}/labs/biomarker_alert`)
+    .set(alertObj);
+
+  // Notificar al equipo PROA si la alerta es relevante
+  if (alertLevel !== 'none') {
+    await notificarEquipoPROA(
+      hospitalId,
+      alertLevel === 'strong'
+        ? '🛑 Alerta biomarcador FUERTE — posible cese ATB'
+        : '⚠️ Alerta biomarcador moderada',
+      `Paciente ${patientId} · ${recommendation.slice(0, 100)}…`
+    );
+  }
+
+  return alertObj;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ── 10. checkBiomarkerAlerts — onCall: alerta por PCT / CRP ─────────
+// Justificación clínica: la caída de PCT >80% desde el pico tiene
+// un valor predictivo negativo del 99% para resolución de infección
+// (De Jong et al., Lancet 2016). La normalización de CRP (<10 mg/L)
+// combinada con mejoría clínica apoya la discontinuación (guías
+// IDSA/SHEA 2019 de uso de biomarcadores en ATB stewardship).
+// ════════════════════════════════════════════════════════════════════
+exports.checkBiomarkerAlerts = onCall(
+  { region: 'us-central1', timeoutSeconds: 30 },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Login requerido');
+
+    const { hospitalId, patientId } = req.data || {};
+    if (!hospitalId || !patientId) {
+      throw new HttpsError('invalid-argument', 'hospitalId y patientId son requeridos');
+    }
+
+    // Validar membresía del hospital
+    const hospUserSnap = await db.doc(`hospitals/${hospitalId}/users/${req.auth.uid}`).get();
+    if (!hospUserSnap.exists) {
+      throw new HttpsError('permission-denied', 'No eres miembro de este hospital');
+    }
+
+    try {
+      const alertObj = await _checkBiomarkerAlertsInternal(hospitalId, patientId);
+      return alertObj;
+    } catch (e) {
+      console.error('[checkBiomarkerAlerts] error:', e.message);
+      throw new HttpsError('internal', e.message);
+    }
+  }
+);
+
+// ════════════════════════════════════════════════════════════════════
+// ── 11. detectResistanceClusters — Programado cada 6 horas ──────────
+// Justificación clínica: la detección temprana de clústeres de
+// Klebsiella pneumoniae resistente a carbapenémicos (≥2 casos en
+// el mismo servicio en 14 días) activa el control de brotes.
+// El CDC define clúster como ≥2 casos epidemiológicamente vinculados.
+// La ventana de 14 días cubre el período de incubación + transmisión
+// nosocomial (CDC MDRO Guidance 2019).
+// ════════════════════════════════════════════════════════════════════
+exports.detectResistanceClusters = onSchedule(
+  { schedule: 'every 6 hours', region: 'us-central1', timeoutSeconds: 540 },
+  async () => {
+    console.info('[detectResistanceClusters] Iniciando detección de clústeres MDR');
+
+    const MDR_MARKERS = ['kpc', 'ndm', 'oxa-48', 'vim', 'mrsa', 'vre', 'crab', 'pdr', 'xdr'];
+    const MDR_ORGANISMS = ['klebsiella', 'acinetobacter', 'pseudomonas'];
+    const MDR_PHENOTYPES = ['carba', 'mdr', 'xdr'];
+
+    function isMDRCase(p) {
+      const bact = (p.bact || '').toLowerCase();
+      const fenotipo = (p.fenotipo || '').toLowerCase();
+      // Marcador directo
+      if (MDR_MARKERS.some(m => bact.includes(m) || fenotipo.includes(m))) return true;
+      // Organismo + fenotipo MDR
+      if (
+        MDR_ORGANISMS.some(o => bact.includes(o)) &&
+        MDR_PHENOTYPES.some(ph => fenotipo.includes(ph))
+      ) return true;
+      return false;
+    }
+
+    function getClusterType(cases) {
+      const bacts = cases.map(c => (c.bact || '').toLowerCase());
+      if (bacts.some(b => b.includes('kpc') || b.includes('ndm') || b.includes('oxa-48'))) return 'KPC';
+      if (bacts.some(b => b.includes('mrsa'))) return 'MRSA';
+      if (bacts.some(b => b.includes('vre'))) return 'VRE';
+      if (bacts.some(b => b.includes('crab') || b.includes('acinetobacter'))) return 'CRAB';
+      return 'MDR_mixed';
+    }
+
+    let registrySnap;
+    try {
+      registrySnap = await db.collection('hospitals_registry').where('activo', '==', true).get();
+    } catch (e) {
+      console.error('[detectResistanceClusters] Error leyendo hospitals_registry:', e.message);
+      return;
+    }
+
+    const allClusters = [];
+    const now = new Date();
+    const cutoff14 = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const cutoff30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const cutoff30Month = cutoff30.toISOString().slice(0, 7);
+    const currentMonth = now.toISOString().slice(0, 7);
+
+    const promises = registrySnap.docs.map(async (regDoc) => {
+      const hospId = regDoc.id;
+      try {
+        // Leer pacientes de los últimos 30 días (mes actual y anterior)
+        const months = Array.from(new Set([cutoff30Month, currentMonth]));
+        const allPatients = [];
+
+        for (const month of months) {
+          try {
+            const snap = await db
+              .collection(`hospitals/${hospId}/months/${month}/patients`)
+              .get();
+            snap.forEach(doc => allPatients.push({ id: doc.id, ...doc.data() }));
+          } catch (_) { /* mes puede no existir */ }
+        }
+
+        // Filtrar solo casos MDR con fecha en últimos 14 días
+        const mdrCases = allPatients.filter(p => {
+          if (!isMDRCase(p)) return false;
+          // Obtener fecha de ingreso/actualización
+          const dateAdded = p.fecha || p.ingreso || p.createdAt || null;
+          if (!dateAdded) return true; // incluir si no tiene fecha (conservador)
+          const ts = dateAdded.toDate ? dateAdded.toDate() : new Date(dateAdded);
+          return ts >= cutoff14;
+        });
+
+        // Agrupar por servicio
+        const serviceGroups = {};
+        mdrCases.forEach(p => {
+          const svc = p.svc || p.servicio || 'Sin servicio';
+          if (!serviceGroups[svc]) serviceGroups[svc] = [];
+          serviceGroups[svc].push(p);
+        });
+
+        // Detectar clústeres (≥2 casos por servicio)
+        for (const [service, cases] of Object.entries(serviceGroups)) {
+          if (cases.length < 2) continue;
+
+          // Agrupar por organismo para encontrar el más común
+          const orgCount = {};
+          cases.forEach(c => {
+            const org = c.bact || 'Organismo MDR';
+            orgCount[org] = (orgCount[org] || 0) + 1;
+          });
+          const mostCommonOrganism = Object.entries(orgCount)
+            .sort((a, b) => b[1] - a[1])[0][0];
+
+          const clusterType = getClusterType(cases);
+          const alertLevel = cases.length >= 4 ? 'critical' : 'high';
+
+          // Evitar duplicados: verificar si ya existe clúster activo
+          // para este servicio + tipo en las últimas 24h
+          const cutoff24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          let duplicateExists = false;
+          try {
+            const existingSnap = await db
+              .collection(`hospitals/${hospId}/resistance_clusters`)
+              .where('active', '==', true)
+              .where('service', '==', service)
+              .where('clusterType', '==', clusterType)
+              .get();
+            duplicateExists = existingSnap.docs.some(doc => {
+              const detectedAt = doc.data().detectedAt;
+              if (!detectedAt) return false;
+              const ts = detectedAt.toDate ? detectedAt.toDate() : new Date(detectedAt);
+              return ts >= cutoff24h;
+            });
+          } catch (_) { /* no bloquea */ }
+
+          if (duplicateExists) continue;
+
+          // Crear clúster
+          const clusterData = {
+            service,
+            organism: mostCommonOrganism,
+            cases: cases.map(c => ({
+              patientId: c.id,
+              patientName: '[ANONIMIZADO]',
+              dateAdded: c.fecha || c.ingreso || null,
+              bact: c.bact || null,
+              fenotipo: c.fenotipo || null,
+            })),
+            caseCount: cases.length,
+            windowDays: 14,
+            clusterType,
+            alertLevel,
+            detectedAt: admin.firestore.FieldValue.serverTimestamp(),
+            active: true,
+          };
+
+          try {
+            await db.collection(`hospitals/${hospId}/resistance_clusters`).add(clusterData);
+            allClusters.push({ hospId, service, organism: mostCommonOrganism, caseCount: cases.length });
+
+            // Notificar al equipo PROA
+            await notificarEquipoPROA(
+              hospId,
+              `🚨 Clúster MDR detectado — ${service}`,
+              `${cases.length} casos de ${mostCommonOrganism} en los últimos 14 días. Activar protocolo de brote.`
+            );
+          } catch (e) {
+            console.error(`[detectResistanceClusters] ${hospId}: error guardando clúster:`, e.message);
+          }
+        }
+      } catch (e) {
+        console.error(`[detectResistanceClusters] ${hospId}: error:`, e.message);
+      }
+    });
+
+    await Promise.allSettled(promises);
+    console.info(`[detectResistanceClusters] Completado — ${allClusters.length} clústeres detectados`);
+    return { clusters: allClusters };
+  }
+);
+
+// ════════════════════════════════════════════════════════════════════
+// ── 12. auditLog — onCall: registro de auditoría HIPAA/SaMD ─────────
+// Justificación clínica/regulatoria:
+// - HIPAA §164.312(b): los sistemas deben registrar la actividad
+//   de acceso a PHI (Protected Health Information).
+// - FDA 21 CFR Part 11: los registros electrónicos deben ser
+//   auditables e inalterables.
+// - El log es inmutable: las reglas de Firestore prohíben
+//   update/delete en _audit_log; solo el admin SDK puede leer.
+// ════════════════════════════════════════════════════════════════════
+exports.auditLog = onCall(
+  { region: 'us-central1', timeoutSeconds: 15 },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Login requerido');
+
+    const {
+      action, resourceType, resourceId, hospitalId, details,
+    } = req.data || {};
+
+    if (!action || !resourceType) {
+      throw new HttpsError('invalid-argument', 'action y resourceType son requeridos');
+    }
+
+    // Validar enum de acciones permitidas
+    const validActions = ['READ', 'WRITE', 'DELETE', 'PROA_DECISION', 'EHR_SYNC', 'BIOMARKER_ALERT'];
+    if (!validActions.includes(action)) {
+      throw new HttpsError('invalid-argument', `action debe ser uno de: ${validActions.join(', ')}`);
+    }
+
+    // Validar enum de tipos de recurso
+    const validResourceTypes = ['patient', 'lab', 'atb_request', 'decision'];
+    if (!validResourceTypes.includes(resourceType)) {
+      throw new HttpsError('invalid-argument', `resourceType debe ser uno de: ${validResourceTypes.join(', ')}`);
+    }
+
+    const logEntry = {
+      uid: req.auth.uid,
+      email: req.auth.token.email || 'unknown',
+      action,
+      resourceType,
+      resourceId: resourceId || null,
+      hospitalId: hospitalId || null,
+      details: details || {},
+      ipAddress: req.rawRequest?.ip || 'unknown',
+      userAgent: req.rawRequest?.headers?.['user-agent'] || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      immutable: true,
+    };
+
+    let logId;
+    try {
+      const docRef = await db.collection('_audit_log').add(logEntry);
+      logId = docRef.id;
+    } catch (e) {
+      console.error('[auditLog] error escribiendo log:', e.message);
+      throw new HttpsError('internal', 'Error registrando auditoría');
+    }
+
+    return { logged: true, logId };
+  }
+);

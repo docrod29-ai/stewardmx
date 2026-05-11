@@ -40,6 +40,37 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.status
            == 'admin';
     }
+    // Usuario tiene rol PROA o Infectología en el hospital (acceso clínico total)
+    function isHospPROA(hospId) {
+      return isAuth()
+        && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
+        && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
+           in ['PROA', 'Infectología'];
+    }
+    // Usuario tiene rol Farmacia en el hospital
+    function isHospFarmacia(hospId) {
+      return isAuth()
+        && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
+        && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
+           == 'Farmacia';
+    }
+    // Usuario tiene rol Medico en el hospital
+    function isHospMedico(hospId) {
+      return isAuth()
+        && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
+        && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
+           in ['Medico', 'medico'];
+    }
+
+    // ── _audit_log — Registro de auditoría HIPAA/SaMD inmutable ──────────
+    // create: cualquier usuario autenticado puede crear entradas (desde PWA)
+    // read/update/delete: NUNCA (inmutable — solo el admin SDK puede leer vía Cloud Functions)
+    match /_audit_log/{logId} {
+      allow create: if isAuth();
+      allow read:   if false;
+      allow update: if false;
+      allow delete: if false;
+    }
 
     // ── users/{uid} — Mapeo uid → hospitalId ──────────────────────────────
     // Solo el propietario puede leer/escribir su propio doc.
@@ -147,6 +178,35 @@ service cloud.firestore {
       }
       match /patients/{patId}/{subCol}/{subDocId} {
         allow read, write: if isSuperAdmin() || isHospMember(hospId);
+      }
+
+      // ── Laboratorios clínicos (biomarkers: PCT, CRP, cultivos) ──────────
+      // Cualquier miembro del hospital puede leer/escribir labs (tracking de biomarcadores)
+      match /patients/{patId}/labs/{labId} {
+        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+      }
+
+      // ── Cola LIS — sincronización de resultados de laboratorio ───────────
+      // Lectura/escritura: admin del hospital o equipo PROA (para resolver conflictos)
+      // La función lisSync escribe vía admin SDK; el equipo PROA revisa conflictos
+      match /lis_queue/{queueId} {
+        allow read, write: if isSuperAdmin() || isHospAdmin(hospId) || isHospPROA(hospId);
+      }
+
+      // ── Benchmarks anónimos de prescripción ─────────────────────────────
+      // Lectura: cualquier miembro del hospital (visibilidad para efecto de empujón)
+      // Escritura: NUNCA desde cliente — solo Cloud Functions vía admin SDK
+      match /benchmarks/{month} {
+        allow read:  if isSuperAdmin() || isHospMember(hospId);
+        allow write: if false;
+      }
+
+      // ── Clústeres de resistencia (geo-epidemiología) ─────────────────────
+      // Lectura: cualquier miembro del hospital
+      // Escritura: NUNCA desde cliente — solo Cloud Functions vía admin SDK
+      match /resistance_clusters/{clusterId} {
+        allow read:  if isSuperAdmin() || isHospMember(hospId);
+        allow write: if false;
       }
 
       // Sistema de Farmacia
