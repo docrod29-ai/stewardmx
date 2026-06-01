@@ -1,0 +1,94 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "purpose": "Vocabulario médico configurable para sesgar la transcripción (Whisper prompt + phrase hints) y para el normalizador conservador post-transcripción de StewardMX. Editable sin tocar código.",
+    "usage": "El array `whisper_prompt_terms` se inyecta en el prompt de OpenAI Whisper (functions/index.js → whisperTranscribe). `phonetic_corrections` alimenta el normalizador conservador (solo corrige con alta confianza).",
+    "lang": "es-MX",
+    "safety": "El normalizador NUNCA cambia un término si la confianza es baja; ante duda, conserva el original y marca needs_review."
+  },
+  "antibioticos": [
+    "amoxicilina", "amoxicilina/clavulanato", "ampicilina", "ampicilina/sulbactam",
+    "piperacilina/tazobactam", "cefazolina", "cefalexina", "cefuroxima", "ceftriaxona",
+    "cefotaxima", "ceftazidima", "cefepime", "ceftolozano/tazobactam", "ceftazidima/avibactam",
+    "aztreonam", "aztreonam/avibactam", "meropenem", "imipenem", "ertapenem", "doripenem",
+    "meropenem/vaborbactam", "imipenem/relebactam", "vancomicina", "teicoplanina", "daptomicina",
+    "linezolid", "tedizolid", "clindamicina", "metronidazol", "tigeciclina", "eravaciclina",
+    "omadaciclina", "colistina", "polimixina B", "amikacina", "gentamicina", "tobramicina",
+    "ciprofloxacino", "levofloxacino", "moxifloxacino", "trimetoprim/sulfametoxazol",
+    "nitrofurantoína", "fosfomicina", "rifampicina", "rifabutina", "isoniazida", "pirazinamida",
+    "etambutol", "bedaquilina", "delamanid"
+  ],
+  "antifungicos": [
+    "fluconazol", "itraconazol", "voriconazol", "posaconazol", "isavuconazol",
+    "anfotericina B", "anfotericina B liposomal", "caspofungina", "micafungina",
+    "anidulafungina", "flucitosina"
+  ],
+  "antivirales_antirretrovirales": [
+    "aciclovir", "valaciclovir", "ganciclovir", "valganciclovir", "foscarnet", "oseltamivir",
+    "remdesivir", "bictegravir", "tenofovir alafenamida", "emtricitabina", "dolutegravir",
+    "lamivudina", "Dovato", "Biktarvy", "efavirenz", "darunavir", "ritonavir", "cobicistat"
+  ],
+  "microorganismos": [
+    "Staphylococcus aureus", "Staphylococcus epidermidis", "Streptococcus pneumoniae",
+    "Streptococcus pyogenes", "Enterococcus faecalis", "Enterococcus faecium", "Escherichia coli",
+    "Klebsiella pneumoniae", "Klebsiella aerogenes", "Enterobacter cloacae", "Pseudomonas aeruginosa",
+    "Acinetobacter baumannii", "Stenotrophomonas maltophilia", "Burkholderia cepacia",
+    "Proteus mirabilis", "Serratia marcescens", "Morganella morganii", "Providencia stuartii",
+    "Bacteroides fragilis", "Clostridioides difficile", "Mycobacterium tuberculosis",
+    "Mycobacterium avium", "Nocardia", "Candida albicans", "Candida glabrata", "Candida auris",
+    "Aspergillus fumigatus", "Mucorales", "Cryptococcus neoformans", "Coccidioides",
+    "Histoplasma", "Blastomyces"
+  ],
+  "mecanismos_resistencia": [
+    "BLEE", "ESBL", "AmpC", "KPC", "NDM", "VIM", "IMP", "OXA-48", "OXA-48-like", "OXA-23",
+    "OXA-24/40", "OXA-58", "MRSA", "MSSA", "VRE", "CRE", "CRAB", "DTR", "MDR", "XDR", "PDR"
+  ],
+  "sindromes_infecciosos": [
+    "neumonía adquirida en la comunidad", "neumonía asociada a ventilación mecánica",
+    "neumonía intrahospitalaria", "bacteriemia", "sepsis", "choque séptico",
+    "infección de vías urinarias", "pielonefritis", "prostatitis", "celulitis",
+    "fascitis necrosante", "osteomielitis", "artritis séptica", "infección periprotésica",
+    "meningitis", "encefalitis", "endocarditis infecciosa", "infección intraabdominal",
+    "colangitis", "absceso hepático", "infección de catéter", "infección de sitio quirúrgico",
+    "infección por Clostridioides difficile", "tuberculosis latente", "tuberculosis activa",
+    "infección oportunista", "neutropenia febril"
+  ],
+  "frases_clinicas": [
+    "fiebre no cuantificada", "escalofríos", "disuria", "polaquiuria", "tenesmo vesical",
+    "tos productiva", "expectoración purulenta", "dolor pleurítico", "disnea", "dolor abdominal",
+    "diarrea", "evacuaciones líquidas", "hemocultivos positivos", "urocultivo positivo",
+    "cultivo negativo", "panel molecular positivo", "carga viral indetectable", "CD4",
+    "función renal", "depuración de creatinina", "terapia de reemplazo renal", "hemodiálisis",
+    "diálisis peritoneal", "terapia continua de reemplazo renal"
+  ],
+  "phonetic_corrections": [
+    { "wrong": ["mero pe nem", "meropen", "merope nem"], "correct": "meropenem", "min_confidence": "alta" },
+    { "wrong": ["bancomicina", "vancomis", "bancomis"], "correct": "vancomicina", "min_confidence": "alta" },
+    { "wrong": ["tazo bactam", "pipertazo", "piper tazo"], "correct": "piperacilina/tazobactam", "min_confidence": "alta" },
+    { "wrong": ["cef tria xona", "ceftriax"], "correct": "ceftriaxona", "min_confidence": "alta" },
+    { "wrong": ["septra", "cotri", "cotrimox"], "correct": "trimetoprim/sulfametoxazol", "min_confidence": "media" },
+    { "wrong": ["caz avi", "ceftazidima avibactam"], "correct": "ceftazidima/avibactam", "min_confidence": "alta" },
+    { "wrong": ["dobato", "debato", "dobado"], "correct": "Dovato", "min_confidence": "alta" },
+    { "wrong": ["victarvi", "bictarvi", "bictarbi"], "correct": "Biktarvy", "min_confidence": "alta" },
+    { "wrong": ["mersa", "mersa"], "correct": "MRSA", "min_confidence": "alta" },
+    { "wrong": ["la procal", "procal"], "correct": "procalcitonina", "min_confidence": "media" },
+    { "wrong": ["clebsiela", "klebsiela", "klebsela"], "correct": "Klebsiella pneumoniae", "min_confidence": "media" },
+    { "wrong": ["acineto", "acinetobacter"], "correct": "Acinetobacter baumannii", "min_confidence": "media" },
+    { "wrong": ["pseudomona", "seudomona"], "correct": "Pseudomonas aeruginosa", "min_confidence": "media" },
+    { "wrong": ["erta pe nem", "erta penem", "ertapenen"], "correct": "ertapenem", "min_confidence": "alta" },
+    { "wrong": ["imi pe nem", "imi penem", "imipenen"], "correct": "imipenem", "min_confidence": "alta" },
+    { "wrong": ["uve de erre ele", "ve de erre ele", "uvedereele"], "correct": "VDRL", "min_confidence": "alta" },
+    { "wrong": ["caz avi", "ceftazidima avibactam"], "correct": "ceftazidima/avibactam", "min_confidence": "alta" },
+    { "wrong": ["ka pe ce"], "correct": "KPC", "min_confidence": "alta" },
+    { "wrong": ["ene de eme"], "correct": "NDM", "min_confidence": "alta" },
+    { "wrong": ["anfo tericina be", "anfotericina be"], "correct": "anfotericina B", "min_confidence": "alta" },
+    { "wrong": ["clebsiela", "clepsiela", "klebsela"], "correct": "Klebsiella pneumoniae", "min_confidence": "media" }
+  ],
+  "_implementation_note": "El normalizador en runtime (window._vaNormalizeMedical en index.html) tiene un diccionario embebido más amplio (espejo testeable de este). Para añadir términos: edita ambos y agrega un caso en tests/critical-flows.test.mjs. El normalizador SOLO corrige matches inequívocos (límite de palabra \\b…\\b) — nunca inventa.",
+  "preserve_exact": [
+    "BLEE", "KPC", "NDM", "VIM", "IMP", "OXA-48", "OXA-23", "OXA-24/40", "OXA-58",
+    "MRSA", "MSSA", "VRE", "CRE", "CRAB", "DTR", "MDR", "XDR", "PDR",
+    "Dovato", "Biktarvy", "CD4", "ceftazidima/avibactam", "piperacilina/tazobactam",
+    "aztreonam/avibactam", "meropenem/vaborbactam", "imipenem/relebactam"
+  ]
+}

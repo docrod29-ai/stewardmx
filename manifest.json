@@ -1,29 +1,53 @@
 {
+  "id": "/stewardmx-proa",
   "name": "StewardMX — PROA Hospitalario",
   "short_name": "StewardMX",
-  "description": "Censo y gestión hospitalaria para programas PROA",
-  "start_url": "/",
+  "description": "Plataforma clínica para Programas de Optimización del Uso de Antimicrobianos (PROA). Censo de pacientes, expediente electrónico, farmacia y analítica epidemiológica.",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "any",
   "theme_color": "#0a1628",
-  "background_color": "#0a1628",
-  "lang": "es",
+  "background_color": "#040b12",
+  "lang": "es-MX",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "categories": ["medical", "health", "productivity"],
   "icons": [
     {
       "src": "icons/icon-192.svg",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
       "src": "icons/icon-512.svg",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
       "src": "icons/icon-maskable.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Censo de Pacientes",
+      "short_name": "Censo",
+      "description": "Ir directamente al censo de pacientes hospitalizados",
+      "url": "/?view=censo&utm_source=shortcut",
+      "icons": [{ "src": "icons/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Módulo Clínica",
+      "short_name": "Clínica",
+      "description": "Expediente electrónico de consulta externa",
+      "url": "/?view=clinica&utm_source=shortcut",
+      "icons": [{ "src": "icons/icon-192.svg", "sizes": "192x192" }]
     }
   ]
 }

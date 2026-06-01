@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /
+# StewardMX — aplicación clínica con acceso restringido
+# No indexar contenido protegido por autenticación
+Sitemap: https://stewardmx-1.web.app/sitemap.xml

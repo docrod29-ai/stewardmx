@@ -26,22 +26,41 @@ const db = admin.firestore();
 // para que las demás functions puedan desplegarse sin necesitarlo.
 // ════════════════════════════════════════════════════════════════════
 exports.anthropicProxy = onCall(
-  { secrets: ['ANTHROPIC_KEY'], cors: true, region: 'us-central1', timeoutSeconds: 60 },
+  { secrets: ['ANTHROPIC_KEY'], cors: true, region: 'us-central1', timeoutSeconds: 180 },
   async (req) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Login requerido');
 
     const uid = req.auth.uid;
-    const userDoc = await db.doc(`users/${uid}`).get();
-    if (!userDoc.exists) throw new HttpsError('permission-denied', 'Usuario no encontrado');
-    const { hospitalId } = userDoc.data();
-    if (!hospitalId) throw new HttpsError('permission-denied', 'Sin hospital asignado');
-    const hospUserDoc = await db.doc(`hospitals/${hospitalId}/users/${uid}`).get();
-    const hu = hospUserDoc.data() || {};
-    if (hu.status !== 'aprobado' && hu.status !== 'admin') {
-      throw new HttpsError('permission-denied', 'Usuario no aprobado');
+    const email = req.auth.token.email || '';
+    const isSA = email === SUPER_ADMIN_EMAIL;
+
+    // Obtener hospitalId: del cliente (prioritario para super-admin) o de users/{uid}
+    let hospitalId = req.data?.hospitalId || null;
+
+    if (!isSA) {
+      // Usuarios normales: verificar aprobación en su hospital
+      if (!hospitalId) {
+        const userDoc = await db.doc(`users/${uid}`).get();
+        if (!userDoc.exists) throw new HttpsError('permission-denied', 'Usuario no encontrado');
+        hospitalId = userDoc.data().hospitalId;
+      }
+      if (!hospitalId) throw new HttpsError('permission-denied', 'Sin hospital asignado');
+      const hospUserDoc = await db.doc(`hospitals/${hospitalId}/users/${uid}`).get();
+      const hu = hospUserDoc.data() || {};
+      if (hu.status !== 'aprobado' && hu.status !== 'admin') {
+        throw new HttpsError('permission-denied', 'Usuario no aprobado');
+      }
+    } else {
+      // Super-admin: acceso total — obtener hospitalId de users/{uid} si no vino en el body
+      if (!hospitalId) {
+        try {
+          const userDoc = await db.doc(`users/${uid}`).get();
+          hospitalId = userDoc.exists ? userDoc.data().hospitalId : null;
+        } catch (_) { /* sin hospitalId para el audit log */ }
+      }
     }
 
-    const { messages, system, max_tokens = 1500, model = 'claude-sonnet-4-5' } = req.data || {};
+    const { messages, system, max_tokens = 1500, model = 'claude-sonnet-4-6' } = req.data || {};
     if (!Array.isArray(messages) || !messages.length) {
       throw new HttpsError('invalid-argument', 'messages requerido');
     }
@@ -57,22 +76,39 @@ exports.anthropicProxy = onCall(
     const apiKey = process.env.ANTHROPIC_KEY;
     if (!apiKey) throw new HttpsError('failed-precondition', 'API key no configurada en secrets');
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({ model, max_tokens, system, messages }),
-    });
-    const j = await res.json();
+    // Cadena de modelos: si el principal está saturado, cae al siguiente
+    const modelChain = [model, 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+    const tried = new Set();
+    let res, j, usedModel = model;
+
+    for (const m of modelChain) {
+      if (tried.has(m)) continue;
+      tried.add(m);
+      usedModel = m;
+      let overloaded = false;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 4000));
+        res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({ model: m, max_tokens, ...(system ? { system } : {}), messages }),
+        });
+        j = await res.json();
+        if (res.status !== 529) { overloaded = false; break; }
+        overloaded = true;
+      }
+      if (!overloaded) break; // éxito con este modelo — salir del loop de modelos
+    }
     if (!res.ok) throw new HttpsError('internal', j.error?.message || 'Error Anthropic');
 
     try {
       await db.collection(`hospitals/${hospitalId}/_ai_audit`).add({
         uid, email: req.auth.token.email,
-        model, tokens_in: j.usage?.input_tokens || 0, tokens_out: j.usage?.output_tokens || 0,
+        model: usedModel, tokens_in: j.usage?.input_tokens || 0, tokens_out: j.usage?.output_tokens || 0,
         ts: admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch (_) { /* no bloquea */ }
@@ -1234,7 +1270,7 @@ async function _checkBiomarkerAlertsInternal(hospitalId, patientId) {
   // Leer todos los labs del paciente ordenados por fecha descendente
   const labsSnap = await db
     .collection(`hospitals/${hospitalId}/patients/${patientId}/labs`)
-    .orderBy('collectedAt', 'desc')
+    .orderBy('creadoAt', 'desc')
     .get();
 
   let pctPeak = null;
@@ -1254,9 +1290,9 @@ async function _checkBiomarkerAlertsInternal(hospitalId, patientId) {
         if (pctPeak === null || val > pctPeak) pctPeak = val;
       }
     }
-    // CRP (Proteína C reactiva)
-    if (lab.crp != null) {
-      const val = parseFloat(lab.crp);
+    // PCR (Proteína C reactiva) — field key is 'pcr' in LAB_GRUPOS/LAB_KEY_MAP
+    if (lab.pcr != null) {
+      const val = parseFloat(lab.pcr);
       if (!isNaN(val)) {
         if (crpLatest === null) crpLatest = val;
         if (crpPeak === null || val > crpPeak) crpPeak = val;
@@ -1619,9 +1655,34 @@ exports.whisperTranscribe = onRequest(
   async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { audioBase64, mimeType, hospId, uid, durationEstSec } = req.body;
-    if (!audioBase64 || !hospId || !uid) {
-      return res.status(400).json({ error: 'audioBase64, hospId y uid son requeridos' });
+    const { audioBase64, mimeType, hospId, durationEstSec } = req.body;
+    if (!audioBase64 || !hospId) {
+      return res.status(400).json({ error: 'audioBase64 y hospId son requeridos' });
+    }
+
+    // ── SEGURIDAD (v270): verificar token de Firebase y que el usuario pertenezca al hospital.
+    // Antes se confiaba en el uid/hospId del body sin validar → cualquiera podía consumir la
+    // cuota de voz de un hospId conocido. Ahora exigimos un idToken válido en Authorization y
+    // que ese uid sea miembro aprobado del hospId (mismo modelo que anthropicProxy).
+    let uid = null;
+    try {
+      const _authH = req.headers['authorization'] || req.headers['Authorization'] || '';
+      const _idToken = _authH.startsWith('Bearer ') ? _authH.slice(7) : '';
+      if (!_idToken) return res.status(401).json({ error: 'Sesión no válida (token requerido)', code: 'NO_TOKEN' });
+      const _decoded = await admin.auth().verifyIdToken(_idToken);
+      uid = _decoded.uid;
+      const _email = _decoded.email || '';
+      // Super-admin tiene acceso total; los demás deben ser miembros aprobados del hospId
+      if (_email !== SUPER_ADMIN_EMAIL) {
+        const _hu = await db.doc(`hospitals/${hospId}/users/${uid}`).get();
+        const _huData = _hu.exists ? _hu.data() : {};
+        if (_huData.status !== 'aprobado' && _huData.status !== 'admin') {
+          return res.status(403).json({ error: 'No autorizado para este hospital', code: 'NOT_HOSP_MEMBER' });
+        }
+      }
+    } catch (e) {
+      console.warn('[whisperTranscribe] auth fail:', e.message);
+      return res.status(401).json({ error: 'Token inválido o expirado', code: 'BAD_TOKEN' });
     }
 
     // ── Verificar que el hospital tiene voz habilitada ──
@@ -1681,7 +1742,10 @@ exports.whisperTranscribe = onRequest(
         model: 'whisper-1',
         language: 'es',
         response_format: 'verbose_json',
-        prompt: 'Transcripción de visita médica PROA. Términos médicos en español: antibiótico, procalcitonina, meropenem, carbapenem, BLEE, KPC, sepsis, bacteriemia, infección, dosis, servicio, cama, diagnóstico.',
+        // v270: prompt enriquecido con vocabulario médico (clinical-vocabulary.json). Whisper
+        // limita el prompt a ~224 tokens → se priorizan los términos con mayor riesgo de error
+        // fonético (antibióticos de nombre largo, mecanismos de resistencia, marcas).
+        prompt: 'Transcripción de visita médica PROA en español de México. Términos: meropenem, piperacilina/tazobactam, ceftazidima/avibactam, ceftolozano/tazobactam, cefepime, ertapenem, vancomicina, daptomicina, linezolid, tigeciclina, colistina, amikacina, levofloxacino, trimetoprim/sulfametoxazol, fosfomicina, anfotericina, caspofungina, fluconazol, voriconazol, isavuconazol. Microorganismos: Klebsiella pneumoniae, Escherichia coli, Pseudomonas aeruginosa, Acinetobacter baumannii, Stenotrophomonas maltophilia, Staphylococcus aureus, Enterococcus faecium, Candida auris, Clostridioides difficile. Resistencia: BLEE, KPC, NDM, OXA-48, VIM, MRSA, VRE, CRE, CRAB, MDR, XDR. Antirretrovirales: Biktarvy, Dovato, dolutegravir, bictegravir, tenofovir. Labs: procalcitonina, PCR, lactato, creatinina, leucocitos. Síndromes: bacteriemia, sepsis, choque séptico, neumonía, pielonefritis, endocarditis, neutropenia febril.',
       });
 
       const transcript = whisperRes.text || '';
@@ -1709,5 +1773,457 @@ exports.whisperTranscribe = onRequest(
       console.error('[whisperTranscribe] Error:', e.message);
       return res.status(502).json({ error: 'Error en transcripción. Intenta de nuevo. ' + e.message });
     }
+  }
+);
+
+// ════════════════════════════════════════════════════════════════════
+// ── checkBedAvailable — validación atómica de cama libre ────────────
+// Usa una transacción Firestore para garantizar que ningún otro proceso
+// asignó la misma cama entre la lectura y la escritura del cliente.
+// Llamar ANTES de guardar el paciente. No escribe datos clínicos.
+// ════════════════════════════════════════════════════════════════════
+exports.checkBedAvailable = onCall(
+  { region: 'us-central1' },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Login requerido');
+
+    const { hospitalId, servicio, cama, excludePatientId } = req.data || {};
+    if (!hospitalId || !servicio || !cama) {
+      throw new HttpsError('invalid-argument', 'hospitalId, servicio y cama son obligatorios');
+    }
+
+    // Verificar que el usuario pertenece al hospital solicitado
+    const uid = req.auth.uid;
+    const userDoc = await db.doc(`users/${uid}`).get();
+    if (!userDoc.exists || userDoc.data().hospitalId !== hospitalId) {
+      throw new HttpsError('permission-denied', 'Sin acceso a este hospital');
+    }
+
+    // Transacción de solo lectura: busca pacientes activos con esa cama
+    const patientsRef = db.collection(`hospitals/${hospitalId}/patients`);
+    const snap = await patientsRef
+      .where('servicio', '==', servicio)
+      .where('cama', '==', cama)
+      .get();
+
+    const conflict = snap.docs.find(d => {
+      if (d.data().alta) return false;          // dado de alta → no cuenta
+      if (excludePatientId && d.id === excludePatientId) return false; // propio paciente en edición
+      return true;
+    });
+
+    if (conflict) {
+      return {
+        available: false,
+        occupiedBy: conflict.data().nombre || '—',
+        patientId: conflict.id,
+      };
+    }
+    return { available: true };
+  }
+);
+
+// ════════════════════════════════════════════════════════════════════
+// ── limpiarPacientes — borra todos los pacientes de un hospital ──────
+// Solo super-admin O admin del propio hospital pueden invocarla.
+// Borra en lotes de 400 (límite Firestore batch).
+// ════════════════════════════════════════════════════════════════════
+const SUPER_ADMIN_EMAIL = 'docrod29@gmail.com';
+
+exports.limpiarPacientes = onCall(
+  { region: 'us-central1', timeoutSeconds: 120 },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Login requerido');
+
+    const { hospitalId } = req.data || {};
+    if (!hospitalId) throw new HttpsError('invalid-argument', 'hospitalId requerido');
+
+    const uid = req.auth.uid;
+    const email = req.auth.token.email || '';
+
+    // Verificar permiso: super-admin o admin del hospital
+    const isSA = email === SUPER_ADMIN_EMAIL;
+    if (!isSA) {
+      const hospUserDoc = await db.doc(`hospitals/${hospitalId}/users/${uid}`).get();
+      const hu = hospUserDoc.data() || {};
+      if (hu.rol !== 'admin' && hu.status !== 'admin') {
+        throw new HttpsError('permission-denied', 'Solo admins del hospital pueden limpiar datos');
+      }
+    }
+
+    // Borrar todos los pacientes de todos los meses en lotes de 400
+    let totalDeleted = 0;
+    let batch = db.batch();
+    let count = 0;
+
+    const monthsSnap = await db.collection(`hospitals/${hospitalId}/months`).get();
+    for (const monthDoc of monthsSnap.docs) {
+      const patientsSnap = await monthDoc.ref.collection('patients').get();
+      for (const docSnap of patientsSnap.docs) {
+        for (const sub of ['visits', 'antibiograms', 'labs', 'molecular', 'histo', 'recos']) {
+          const subSnap = await docSnap.ref.collection(sub).get();
+          for (const s of subSnap.docs) {
+            batch.delete(s.ref);
+            count++;
+            if (count >= 400) { await batch.commit(); batch = db.batch(); count = 0; }
+          }
+        }
+        batch.delete(docSnap.ref);
+        totalDeleted++;
+        count++;
+        if (count >= 400) { await batch.commit(); batch = db.batch(); count = 0; }
+      }
+    }
+    if (count > 0) await batch.commit();
+
+    // Audit log
+    await db.collection(`hospitals/${hospitalId}/_audit`).add({
+      accion: 'limpiar_pacientes',
+      por: email,
+      uid,
+      totalBorrados: totalDeleted,
+      ts: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { ok: true, totalDeleted };
+  }
+);
+
+// ════════════════════════════════════════════════════════════════════
+// ── seedDemoData — carga pacientes demo realistas ────────────────────
+// Crea 10 pacientes ficticios que cubren todas las alertas y casos
+// de uso de StewardMX: MDR, cultivos, IC, restricción farmacia, CDI…
+// ════════════════════════════════════════════════════════════════════
+exports.seedDemoData = onCall(
+  { region: 'us-central1', timeoutSeconds: 60 },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Login requerido');
+
+    const { hospitalId } = req.data || {};
+    if (!hospitalId) throw new HttpsError('invalid-argument', 'hospitalId requerido');
+
+    const uid = req.auth.uid;
+    const email = req.auth.token.email || '';
+    const isSA = email === SUPER_ADMIN_EMAIL;
+    if (!isSA) {
+      const hospUserDoc = await db.doc(`hospitals/${hospitalId}/users/${uid}`).get();
+      const hu = hospUserDoc.data() || {};
+      if (hu.rol !== 'admin' && hu.status !== 'admin') {
+        throw new HttpsError('permission-denied', 'Solo admins pueden cargar datos demo');
+      }
+    }
+
+    const now = new Date();
+    const daysAgo = d => new Date(now - d * 86400000).toISOString().slice(0, 10);
+    const ts = admin.firestore.FieldValue.serverTimestamp();
+
+    const demoPacientes = [
+      {
+        nombre: 'María González Ramos', exp: 'EXP-001', edad: '67', sexo: 'F', peso: '62',
+        servicio: 'Medicina Interna', cama: '3',
+        ingreso: daysAgo(16), medico: 'Dr. Pérez',
+        dx: 'Neumonía nosocomial (VAP)',
+        atb: 'Meropenem', atbList: [{ nombre: 'Meropenem', via: 'IV', dosis: '1g c/8h', fechaInicioIV: daysAgo(16) }],
+        aware: 'Watch', pol: 'restringido',
+        cult: 'positivo', organismo: 'Klebsiella pneumoniae',
+        mec_kpc: true, mec_blee: true,
+        fenotipo: 'Carbapenemasa KPC',
+        riesgo: 'alto', accion: 'mantener', adecuacion: 'adecuado',
+        rev: '24h', notas: 'Paciente en VM. KPC confirmado por PCR. DOT elevado — evaluar tigeciclina.',
+        ts, updatedBy: 'demo@stewardmx.com', updatedAt: now.toISOString(),
+      },
+      {
+        nombre: 'José Martínez López', exp: 'EXP-002', edad: '54', sexo: 'M', peso: '78',
+        servicio: 'UCI Adultos', cama: '1',
+        ingreso: daysAgo(4), medico: 'Dra. Sánchez',
+        dx: 'Bacteriemia por S. aureus',
+        atb: 'Vancomicina', atbList: [{ nombre: 'Vancomicina', via: 'IV', dosis: '1.5g c/12h', fechaInicioIV: daysAgo(4) }],
+        aware: 'Reserve', pol: 'restringido',
+        cult: 'positivo', organismo: 'Staphylococcus aureus',
+        mec_mrsa: true, fenotipo: 'MRSA',
+        riesgo: 'alto', accion: 'mantener', adecuacion: 'adecuado',
+        bacteriemia: 'sí',
+        rev: '24h', notas: 'MRSA bacteriemia. Eco pendiente para descartar endocarditis. AUC/MIC monitorizado.',
+        ts, updatedBy: 'demo@stewardmx.com', updatedAt: now.toISOString(),
+      },
+      {
+        nombre: 'Ana Flores Herrera', exp: 'EXP-003', edad: '38', sexo: 'F', peso: '58',
+        servicio: 'Medicina Interna', cama: '7',
+        ingreso: daysAgo(3), medico: 'Dr. Torres',
+        dx: 'ITU complicada / Pielonefritis',
+        atb: 'Ceftriaxona', atbList: [{ nombre: 'Ceftriaxona', via: 'IV', dosis: '2g c/24h', fechaInicioIV: daysAgo(3), toleraVO: 'sí' }],
+        aware: 'Watch', pol: 'vigilado',
+        cult: 'pendiente', organismo: '',
+        riesgo: 'moderado', accion: 'desescalar',
+        rev: '48h', notas: 'Urocultivo pendiente 48h. Paciente tolerando VO. Candidata IV→VO si cultivo sin resistencias.',
+        ts, updatedBy: 'demo@stewardmx.com', updatedAt: now.toISOString(),
+      },
+      {
+        nombre: 'Carlos Reyes Gutiérrez', exp: 'EXP-004', edad: '72', sexo: 'M', peso: '70',
+        servicio: 'Medicina Interna', cama: '12',
+        ingreso: daysAgo(5), medico: 'Dra. Morales',
+        dx: 'Infección por Clostridioides difficile — severa',
+        atb: 'Vancomicina oral', atbList: [{ nombre: 'Vancomicina oral', via: 'PO', dosis: '125mg c/6h', fechaInicioIV: daysAgo(5) }],
+        aware: 'Watch', pol: 'libre',
+        cult: 'positivo', organismo: 'Clostridioides difficile',
+        cdi: true, cdiSeveridad: 'severa', cdiRecurrencia: false,
+        riesgo: 'alto', accion: 'mantener',
+        rev: '48h', notas: 'C. diff toxina A/B+. Aislamiento de contacto activo. Leuco 18k, Creat 1.8.',
+        ts, updatedBy: 'demo@stewardmx.com', updatedAt: now.toISOString(),
+      },
+      {
+        nombre: 'Lucía Vega Mendoza', exp: 'EXP-005', edad: '45', sexo: 'F', peso: '65',
+        servicio: 'Cirugía General', cama: '2',
+        ingreso: daysAgo(8), medico: 'Dr. Ramírez',
+        dx: 'IAB / Peritonitis secundaria post-op',
+        atb: 'Pip-Tazo', atbList: [{ nombre: 'Pip-Tazo', via: 'IV', dosis: '4.5g c/8h', fechaInicioIV: daysAgo(8) }],
+        aware: 'Watch', pol: 'vigilado',
+        cult: 'positivo', organismo: 'Escherichia coli',
+        mec_blee: true, mec_blee_ctxm: true, fenotipo: 'BLEE CTX-M',
+        riesgo: 'moderado', accion: 'escalar',
+        rev: '24h', notas: 'BLEE confirmada. Cambiar a Ertapenem según antibiograma. IAB con CL drenado.',
+        ts, updatedBy: 'demo@stewardmx.com', updatedAt: now.toISOString(),
+      },
+      {
+        nombre: 'Roberto Díaz Castillo', exp: 'EXP-006', edad: '61', sexo: 'M', peso: '85',
+        servicio: 'Neumología', cama: '5',
+        ingreso: daysAgo(6), medico: 'Dra. López',
+        dx: 'NAC grave / CURB-65 ≥3',
+        atb: 'Levofloxacino', atbList: [{ nombre: 'Levofloxacino', via: 'IV', dosis: '500mg c/24h', fechaInicioIV: daysAgo(6), toleraVO: 'sí' }],
+        aware: 'Watch', pol: 'vigilado',
+        cult: 'sí', organismo: 'Streptococcus pneumoniae',
+        riesgo: 'moderado', accion: 'vo',
+        rev: '48h', notas: 'Mejoría clínica 72h. Candidato switch IV→VO. Cultivo de esputo +. Desescalar a amoxicilina.',
+        ts, updatedBy: 'demo@stewardmx.com', updatedAt: now.toISOString(),
+      },
+      {
+        nombre: 'Sandra Moreno Ibarra', exp: 'EXP-007', edad: '29', sexo: 'F', peso: '55',
+        servicio: 'Ginecología y Obstetricia', cama: '4',
+        ingreso: daysAgo(2), medico: 'Dr. Jiménez',
+        dx: 'Endometritis postparto',
+        atb: 'Clindamicina + Gentamicina', atbList: [
+          { nombre: 'Clindamicina', via: 'IV', dosis: '900mg c/8h', fechaInicioIV: daysAgo(2) },
+          { nombre: 'Gentamicina', via: 'IV', dosis: '5mg/kg/día', fechaInicioIV: daysAgo(2) },
+        ],
+        aware: 'Watch', pol: 'libre',
+        cult: 'no', organismo: '',
+        alergias: 'Penicilina (rash urticarial)',
+        riesgo: 'bajo', accion: 'mantener',
+        icServicio: 'Infectología', icMotivo: 'Alergia a betalactámicos — orientación terapéutica',
+        icUrgencia: 'rutinaria', icFinalizado: false,
+        rev: '48h', notas: 'Alergia documentada a penicilina. IC infectología pendiente respuesta.',
+        ts, updatedBy: 'demo@stewardmx.com', updatedAt: now.toISOString(),
+      },
+      {
+        nombre: 'Pedro Ruiz Salinas', exp: 'EXP-008', edad: '58', sexo: 'M', peso: '90',
+        servicio: 'Medicina Interna', cama: '15',
+        ingreso: daysAgo(14), medico: 'Dra. Ríos',
+        dx: 'Bacteriemia primaria — origen desconocido',
+        atb: 'Cefepime', atbList: [{ nombre: 'Cefepime', via: 'IV', dosis: '2g c/8h', fechaInicioIV: daysAgo(14) }],
+        aware: 'Watch', pol: 'libre',
+        cult: 'positivo', organismo: 'Pseudomonas aeruginosa',
+        mec_ampc: true, mec_bomba: true, fenotipo: 'AmpC + bomba de eflujo',
+        riesgo: 'alto', accion: 'ajustar',
+        rev: '24h', notas: 'Tratamiento >14 días. Considera optimización PK/PD con infusión extendida.',
+        ts, updatedBy: 'demo@stewardmx.com', updatedAt: now.toISOString(),
+      },
+      {
+        nombre: 'Carmen Álvarez Núñez', exp: 'EXP-009', edad: '43', sexo: 'F', peso: '60',
+        servicio: 'Oncología Médica', cama: '8',
+        ingreso: daysAgo(1), medico: 'Dr. Aguilar',
+        dx: 'Neutropenia febril — LLA en tratamiento',
+        atb: 'Cefepime', atbList: [{ nombre: 'Cefepime', via: 'IV', dosis: '2g c/8h', fechaInicioIV: daysAgo(1) }],
+        aware: 'Watch', pol: 'libre',
+        cult: 'pendiente', organismo: '',
+        inmuno: 'neutropenia',
+        riesgo: 'alto', accion: 'mantener',
+        rev: '24h', notas: 'Neutropenia <500. Hemocultivos x2 enviados. Procalcitonina 8.4. Sin foco claro.',
+        ts, updatedBy: 'demo@stewardmx.com', updatedAt: now.toISOString(),
+      },
+      {
+        nombre: 'Fernando Cruz Espinoza', exp: 'EXP-010', edad: '77', sexo: 'M', peso: '68',
+        servicio: 'Geriatría', cama: '6',
+        ingreso: daysAgo(9), medico: 'Dra. Vargas',
+        dx: 'SSTI / Celulitis infectada — pie diabético',
+        atb: 'Ceftriaxona', atbList: [{ nombre: 'Ceftriaxona', via: 'IV', dosis: '2g c/24h', fechaInicioIV: daysAgo(9), toleraVO: 'sí' }],
+        aware: 'Watch', pol: 'libre',
+        cult: 'sí', organismo: 'Streptococcus agalactiae',
+        riesgo: 'moderado', accion: 'suspender',
+        rev: '48h', notas: 'Buena evolución. Cultivo sensible a amoxicilina. Suspender IV y completar 7 días PO.',
+        ts, updatedBy: 'demo@stewardmx.com', updatedAt: now.toISOString(),
+      },
+    ];
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // "2026-05"
+    const patientsRef = db.collection(`hospitals/${hospitalId}/months/${currentMonth}/patients`);
+    const writes = demoPacientes.map(p => patientsRef.add(p));
+    await Promise.all(writes);
+
+    return { ok: true, total: demoPacientes.length };
+  }
+);
+
+// ════════════════════════════════════════════════════════════════════
+// ── 8. exportSheetSA — Exportar a Google Sheets vía SERVICE ACCOUNT ──
+//  Ningún hospital configura OAuth ni mete su correo. El servidor crea la
+//  hoja con la identidad del Service Account de Firebase Functions y la
+//  comparte al correo del usuario (writer). Multi-tenant, cero fricción.
+//
+//  Requisitos (una sola vez por el dueño):
+//   1. Habilitar Google Sheets API + Drive API en el proyecto GCP.
+//   2. Dar al Service Account de Functions el scope de Sheets/Drive
+//      (las Application Default Credentials ya lo permiten si se solicita
+//       el scope correcto en GoogleAuth, como aquí abajo).
+//   3. firebase deploy --only functions:exportSheetSA
+// ════════════════════════════════════════════════════════════════════
+exports.exportSheetSA = onCall(
+  { secrets: ['SA_KEY'], cors: true, region: 'us-central1', timeoutSeconds: 300, memory: '512MiB' },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Login requerido');
+    const uid = req.auth.uid;
+    const email = req.auth.token.email || '';
+    const isSA = email === SUPER_ADMIN_EMAIL;
+
+    // ── Autorización: admin/aprobado del hospital ──
+    let hospitalId = req.data?.hospitalId || null;
+    if (!isSA) {
+      if (!hospitalId) {
+        const ud = await db.doc(`users/${uid}`).get();
+        hospitalId = ud.exists ? ud.data().hospitalId : null;
+      }
+      if (!hospitalId) throw new HttpsError('permission-denied', 'Sin hospital asignado');
+      const hu = (await db.doc(`hospitals/${hospitalId}/users/${uid}`).get()).data() || {};
+      if (hu.status !== 'admin' && hu.rol !== 'Líder PROA' && hu.rol !== 'Infectólogo') {
+        throw new HttpsError('permission-denied', 'Solo administrador/Líder PROA puede exportar');
+      }
+    }
+
+    const { title, sheets } = req.data || {};
+    // sheets: [{ title:'...', values:[[...],[...]] }, ...]
+    if (!Array.isArray(sheets) || !sheets.length) {
+      throw new HttpsError('invalid-argument', 'sheets requerido (array de {title,values})');
+    }
+
+    // ── Auth con Service Account — LLAVE JSON (método definitivo multi-hospital) ──
+    // El metadata/IAM Credentials falla con 403 en proyectos "sin organización".
+    // Solución: firmar un JWT con la LLAVE JSON de la cuenta de servicio (secret SA_KEY) y
+    // canjearlo por un access token con scopes de Sheets/Drive. Esto NO depende de IAM del
+    // entorno → funciona para TODOS los hospitales sin configurar nada en el cliente.
+    const SHEET_SCOPES = [
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/drive',
+    ];
+    let token = null;
+    const rawKey = process.env.SA_KEY;
+    if (rawKey) {
+      try {
+        const creds = JSON.parse(rawKey);
+        const { JWT } = require('google-auth-library');
+        const jwt = new JWT({
+          email: creds.client_email,
+          key: creds.private_key,
+          scopes: SHEET_SCOPES,
+        });
+        const at = await jwt.authorize();   // intercambia el JWT firmado por un access_token
+        token = at.access_token;
+      } catch (e) {
+        console.error('[exportSheetSA] SA_KEY JWT error', e.message);
+      }
+    }
+    // Fallback: ADC (por si algún día se mueve a organización y el SA_KEY no está)
+    if (!token) {
+      try {
+        const { GoogleAuth } = require('google-auth-library');
+        const auth = new GoogleAuth({ scopes: SHEET_SCOPES });
+        const client = await auth.getClient();
+        token = (await client.getAccessToken()).token;
+      } catch (e) { console.error('[exportSheetSA] ADC fallback error', e.message); }
+    }
+    if (!token) throw new HttpsError('failed-precondition', 'Falta configurar la llave de servicio (SA_KEY). El administrador de la plataforma debe subirla una vez. Mientras tanto usa "Exportar Excel".');
+    if (!token) throw new HttpsError('internal', 'No se pudo obtener token de Sheets. Verifica que la cuenta de servicio tenga el rol "Creador de tokens de cuenta de servicio".');
+    const H = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+    // ── DIAGNÓSTICO v233: verificar el scope REAL del token obtenido ──
+    try {
+      const ti = await fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(token));
+      const tj = await ti.json();
+      console.log('[exportSheetSA] TOKEN scopes=', tj.scope || '(sin scope)', '| email=', tj.email || tj.azp || '?');
+    } catch (e) { console.log('[exportSheetSA] tokeninfo error', e.message); }
+
+    // ── 1. Reusar spreadsheet existente o crear uno nuevo ──
+    let ssId = null;
+    try {
+      const cfg = await db.doc(`hospitals/${hospitalId}/config/sheets_sa`).get();
+      ssId = cfg.exists ? (cfg.data().ssId || null) : null;
+    } catch (_) { /* ignore */ }
+
+    // Verificar que el ssId guardado siga existiendo
+    if (ssId) {
+      const chk = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssId}?fields=spreadsheetId`, { headers: H });
+      if (!chk.ok) ssId = null;
+    }
+
+    if (!ssId) {
+      const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+        method: 'POST', headers: H,
+        body: JSON.stringify({
+          properties: { title: title || ('StewardMX — ' + hospitalId), locale: 'es_MX' },
+          sheets: sheets.map(s => ({ properties: { title: s.title } })),
+        }),
+      });
+      const cj = await createRes.json();
+      if (!createRes.ok) {
+        const gerr = cj.error || {};
+        console.error('[exportSheetSA] create FAILED', createRes.status, JSON.stringify(gerr));
+        // Mensaje accionable según el error real de Google
+        const reason = (gerr.status || '') + ' ' + (gerr.message || '');
+        if (/SERVICE_DISABLED|has not been used|disabled/i.test(reason)) {
+          throw new HttpsError('failed-precondition', 'Falta habilitar Google Sheets API en el proyecto. Abre console.cloud.google.com → APIs → habilita "Google Sheets API" y "Google Drive API", espera 2 min y reintenta.');
+        }
+        if (/PERMISSION_DENIED|caller does not have/i.test(reason)) {
+          throw new HttpsError('permission-denied', 'La cuenta de servicio no tiene permiso de Sheets. Verifica que Google Sheets API esté HABILITADA (no solo el rol Editor). Error Google: ' + (gerr.message || ''));
+        }
+        throw new HttpsError('internal', gerr.message || 'Error creando hoja');
+      }
+      ssId = cj.spreadsheetId;
+      try { await db.doc(`hospitals/${hospitalId}/config/sheets_sa`).set({ ssId, createdAt: Date.now(), createdBy: email }, { merge: true }); } catch (_) {}
+    } else {
+      // Reúso: asegurar que existan todas las hojas necesarias
+      const meta = await (await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssId}?fields=sheets.properties`, { headers: H })).json();
+      const existing = (meta.sheets || []).map(s => s.properties.title);
+      const missing = sheets.filter(s => !existing.includes(s.title));
+      if (missing.length) {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssId}:batchUpdate`, {
+          method: 'POST', headers: H,
+          body: JSON.stringify({ requests: missing.map(s => ({ addSheet: { properties: { title: s.title } } })) }),
+        });
+      }
+      // Limpiar contenido previo de las hojas que vamos a reescribir
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssId}/values:batchClear`, {
+        method: 'POST', headers: H,
+        body: JSON.stringify({ ranges: sheets.map(s => `'${s.title.replace(/'/g, "''")}'!A1:ZZ20000`) }),
+      });
+    }
+
+    // ── 2. Escribir valores (USER_ENTERED → las fórmulas viven) ──
+    const data = sheets.map(s => ({ range: `'${s.title.replace(/'/g, "''")}'!A1`, values: s.values }));
+    const wRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssId}/values:batchUpdate`, {
+      method: 'POST', headers: H,
+      body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data }),
+    });
+    if (!wRes.ok) { const ej = await wRes.json(); throw new HttpsError('internal', ej.error?.message || 'Error escribiendo'); }
+
+    // ── 3. Compartir con el usuario (writer) para que pueda abrirla ──
+    if (email) {
+      try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${ssId}/permissions?sendNotificationEmail=false`, {
+          method: 'POST', headers: H,
+          body: JSON.stringify({ role: 'writer', type: 'user', emailAddress: email }),
+        });
+      } catch (_) { /* si falla el share, igual devolvemos el link */ }
+    }
+
+    const url = 'https://docs.google.com/spreadsheets/d/' + ssId;
+    return { ok: true, ssId, url };
   }
 );

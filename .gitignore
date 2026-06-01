@@ -22,3 +22,6 @@ docs/
 # Archivos temporales
 *.log
 *.tmp
+Copia de index.html
+.claude/
+_mockups/

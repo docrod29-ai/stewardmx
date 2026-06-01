@@ -2,14 +2,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helpers ────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════
+    //  HELPERS GLOBALES
+    //  Toda validación de rol/status se hace server-side
+    //  contra Firestore — NUNCA contra datos del cliente.
+    // ══════════════════════════════════════════════════════
+
     function isAuth() {
       return request.auth != null;
     }
     function uid() {
       return request.auth.uid;
     }
-    // Super-admin verificado por Firebase Auth (seguro — no viene del cliente)
+    // Super-admin verificado por Firebase Auth custom claim
+    // (el email viene en el token y no puede ser manipulado desde el cliente)
     function isSuperAdmin() {
       return isAuth() && request.auth.token.email == 'docrod29@gmail.com';
     }
@@ -19,52 +25,70 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/platform_staff/$(uid()))
         && get(/databases/$(database)/documents/platform_staff/$(uid())).data.activo == true;
     }
-    // Manager de plataforma (puede aprobar/suspender/renovar hospitales)
+    // Manager de plataforma
     function isPlatformManager() {
       return isAuth()
         && exists(/databases/$(database)/documents/platform_staff/$(uid()))
         && get(/databases/$(database)/documents/platform_staff/$(uid())).data.activo == true
         && get(/databases/$(database)/documents/platform_staff/$(uid())).data.rol == 'Manager';
     }
-    // Usuario es miembro aprobado del hospital (status aprobado o admin)
+    // Miembro aprobado del hospital (status aprobado o admin)
     function isHospMember(hospId) {
       return isAuth()
         && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.status
            in ['aprobado', 'admin'];
     }
-    // Usuario es administrador del hospital (status admin)
+    // Administrador del hospital (status admin)
     function isHospAdmin(hospId) {
       return isAuth()
         && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.status
            == 'admin';
     }
-    // Usuario tiene rol PROA o Infectología en el hospital (acceso clínico total)
+    // Líder PROA activo
+    function isHospLider(hospId) {
+      return isAuth()
+        && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
+        && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.status == 'aprobado'
+        && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol == 'Líder PROA';
+    }
+    // Rol PROA/Infectología (acceso clínico total)
     function isHospPROA(hospId) {
       return isAuth()
         && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
-           in ['PROA', 'Infectología'];
+           in ['PROA', 'Infectología', 'Infectólogo', 'Líder PROA', 'Médico PROA'];
     }
-    // Usuario tiene rol Farmacéutico en el hospital
+    // Farmacéutico del hospital (incluye Auxiliar Farmacia)
     function isHospFarmacia(hospId) {
+      return isAuth()
+        && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
+        && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
+           in ['Farmacéutico', 'Auxiliar Farmacia'];
+    }
+    // Solo Farmacéutico titular (no Auxiliar) — para escritura de datos clínicos
+    function isHospFarmaceuticoTitular(hospId) {
       return isAuth()
         && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
            == 'Farmacéutico';
     }
-    // Usuario tiene rol Medico en el hospital
+    // Médico (cualquier rol médico)
     function isHospMedico(hospId) {
       return isAuth()
         && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
-           in ['Medico', 'medico'];
+           in ['Medico', 'medico', 'Residente', 'Interno', 'Especialista',
+               'Médico adscrito', 'Médico PROA', 'Médico interconsultante',
+               'Médico General / Urgencias'];
     }
 
-    // ── _audit_log — Registro de auditoría HIPAA/SaMD inmutable ──────────
-    // create: cualquier usuario autenticado puede crear entradas (desde PWA)
-    // read/update/delete: NUNCA (inmutable — solo el admin SDK puede leer vía Cloud Functions)
+    // ══════════════════════════════════════════════════════
+    //  _audit_log — Registro de auditoría INMUTABLE
+    //  create: cualquier usuario autenticado (desde PWA)
+    //  read/update/delete: NUNCA desde cliente
+    // ══════════════════════════════════════════════════════
     match /_audit_log/{logId} {
       allow create: if isAuth();
       allow read:   if false;
@@ -72,19 +96,17 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ── users/{uid} — Mapeo uid → hospitalId ──────────────────────────────
-    // Solo el propietario puede leer/escribir su propio doc.
+    // ══════════════════════════════════════════════════════
+    //  users/{uid} — Mapeo uid → hospitalId
+    // ══════════════════════════════════════════════════════
     match /users/{userId} {
       allow read:  if isAuth() && (uid() == userId || isSuperAdmin());
       allow write: if isAuth() && uid() == userId;
     }
 
-    // ── hospitals_registry ────────────────────────────────────────────────
-    // get (doc único): cualquier usuario auth — necesario para validar código al unirse.
-    // list (colección completa): super-admin o staff de plataforma — para panel Plataforma.
-    // create: cualquier usuario auth — para registrar un nuevo hospital.
-    // update: super-admin, admin del hospital, o staff activo de plataforma.
-    // delete: solo super-admin.
+    // ══════════════════════════════════════════════════════
+    //  hospitals_registry — Directorio de hospitales
+    // ══════════════════════════════════════════════════════
     match /hospitals_registry/{hospId} {
       allow get:    if isAuth();
       allow list:   if isSuperAdmin() || isActivePlatformStaff();
@@ -95,172 +117,268 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    // ── platform_invites/{email} — Invitaciones pendientes de staff ───────
-    // Cualquier auth puede leer su propia invitación (solo conoce su email).
-    // Solo super-admin puede crear/borrar invitaciones.
+    // ══════════════════════════════════════════════════════
+    //  platform_invites / platform_staff
+    // ══════════════════════════════════════════════════════
     match /platform_invites/{email} {
       allow read:  if isAuth();
       allow write: if isSuperAdmin();
     }
-
-    // ── platform_staff/{uid} — Staff activo de plataforma ─────────────────
-    // Solo el propio staff puede leer su doc; super-admin lee/escribe todos.
     match /platform_staff/{staffUid} {
       allow read:  if isAuth() && (uid() == staffUid || isSuperAdmin());
       allow write: if isSuperAdmin();
     }
 
-    // ── hospital_role_codes/{code} ────────────────────────────────────────
-    // get: cualquier usuario auth — para validar el código al unirse.
-    // list: solo super-admin (nunca se lista en la app, solo get individual).
-    // create/delete: admin del hospital correspondiente o super-admin.
+    // ══════════════════════════════════════════════════════
+    //  hospital_role_codes — Códigos de invitación
+    // ══════════════════════════════════════════════════════
     match /hospital_role_codes/{code} {
       allow get:    if isAuth();
       allow list:   if isSuperAdmin();
-      allow create: if isAuth() && isHospAdmin(request.resource.data.hospitalId);
+      allow create: if isSuperAdmin()
+                    || (isAuth() && isHospAdmin(request.resource.data.hospitalId))
+                    || (isAuth() && isHospLider(request.resource.data.hospitalId));
       allow delete: if isSuperAdmin()
-                    || (isAuth() && isHospAdmin(resource.data.hospitalId));
+                    || (isAuth() && isHospAdmin(resource.data.hospitalId))
+                    || (isAuth() && isHospLider(resource.data.hospitalId));
     }
 
-    // ── config/{docId} — Configuración global (API key, proxy, WA ventas) ─
-    // Lectura: usuarios autenticados (necesitan la API key al cargar).
-    // Escritura: solo super-admin.
+    // ══════════════════════════════════════════════════════
+    //  config/{docId} — CONFIGURACIÓN GLOBAL DE PLATAFORMA
+    //  ⚠ SEGURIDAD CRÍTICA: este documento puede contener
+    //  la Anthropic API key y otras credenciales.
+    //  Lectura: SOLO super-admin (nunca miembros normales)
+    //  Escritura: SOLO super-admin
+    //  Nota: los usuarios normales usan el proxy Cloud Function
+    //  (anthropicProxy) que NO expone la key al cliente.
+    // ══════════════════════════════════════════════════════
     match /config/{docId} {
-      allow read:  if isAuth();
+      allow read:  if isSuperAdmin();
       allow write: if isSuperAdmin();
     }
 
-    // ── hospitals/{hospId}/** ─────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════
+    //  hospitals/{hospId}/** — AISLAMIENTO POR HOSPITAL
+    //  Toda regla dentro de este bloque requiere que el
+    //  usuario sea miembro del MISMO hospital (hospId).
+    //  Un usuario de Hospital A NO puede leer Hospital B.
+    // ══════════════════════════════════════════════════════
     match /hospitals/{hospId} {
 
-      // Hospital info y configuración interna
-      // create: permitido para cualquier usuario auth — creación inicial del hospital.
-      //         (document doesn't exist → es un `create`, no `update`)
-      // read/update/delete: miembros aprobados o super-admin.
+      // ── Info y configuración del hospital ───────────────
       match /info/{docId} {
-        allow read:           if isSuperAdmin() || isHospMember(hospId);
+        allow get:            if isAuth();
+        allow list:           if isSuperAdmin() || isHospMember(hospId);
         allow create:         if isAuth();
-        allow update, delete: if isSuperAdmin() || isHospAdmin(hospId);
+        allow update, delete: if isSuperAdmin() || isHospAdmin(hospId) || isHospLider(hospId);
       }
+      // config del hospital: solo admin lo escribe; miembros pueden leer
+      // (contiene configuración no-sensible: nombre, camas, WA, etc.)
       match /config/{docId} {
-        allow read:           if isSuperAdmin() || isHospMember(hospId);
+        allow read:           if isSuperAdmin() || isHospAdmin(hospId);
         allow create:         if isAuth();
-        allow update, delete: if isSuperAdmin() || isHospAdmin(hospId);
+        allow update, delete: if isSuperAdmin() || isHospAdmin(hospId) || isHospLider(hospId);
       }
 
-      // Usuarios del hospital
-      // create: el propio usuario puede crear su solicitud de acceso (cualquier status inicial)
-      // read: propio usuario, admin del hospital, o super-admin
-      // update status: solo admin o super-admin; usuario puede editar sus propios campos no-status
-      // delete: admin o super-admin
+      // ── Gestión de usuarios del hospital ────────────────
       match /users/{userId} {
-        allow read:   if isAuth() && (uid() == userId || isHospAdmin(hospId) || isSuperAdmin());
+        allow read:   if isAuth() && (uid() == userId || isHospAdmin(hospId) || isHospLider(hospId) || isSuperAdmin());
         allow create: if isAuth() && uid() == userId;
         allow update: if isSuperAdmin()
-                      || isHospAdmin(hospId)
+                      || (isHospAdmin(hospId)
+                          && userId != uid()
+                          && resource.data.status != 'admin'
+                          && request.resource.data.status != 'admin')
+                      || (isHospLider(hospId)
+                          && userId != uid()
+                          && resource.data.status != 'admin'
+                          && request.resource.data.status != 'admin')
                       || (isAuth() && uid() == userId
-                          && request.resource.data.status == resource.data.status);
-        allow delete: if isAuth() && (isSuperAdmin() || isHospAdmin(hospId));
+                          && request.resource.data.status == resource.data.status
+                          && request.resource.data.rol == resource.data.rol);
+        allow delete: if isSuperAdmin()
+                      || (isHospAdmin(hospId) && userId != uid() && resource.data.status != 'admin')
+                      || (isHospLider(hospId) && userId != uid() && resource.data.status != 'admin');
       }
 
-      // Census mensual de pacientes: hospitals/{hospId}/months/{month}/patients/{id}
+      // ── Censo clínico mensual ────────────────────────────
+      // read: cualquier miembro (necesario para trabajo clínico diario)
+      // write: cualquier miembro (médicos, PROA, enfermería actualizan)
       match /months/{month}/patients/{patId} {
-        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+        allow read:   if isSuperAdmin() || isHospMember(hospId);
+        allow create: if isSuperAdmin() || isHospMember(hospId);
+        allow update: if isSuperAdmin() || isHospMember(hospId);
+        // delete solo admin o PROA (no se debe borrar pacientes sin trazabilidad)
+        allow delete: if isSuperAdmin() || isHospAdmin(hospId) || isHospPROA(hospId);
       }
-      // Historial de auditoría mensual
+      // Historial de auditoría mensual — inmutable desde cliente excepto crear
       match /months/{month}/history/{histId} {
-        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+        allow read:   if isSuperAdmin() || isHospMember(hospId);
+        allow create: if isSuperAdmin() || isHospMember(hospId);
+        allow update: if isSuperAdmin();
+        allow delete: if isSuperAdmin();
       }
 
-      // Registro permanente de pacientes y subcollections (antibiogramas, labs, visitas…)
+      // ── Registro permanente de pacientes ────────────────
       match /patients/{patId} {
-        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+        allow read:   if isSuperAdmin() || isHospMember(hospId);
+        allow create: if isSuperAdmin() || isHospMember(hospId);
+        allow update: if isSuperAdmin() || isHospMember(hospId);
+        allow delete: if isSuperAdmin() || isHospAdmin(hospId);
       }
       match /patients/{patId}/{subCol}/{subDocId} {
-        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+        allow read:   if isSuperAdmin() || isHospMember(hospId);
+        allow create: if isSuperAdmin() || isHospMember(hospId);
+        allow update: if isSuperAdmin()
+                      || (isHospMember(hospId) && !resource.data.get('firmado', false));
+        allow delete: if isSuperAdmin() || isHospAdmin(hospId);
       }
 
-      // ── Laboratorios clínicos (biomarkers: PCT, CRP, cultivos) ──────────
-      // Cualquier miembro del hospital puede leer/escribir labs (tracking de biomarcadores)
+      // ── Laboratorios clínicos ────────────────────────────
       match /patients/{patId}/labs/{labId} {
         allow read, write: if isSuperAdmin() || isHospMember(hospId);
       }
 
-      // ── Cola LIS — sincronización de resultados de laboratorio ───────────
-      // Lectura/escritura: admin del hospital o equipo PROA (para resolver conflictos)
-      // La función lisSync escribe vía admin SDK; el equipo PROA revisa conflictos
-      match /lis_queue/{queueId} {
-        allow read, write: if isSuperAdmin() || isHospAdmin(hospId) || isHospPROA(hospId);
+      // ── Sistema de Farmacia: Solicitudes de ATBs ────────
+      match /antibiotic_requests/{reqId} {
+        allow read:   if isSuperAdmin() || isHospMember(hospId);
+        allow create: if isSuperAdmin() || isHospMember(hospId);
+        allow update: if isSuperAdmin() || isHospMember(hospId);
+        allow delete: if isSuperAdmin() || isHospAdmin(hospId) || isHospPROA(hospId);
+      }
+      // Subcollection: Recomendaciones de Farmacia Clínica (FC)
+      // write: farmacéuticos y admin
+      // read: todos los miembros (PROA necesita ver las recomendaciones)
+      match /antibiotic_requests/{reqId}/fc_recomendaciones/{recoId} {
+        allow read:   if isSuperAdmin() || isHospMember(hospId);
+        allow create: if isSuperAdmin() || isHospAdmin(hospId) || isHospFarmaceuticoTitular(hospId);
+        allow update: if isSuperAdmin() || isHospAdmin(hospId) || isHospFarmaceuticoTitular(hospId);
+        allow delete: if isSuperAdmin() || isHospAdmin(hospId);
       }
 
-      // ── Benchmarks anónimos de prescripción ─────────────────────────────
-      // Lectura: cualquier miembro del hospital (visibilidad para efecto de empujón)
-      // Escritura: NUNCA desde cliente — solo Cloud Functions vía admin SDK
+      // ── Catálogo de antibióticos ─────────────────────────
+      match /antibiotics_catalog/{catId} {
+        allow read:  if isSuperAdmin() || isHospMember(hospId);
+        allow write: if isSuperAdmin() || isHospAdmin(hospId);
+      }
+
+      // ── Bloqueos de ATBs ─────────────────────────────────
+      // write: PROA, Farmacéutico, Admin
+      // read: todos los miembros (enfermería y médicos necesitan saber)
+      match /atb_blocks/{blockId} {
+        allow read:  if isSuperAdmin() || isHospMember(hospId);
+        allow write: if isSuperAdmin() || isHospAdmin(hospId)
+                     || isHospPROA(hospId) || isHospFarmacia(hospId);
+      }
+
+      // ── DDD Farmacia — Consumo diario real ───────────────
+      // write: SOLO farmacéutico titular o admin (dato oficial)
+      // read: todos los miembros con acceso al hospital
+      match /ddd_farmacia/{docId} {
+        allow read:   if isSuperAdmin() || isHospMember(hospId);
+        allow create: if isSuperAdmin() || isHospAdmin(hospId) || isHospFarmaceuticoTitular(hospId);
+        allow update: if isSuperAdmin() || isHospAdmin(hospId) || isHospFarmaceuticoTitular(hospId);
+        allow delete: if isSuperAdmin() || isHospAdmin(hospId);
+      }
+
+      // ── Benchmarks anónimos ──────────────────────────────
+      // write: NUNCA desde cliente — solo Cloud Functions (Admin SDK)
       match /benchmarks/{month} {
         allow read:  if isSuperAdmin() || isHospMember(hospId);
         allow write: if false;
       }
 
-      // ── Clústeres de resistencia (geo-epidemiología) ─────────────────────
-      // Lectura: cualquier miembro del hospital
-      // Escritura: NUNCA desde cliente — solo Cloud Functions vía admin SDK
+      // ── Clústeres de resistencia ─────────────────────────
+      // write: NUNCA desde cliente — solo Cloud Functions (Admin SDK)
       match /resistance_clusters/{clusterId} {
         allow read:  if isSuperAdmin() || isHospMember(hospId);
         allow write: if false;
       }
 
-      // ── Uso de voz por hospital (tracking Whisper) ───────────────────────
-      // Lectura: admin del hospital o super-admin
-      // Escritura: solo Cloud Function vía admin SDK
+      // ── Uso de voz (Whisper) ─────────────────────────────
+      // write: NUNCA desde cliente — solo Cloud Functions (Admin SDK)
       match /voice_usage/{month} {
-        allow read: if isSuperAdmin() || isHospAdmin(hospId);
+        allow read:  if isSuperAdmin() || isHospAdmin(hospId);
         allow write: if false;
       }
 
-      // Sistema de Farmacia
-      match /antibiotic_requests/{reqId} {
-        allow read, write: if isSuperAdmin() || isHospMember(hospId);
-      }
-      match /antibiotics_catalog/{catId} {
-        allow read:           if isSuperAdmin() || isHospMember(hospId);
-        allow write:          if isSuperAdmin() || isHospAdmin(hospId);
-      }
-      match /atb_blocks/{blockId} {
-        allow read: if isSuperAdmin() || isHospMember(hospId);
-        allow write: if isSuperAdmin() || isHospAdmin(hospId) || isHospPROA(hospId) || isHospFarmacia(hospId);
+      // ── Cola LIS ─────────────────────────────────────────
+      match /lis_queue/{queueId} {
+        allow read, write: if isSuperAdmin() || isHospAdmin(hospId) || isHospPROA(hospId);
       }
 
-      // Resto de colecciones del hospital (contactos, profilaxis, certificaciones, alertas…)
+      // ── EHR / FHIR ───────────────────────────────────────
+      match /ehr_config/{docId} {
+        allow read:  if isSuperAdmin() || isHospAdmin(hospId);
+        allow write: if isSuperAdmin() || isHospAdmin(hospId);
+      }
+      match /ehr_requests/{reqId} {
+        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+      }
+      match /ehr_sync_log/{logId} {
+        allow read:  if isSuperAdmin() || isHospAdmin(hospId);
+        allow write: if false;
+      }
+
+      // ── Módulo Clínica / Expediente Electrónico ──────────
+      match /clinica_patients/{clinicaPacId} {
+        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+      }
+      match /clinica_patients/{clinicaPacId}/{subCol}/{subDocId} {
+        allow read:   if isSuperAdmin() || isHospMember(hospId);
+        allow create: if isSuperAdmin() || isHospMember(hospId);
+        allow update: if isSuperAdmin()
+                      || (isHospMember(hospId) && !resource.data.get('firmado', false));
+        allow delete: if isSuperAdmin() || isHospAdmin(hospId);
+      }
+      match /clinica_appointments/{apptId} {
+        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+      }
+
+      // ── Contactos, profilaxis, certificaciones, alertas ──
       match /contacts/{id}          { allow read, write: if isSuperAdmin() || isHospMember(hospId); }
       match /profilaxis/{id}        { allow read, write: if isSuperAdmin() || isHospMember(hospId); }
       match /certificaciones/{id}   { allow read, write: if isSuperAdmin() || isHospMember(hospId); }
       match /alertas_atendidas/{id} { allow read, write: if isSuperAdmin() || isHospMember(hospId); }
 
-      // ── EHR Integration ──────────────────────────────────────────────
-      // Configuración del EHR / FHIR (solo admin o super-admin)
-      match /ehr_config/{docId} {
-        allow read: if isSuperAdmin() || isHospAdmin(hospId);
-        allow write: if isSuperAdmin() || isHospAdmin(hospId);
-      }
-      // Cola de solicitudes de ATBs provenientes del EHR (todo el equipo PROA)
-      match /ehr_requests/{reqId} {
+      // ── Solicitudes de cultivo ────────────────────────────
+      match /culture_requests/{reqId} {
         allow read, write: if isSuperAdmin() || isHospMember(hospId);
       }
-      // Log de sincronizaciones EHR (solo lectura para admins; escritura exclusiva de Cloud Functions via Admin SDK)
-      match /ehr_sync_log/{logId} {
-        allow read: if isSuperAdmin() || isHospAdmin(hospId);
-        allow write: if false; // solo Cloud Functions (admin SDK)
-      }
 
-      // Catch-all para cualquier otra colección que pueda agregarse en el futuro
+      // ── Catch-all para colecciones futuras del hospital ──
+      // Solo lectura/escritura para miembros del MISMO hospital.
+      // Subcollections de 2 niveles están cubiertas aquí.
       match /{anyCol}/{anyDoc} {
         allow read, write: if isSuperAdmin() || isHospMember(hospId);
       }
+      // Subcollections de 3 niveles (safety net)
+      match /{anyCol}/{anyDoc}/{subCol}/{subDocId} {
+        allow read:   if isSuperAdmin() || isHospMember(hospId);
+        allow create: if isSuperAdmin() || isHospMember(hospId);
+        allow update: if isSuperAdmin() || isHospMember(hospId);
+        allow delete: if isSuperAdmin() || isHospAdmin(hospId);
+      }
+
+    } // end hospitals/{hospId}
+
+    // ══════════════════════════════════════════════════════
+    //  SOLICITUDES DE DEMO — formulario público sin login
+    //  Cualquiera puede crear (formulario del login).
+    //  Solo el super-admin puede leer, actualizar y borrar.
+    // ══════════════════════════════════════════════════════
+    match /solicitudes_demo/{docId} {
+      allow create: if true;
+      allow read, update, delete: if isSuperAdmin();
     }
 
-    // Denegar todo lo demás por defecto (implícito en Firestore, explícito aquí para claridad)
+    // ══════════════════════════════════════════════════════
+    //  DENEGACIÓN GLOBAL POR DEFECTO
+    //  Cualquier colección no listada arriba queda cerrada.
+    // ══════════════════════════════════════════════════════
     match /{document=**} {
       allow read, write: if false;
     }
+
   }
 }
