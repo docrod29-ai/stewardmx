@@ -809,3 +809,17 @@ test('XLSX IAAS: días-dispositivo reales (inserción→retiro) + LOT/DOT', () =
   assert.match(_idx, /Razón DOT\/LOT/);
   assert.match(_idx, /VAP no calculable|requiere capturar el dispositivo ventilador/);
 });
+
+/* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
+const _mCG = _idx.match(/window\.cockcroftGault=function\(edad, peso, creat, sexo\)\{[\s\S]*?\n\};/);
+let _cg = () => null;
+if (_mCG) { _cg = new Function('const window={};' + _mCG[0] + ' return window.cockcroftGault;')(); }
+test('CG: existe cockcroftGault', () => assert.ok(_mCG));
+test('CG: 60a/70kg/Cr1.0 hombre ≈ 77.8 mL/min', () => assert.ok(Math.abs(_cg(60,70,1.0,'M')-77.78)<0.5, _cg(60,70,1.0,'M')));
+test('CG: mujer aplica factor 0.85', () => assert.ok(Math.abs(_cg(60,70,1.0,'F')-66.1)<0.5, _cg(60,70,1.0,'F')));
+test('CG: sin peso → null', () => assert.equal(_cg(60,0,1.0,'M'), null));
+test('CG: Cr inválida → null', () => assert.equal(_cg(60,70,0,'M'), null));
+test('IAAS: días libres de antibiótico + % exposición', () => {
+  assert.match(_idx, /Días libres de antibiótico/);
+  assert.match(_idx, /% días con exposición antibiótica/);
+});

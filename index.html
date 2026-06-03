@@ -8527,6 +8527,14 @@ function _updateICBadge(){
   if(solB){solB.textContent=solPend||'';solB.style.display=solPend>0?'inline':'none';}
 }
 
+// Cockcroft-Gault (Fase 4.8) — aclaramiento de creatinina (mL/min) para ajuste de dosis ATB.
+// CrCl = ((140 − edad) × peso × (0.85 si mujer)) / (72 × Cr). Devuelve null si faltan datos.
+window.cockcroftGault=function(edad, peso, creat, sexo){
+  edad=parseFloat(edad)||0; peso=parseFloat(peso)||0; creat=parseFloat(creat)||0;
+  if(!edad||!peso||!creat||creat<=0)return null;
+  const female=(String(sexo||'').toUpperCase()==='F');
+  return ((140-edad)*peso*(female?0.85:1))/(72*creat);
+};
 window.calcTFG=function(){
   const edad=parseFloat(gv('f-edad'))||0;
   const creat=parseFloat(gv('f-creat'))||0;
@@ -8549,7 +8557,11 @@ window.calcTFG=function(){
   else if(tfgR>=30)cat='TFG '+tfgR+' mL/min (G3b mod-sev↓)';
   else if(tfgR>=15)cat='TFG '+tfgR+' mL/min (G4 severa↓)';
   else cat='TFG '+tfgR+' mL/min (G5 falla renal)';
-  const renalEl=document.getElementById('f-renal');if(renalEl)renalEl.value=cat;
+  // Cockcroft-Gault adicional (si hay peso) — útil para ajuste de dosis de aminoglucósidos/vanco.
+  const peso=parseFloat(gv('f-peso'))||0;
+  const cg=window.cockcroftGault(edad,peso,creat,sexo);
+  const cgTxt=(cg!=null)?(' · CG '+Math.round(cg)+' mL/min'):'';
+  const renalEl=document.getElementById('f-renal');if(renalEl)renalEl.value=cat+cgTxt;
 };
 
 // ── Inferir fenotipo automáticamente ──
@@ -21717,7 +21729,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v289'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v290'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
@@ -23497,6 +23509,8 @@ async function _buildGoogleSheet(token,pacs,mode){
     ['DOT — días de terapia (cada agente cuenta)',_dotTotN,'','',''],
     ['Razón DOT/LOT (≈ agentes simultáneos; >1.3 sugiere terapia combinada/redundante)',_lotTot>0?+(_dotTotN/_lotTot).toFixed(2):0,'','',''],
     ['DOT/1000 días-paciente (NHSN-AUR)',window.dotPer1000(pacs,hasta).por1000,'','',''],
+    ['Días libres de antibiótico (días-paciente − LOT)',Math.max(0,_diasPacIAAS-_lotTot),'','',''],
+    ['% días con exposición antibiótica',_diasPacIAAS>0?+(_lotTot/_diasPacIAAS*100).toFixed(1):0,'','',''],
     ['','','','',''],
     ['MÉTODO','Numeradores CLABSI/CAUTI INFERIDOS (dispositivo presente + dx/bacteriemia compatible) — etiquetados "inferido". Denominador = días-dispositivo reales (inserción→retiro/corte). Tasa por 1000 días-dispositivo con IC95% Poisson (Byar). VAP no calculable: falta capturar ventilador.','','','']
   ];

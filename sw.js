@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v290 (FASE 4.3+4.8: Cockcroft-Gault + días libres de ATB)
+//  · Cockcroft-Gault (window.cockcroftGault): aclaramiento de creatinina para ajuste de dosis,
+//    mostrado JUNTO a la TFG (CKD-EPI 2021) en el formulario cuando hay peso. Verificado vs
+//    cálculo manual (60a/70kg/Cr1.0: 77.8 mL/min hombre, 66.1 mujer).
+//  · Hoja "Tasas IAAS": + Días libres de antibiótico (días-paciente − LOT) y % días con
+//    exposición antibiótica.
+//  · Verificado ya correcto: la columna esr (VSG) del dataset SPSS SÍ se llena (labFirst vsg).
+//  148 pruebas en verde + node --check.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v289 (FASE 4: tasas de IAAS por densidad + LOT/DOT)
 //  NUEVA HOJA "📉 Tasas IAAS (densidad)" — la métrica que pide NOM-045/NHSN y que faltaba:
 //    · CLABSI /1000 días-catéter-central · CAUTI /1000 días-sonda — con IC95% Poisson (Byar).
@@ -226,7 +235,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v289';
+const CACHE = 'stewardmx-v290';
 const SHELL = [
   '/',
   '/index.html',
