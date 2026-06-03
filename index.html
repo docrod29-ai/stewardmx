@@ -21717,7 +21717,29 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v287'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v288'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+// Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
+// Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
+function _chartToPNG(config, w, h){
+  if(typeof Chart==='undefined'||typeof document==='undefined')return null;
+  w=w||520; h=h||320; const scale=2;
+  const canvas=document.createElement('canvas');
+  canvas.width=w*scale; canvas.height=h*scale;
+  canvas.style.cssText='position:fixed;left:-99999px;top:0;width:'+w+'px;height:'+h+'px;';
+  document.body.appendChild(canvas);
+  let png=null,ch=null;
+  try{
+    const whiteBg={id:'whiteBg',beforeDraw:c=>{const x=c.ctx;x.save();x.globalCompositeOperation='destination-over';x.fillStyle='#ffffff';x.fillRect(0,0,c.width,c.height);x.restore();}};
+    const cfg=Object.assign({},config);
+    cfg.options=Object.assign({responsive:false,animation:false,devicePixelRatio:scale},config.options||{});
+    cfg.plugins=[whiteBg].concat(config.plugins||[]);
+    ch=new Chart(canvas,cfg);
+    png=canvas.toDataURL('image/png');
+  }catch(e){console.warn('[chartPNG]',e);}
+  try{if(ch)ch.destroy();}catch(_){}
+  canvas.remove();
+  return png?png.split(',')[1]:null;
+}
 async function _buildExcelJSWorkbook(opts){
   const {sheetDefs, writeData, nameMap, origTitles, ctx={}} = opts;
   const wb = new ExcelJS.Workbook();
@@ -21827,6 +21849,18 @@ async function _buildExcelJSWorkbook(opts){
     const retCell=ws.getCell(1,nCols+1); retCell.value={text:'↩ Portada',hyperlink:"#'Portada'!A1"}; retCell.font={color:{argb:'FF1D4ED8'},underline:true,size:9}; ws.getColumn(nCols+1).width=11;
     ws.getRow(hdrExcel).height=(hdrRowIdx===1)?20:22;
   });
+  // ── Gráficas embebidas (PNG de Chart.js, ancladas junto a su tabla) ──
+  if(Array.isArray(opts.charts)&&opts.charts.length){
+    opts.charts.forEach(c=>{
+      if(!c||!c.base64)return;
+      const ws=wb.getWorksheet(c.sheet);
+      if(!ws)return;
+      try{
+        const imgId=wb.addImage({base64:c.base64, extension:'png'});
+        ws.addImage(imgId,{tl:{col:(c.col!=null?c.col:5), row:(c.row!=null?c.row:1)}, ext:{width:c.w||480, height:c.h||300}});
+      }catch(e){console.warn('[embed chart]',e);}
+    });
+  }
   return wb;
 }
 // Wrapper de descarga (navegador): construye el workbook y lo descarga como .xlsx.
@@ -23496,9 +23530,29 @@ async function _buildGoogleSheet(token,pacs,mode){
     if(typeof ExcelJS!=='undefined' && window._renderXLSXWithExcelJS){
       try{
         const _fnE='StewardMX_'+((HInfo.nombre||HOSP||'reporte')).replace(/[^a-zA-Z0-9]/g,'_')+'_'+(desde===hasta?desde:desde+'_a_'+hasta)+'.xlsx';
+        // ── v288 Gráficas embebidas (Chart.js → PNG). Si Chart no está, _charts queda vacío. ──
+        let _charts=[];
+        if(typeof Chart!=='undefined'){
+          try{
+            const _mkChart=(type,labels,data,title,colors)=>_chartToPNG({
+              type, data:{labels, datasets:[{label:title||'', data, backgroundColor:colors||['#0E7C66','#3D9BFF','#F5A623','#E5484D','#A78BFA','#34A853','#6B7280'], borderWidth:0}]},
+              options:{plugins:{legend:{display:type!=='bar'},title:{display:!!title,text:title||''}}, scales:type==='bar'?{y:{beginAtZero:true}}:{}}
+            }, type==='bar'?520:360, type==='bar'?320:260);
+            const _b1=_mkChart('doughnut',['Access','Watch','Reserve'],[awareC.Access,awareC.Watch,awareC.Reserve],'Distribución AWaRe',['#34A853','#F5A623','#E5484D']);
+            if(_b1)_charts.push({sheet:_nameMap['\u{1F4CA} Dashboard KPIs']||'Dashboard KPIs',col:5,row:6,w:360,h:260,base64:_b1});
+            const _b2=_mkChart('doughnut',['Libre','Vigilado','Restringido'],[polC.Libre,polC.Vigilado,polC.Restringido],'Política de antibióticos',['#34A853','#F5A623','#E5484D']);
+            if(_b2)_charts.push({sheet:_nameMap['\u{1F4CA} Dashboard KPIs']||'Dashboard KPIs',col:5,row:22,w:360,h:260,base64:_b2});
+            const _atbTop=atbRows.slice(1,11);
+            const _b3=_mkChart('bar',_atbTop.map(r=>r[0]),_atbTop.map(r=>r[1]),'DOT por antibiótico (top 10)',['#0E7C66']);
+            if(_b3)_charts.push({sheet:_nameMap['\u{1F48A} ATB por DOT']||'ATB por DOT',col:5,row:1,w:520,h:320,base64:_b3});
+            const _orgTop=microRows.slice(1,11);
+            const _b4=_mkChart('bar',_orgTop.map(r=>r[0]),_orgTop.map(r=>r[1]),'Microorganismos (top 10)',['#3D9BFF']);
+            if(_b4)_charts.push({sheet:_nameMap['\u{1F9EB} Microorganismos']||'Microorganismos',col:6,row:1,w:520,h:320,base64:_b4});
+          }catch(_chErr){console.warn('[charts]',_chErr);_charts=[];}
+        }
         window._xlsxEngine='ExcelJS';
         await window._renderXLSXWithExcelJS({
-          sheetDefs, writeData, nameMap:_nameMap, origTitles:_origTitles,
+          sheetDefs, writeData, nameMap:_nameMap, origTitles:_origTitles, charts:_charts,
           ctx:{hospNombre:(HInfo.nombre||HOSP||''), desde, hasta, userName:(window._userName||U?.email||''), appVer:(window._APP_VER||'')},
           fname:_fnE
         });

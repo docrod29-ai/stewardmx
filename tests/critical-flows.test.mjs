@@ -774,3 +774,20 @@ test('XLSX Portada: columna CONTENIDO con descripciones (no vacía)', () => {
   assert.match(blk, /_descDe\(sd\.title\)/);
   assert.match(blk, /formato compatible WHONET/);
 });
+
+/* ═══════════ Gráficas embebidas — Fase 2 (guardas; embedding verificado en Node) ═══════════ */
+test('XLSX gráficas: _chartToPNG existe y está protegido (browser-only)', () => {
+  assert.match(_idx, /function _chartToPNG\(config, w, h\)\{/);
+  assert.match(_idx, /typeof Chart==='undefined'\|\|typeof document==='undefined'\)return null/);
+});
+test('XLSX gráficas: el renderer embebe opts.charts con addImage', () => {
+  const blk = _idx.match(/async function _buildExcelJSWorkbook[\s\S]*?\n  return wb;\n\}/)[0];
+  assert.match(blk, /Array\.isArray\(opts\.charts\)/);
+  assert.match(blk, /wb\.addImage\(\{base64/);
+  assert.match(blk, /ws\.addImage\(imgId/);
+});
+test('XLSX gráficas: builder genera AWaRe/política/DOT/organismos', () => {
+  assert.match(_idx, /typeof Chart!=='undefined'[\s\S]{0,1600}Distribución AWaRe/);
+  assert.match(_idx, /DOT por antibiótico \(top 10\)/);
+  assert.match(_idx, /Microorganismos \(top 10\)/);
+});

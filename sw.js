@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v288 (FASE 2: gráficas embebidas en el .xlsx)
+//  Las gráficas se renderizan con Chart.js a un <canvas> oculto de alta resolución (2×),
+//  se exportan a PNG y se incrustan con ExcelJS.addImage ancladas junto a su tabla:
+//    · Dashboard: dona AWaRe + dona Política de antibióticos.
+//    · ATB por DOT: barras DOT por antibiótico (top 10).
+//    · Microorganismos: barras (top 10).
+//  _chartToPNG es browser-only (si Chart/document no existen → null, el Excel sale sin imagen,
+//  sin romperse). El EMBEDDING (addImage→media+drawing XML) se verificó en Node: 2 imágenes,
+//  2 drawings (una por hoja), datos intactos. 139 pruebas en verde.
+//  Nota honesta: el render Chart.js→PNG solo corre en navegador; confírmalo al abrir en Excel.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v287 (FASE 3: hojas listas para análisis + CONTENIDO Portada)
 //  4 HOJAS NUEVAS en el .xlsx, calculadas de datos reales y con todo el estilo ExcelJS:
 //    · 🧫 WHONET — 1 fila por aislamiento (dedup CLSI M39) con códigos de organismo/espécimen
@@ -204,7 +215,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v287';
+const CACHE = 'stewardmx-v288';
 const SHELL = [
   '/',
   '/index.html',
