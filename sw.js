@@ -1,4 +1,49 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v284 (FASE 0 COMPLETA: F0.2 denominadores + F0.3 Magiorakos)
+//  · F0.2 DENOMINADORES REALES: días-paciente = Σ(egreso|corte − ingreso) por paciente
+//    (calcDiasPaciente/calcDiasEstancia). DOT NHSN correcto (calcDOT: cada agente cuenta) y
+//    DOT/1000 días-paciente (dotPer1000, estándar CDC/NHSN-AUR). Añadidos al Dashboard, a la
+//    hoja "Servicios" (DOT/1000 por servicio) y a Metadatos (metodología). Se conserva el
+//    DOT/100 camas-día como proxy legacy (no se borra). DDD/100 días-cama (ESAC) sin cambios.
+//  · F0.3 MAGIORAKOS: _intrinsicResistanceKeys (EUCAST) EXCLUYE resistencia intrínseca del
+//    cálculo MDR/XDR/PDR (Klebsiella + solo ampicilina ya NO sale "MDR"). 'I' = no-susceptible
+//    per definición publicada Magiorakos (separado del %R del reporte). isMDR() UNIFICADO:
+//    usa clasificarMagiorakos cuando hay antibiograma, con respaldo de marcadores fenotípicos.
+//  Verificación: 126 pruebas (Fisher vs R, MIC50/90, días-paciente, Magiorakos intrínsecos) verde.
+// ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v283 (FASE 0: credibilidad científica del .xlsx PROA)
+//  Misión "mejor base de datos PROA/AMS": primero corregir bugs que minan la credibilidad.
+//  · DDD WHO ATC/DDD (auditado vs atcddd.fhi.no): Meropenem J01DH02 2→3 g; Colistina
+//    J01XB01 0.006→0.24 g (WHO=3 MU ≈ 240 mg CMS, conversión documentada). Resto verificado
+//    correcto (cefepime 4g, ampicilina 2g, pip/tazo 14g). Cefotaxima J01DC07→J01DD01 flagged
+//    (no se cambia la clave para no orfanar datos históricos; el DDD 4g sí es correcto).
+//  · Test EXACTO de Fisher 2×2 (fisherExact2x2) + selección automática (testAuto2x2): para
+//    n<30 o esperado<5 ahora hay p-value exacto, no solo χ² aproximado. Verificado vs R.
+//  · Antibiograma hospitalario: %S/%I/%R COMPLETO (antes solo %S) + MIC50/MIC90 (micStats,
+//    parser de CMI) + regla CLSI M39 (≥30 Reportable / 10-29 Cautela / <10 No reportable).
+//  Verificación: 109 pruebas (Fisher vs R, MIC50/90, blindaje) en verde + node --check.
+//  PENDIENTE (staged, honesto): F0.2 días-paciente reales, F0.3 Magiorakos intrínsecos,
+//    y Fases 1-5 (migración ExcelJS: dropdowns, formato condicional, gráficas, WHONET/GLASS).
+// ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v282 (onboarding del equipo: alta con código limpia)
+//  · Se quitó el toast de depuración "Código no encontrado en BD" que aparecía durante
+//    el alta aunque el código fuera válido (confundía al equipo nuevo).
+//  · Si el código tecleado es inválido, ahora aparece un aviso claro en rojo con el código
+//    y la indicación de pedir el correcto al administrador (antes quedaba en pantalla muda).
+//  Flujo de alta confirmado: Admin genera código por rol (panel) → lo comparte → el médico
+//    crea su cuenta (Paso 3 pide 🔑 código) → entra AUTO-APROBADO a su hospital con su rol.
+// ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v281 (BLINDAJE ANTI-BORRADO de datos clínicos)
+//  MOTIVO (Dr. Rodríguez — caso San Luis): "no puede estárseles borrando" la info.
+//  v279 ya tapó el borrado de CULTIVOS (re-lectura de prev + salvaguarda de muestras).
+//  v281 GENERALIZA ese blindaje a TODO dato clínico acumulativo con _blindarCamposClinicos():
+//    atbList, muestras, comorbilidades, charlsonItems(+score), atbPrevios, abg, abgFoto.
+//  REGLA: si el formulario llega SIN un campo (vacío/{}) pero el paciente YA tenía datos,
+//    se CONSERVAN los previos en vez de borrarlos, y se AVISA al médico con un toast 🛡
+//    (preservación transparente, nunca silenciosa). Campos escalares editables (notas,
+//    alergias, dx) NUNCA se tocan. updateDoc reemplaza arrays completos → este era el hueco.
+//  Verificación: node --check del módulo + 91 pruebas (13 nuevas del blindaje) en verde.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v267 (auto-actualización fiable + mantenimiento masivo)
 //  · FIX buscadores muertos: renderTabla/renderMicro/renderGuias/cargarApp/syncAtbField/
 //    _clinicaFiltrar no estaban en window → ReferenceError desde onclick/oninput. Bridge añadido.
@@ -119,7 +164,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v275';
+const CACHE = 'stewardmx-v284';
 const SHELL = [
   '/',
   '/index.html',

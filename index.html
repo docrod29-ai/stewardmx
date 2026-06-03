@@ -36,6 +36,57 @@
 <!-- Scripts CDN diferidos para no bloquear el primer paint -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+<!-- v277 ANTI-SOPORTE: watchdog de auto-recuperación. Script CLÁSICO (no módulo) que corre
+     ANTES del módulo. Si la app no marca "lista" en 14s (módulo no cargó / SW roto / caché viejo),
+     muestra una pantalla amigable de 1 clic que limpia SW+caché y recarga. Mata la llamada "no abre". -->
+<script>
+(function(){
+  // Recuperación: desregistra service workers, borra cachés y recarga limpio.
+  window._stewardRecover=function(btn){
+    try{if(btn){btn.textContent='Limpiando…';btn.disabled=true;}}catch(_){}
+    var done=function(){ try{location.reload(true);}catch(_){location.reload();} };
+    try{
+      var ps=[];
+      if('serviceWorker' in navigator){
+        ps.push(navigator.serviceWorker.getRegistrations().then(function(rs){
+          return Promise.all(rs.map(function(r){return r.unregister();}));
+        }).catch(function(){}));
+      }
+      if(window.caches&&caches.keys){
+        ps.push(caches.keys().then(function(ks){
+          return Promise.all(ks.map(function(k){return caches.delete(k);}));
+        }).catch(function(){}));
+      }
+      Promise.all(ps).then(done).catch(done);
+      setTimeout(done,3500); // por si algo se cuelga, recarga igual
+    }catch(_){ done(); }
+  };
+  // Construye (oculta) la pantalla de recuperación.
+  function _mkRecoverUI(){
+    if(document.getElementById('steward-recover'))return;
+    var d=document.createElement('div');
+    d.id='steward-recover';
+    d.setAttribute('style','display:none;position:fixed;inset:0;z-index:2147483647;background:#07111f;color:#e8eef5;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;align-items:center;justify-content:center;padding:24px;text-align:center;');
+    d.innerHTML='<div style="max-width:380px;">'
+      +'<div style="font-size:46px;margin-bottom:10px;">🔄</div>'
+      +'<div style="font-size:19px;font-weight:800;margin-bottom:8px;">La app tardó en abrir</div>'
+      +'<div style="font-size:13px;color:#94abbe;line-height:1.6;margin-bottom:20px;">Suele ser una versión vieja guardada en el navegador. Toca el botón para cargar la versión más reciente — no perderás datos (todo se guarda en la nube).</div>'
+      +'<button onclick="window._stewardRecover(this)" style="background:#00d4a8;color:#04110b;border:none;border-radius:10px;padding:13px 22px;font-size:15px;font-weight:800;cursor:pointer;width:100%;">Recargar la app</button>'
+      +'<div style="font-size:11px;color:#4a637a;margin-top:14px;">Si el problema sigue tras recargar 2 veces, revisa tu conexión a internet.</div>'
+      +'</div>';
+    (document.body||document.documentElement).appendChild(d);
+  }
+  // Watchdog: si _appReady no se marca en 14s, mostrar recuperación.
+  window._appReady=false;
+  function _check(){
+    if(window._appReady)return;
+    try{_mkRecoverUI();var el=document.getElementById('steward-recover');if(el)el.style.display='flex';}catch(_){}
+  }
+  // arrancar el temporizador cuando el DOM exista
+  if(document.addEventListener)document.addEventListener('DOMContentLoaded',function(){ _mkRecoverUI(); });
+  setTimeout(_check,14000);
+})();
+</script>
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import{getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged,createUserWithEmailAndPassword,updateProfile,sendPasswordResetEmail,sendEmailVerification}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
@@ -957,6 +1008,32 @@ function _organismToSpeciesKey(org){
   return null;
 }
 
+// ── Resistencia INTRÍNSECA (EUCAST Expert Rules — tabla de resistencia intrínseca) ──────
+// Devuelve un Set de claves de ATB a las que el organismo es INTRÍNSECAMENTE resistente.
+// La resistencia intrínseca NO es resistencia adquirida → se EXCLUYE del cálculo Magiorakos,
+// de lo contrario se sobre-clasifica (p.ej. Klebsiella saldría "MDR" solo por ampicilina).
+function _intrinsicResistanceKeys(org){
+  const s=(org||'').toLowerCase(); const R=new Set();
+  const add=(...k)=>k.forEach(x=>R.add(x));
+  // Klebsiella / Raoultella: ampicilina intrínseca
+  if(/klebsiella|raoultella/.test(s))add('amp');
+  // AmpC cromosómica desreprimible: amino-penicilinas (± BLI), cefalosporina 1G y cefamicina
+  if(/enterobacter|klebsiella aerogenes|k\. aerogenes|citrobacter freundii|hafnia|serratia|providencia|morganella/.test(s))
+    add('amp','amcl','amsul','cefa','fox');
+  // Serratia, Proteus, Morganella, Providencia: colistina/polimixina intrínseca
+  if(/serratia|proteus|morganella|providencia/.test(s))add('col','polymyxin_b');
+  // Proteae (Proteus, Morganella, Providencia): tigeciclina y tetraciclinas intrínsecas
+  if(/proteus|morganella|providencia/.test(s))add('tig','tetracycline','doxy');
+  if(/citrobacter koseri/.test(s))add('amp');
+  // Enterococcus: clindamicina (y TMP-SMX in vivo) intrínsecas; E. faecalis → quinupristina-dalfopristina
+  if(/enterococ|faecium|faecalis/.test(s))add('cli','sxt','tmp');
+  if(/faecalis/.test(s))add('quinupristin-dalfopristin','qda');
+  // Stenotrophomonas maltophilia: carbapenémicos intrínsecos
+  if(/stenotrophomonas|maltophilia/.test(s))add('imi','mer','ert','doripenem');
+  return R;
+}
+window._intrinsicResistanceKeys=_intrinsicResistanceKeys;
+
 // ── Algoritmo Magiorakos 2012 — Clasifica como S/MDR/posXDR/XDR/posPDR ────
 // abg: object { keyABX: 'S'|'I'|'R' }
 // devuelve: { mdr, posXDR, xdr, posPDR, pdr, nonSuscCategoriesCount, totalCategories, panelComplete }
@@ -966,17 +1043,24 @@ function clasificarMagiorakos(abg,organismo){
     return {classification:'Indeterminado',mdr:false,posXDR:false,xdr:false,posPDR:false,pdr:false,categories:{},summary:'Sin datos suficientes'};
   }
   const cats=CLSI_CATEGORIES[speciesKey];
+  // Fase 0.3 — EXCLUIR resistencia intrínseca: un ATB al que el organismo es intrínsecamente
+  // resistente NO se considera resistencia adquirida (Magiorakos/EUCAST) → se ignora.
+  const intrinsic=_intrinsicResistanceKeys(organismo);
   const results={};
   let totalCats=Object.keys(cats).length;
   let nonSuscCats=0;
   let categoriesWithData=0;
   Object.entries(cats).forEach(([catName,drugKeys])=>{
-    // ¿Hay datos para alguno de los ATB de esta categoría?
+    // ¿Hay datos para alguno de los ATB de esta categoría (excluyendo los intrínsecos)?
     let tested=false;
     let nonSuscInCat=false;
     drugKeys.forEach(d=>{
+      if(intrinsic.has(d))return;            // resistencia intrínseca: no cuenta como adquirida
       if(abg[d]){
         tested=true;
+        // Magiorakos 2012: "no-susceptible" = R o I (definición publicada del algoritmo).
+        // Esto NO es "sumar I a R" en el reporte de %R (ahí van separados, ver Fase 0.4);
+        // es la categorización de no-susceptibilidad para MDR/XDR/PDR.
         if(abg[d]==='R'||abg[d]==='I')nonSuscInCat=true;
       }
     });
@@ -1114,6 +1198,65 @@ function _normCDF(z){
   const v=c*Math.exp(-z*z/2)*(b1*t+b2*t*t+b3*Math.pow(t,3)+b4*Math.pow(t,4)+b5*Math.pow(t,5));
   return z<0?v:1-v;
 }
+
+// ── Fisher's Exact Test (2×2) — p-value EXACTO para tablas pequeñas (Fase 0.5) ──────────
+// Cuando n<30 o alguna celda esperada <5, χ² (incluso con Yates) no es válido; el estándar
+// epidemiológico (CLSI, GLASS, papers de AMR) exige el test exacto de Fisher. Implementado
+// con log-factoriales (sin overflow) y two-tailed por el método de sumar todas las tablas
+// con probabilidad ≤ la observada. Devuelve {p (bilateral), pLeft, pRight, n}.
+function _logFactorial(n){ if(n<2)return 0; let s=0; for(let i=2;i<=n;i++)s+=Math.log(i); return s; }
+function _logHyper2x2(a,b,c,d){
+  const r1=a+b,r2=c+d,c1=a+c,c2=b+d,n=a+b+c+d;
+  return _logFactorial(r1)+_logFactorial(r2)+_logFactorial(c1)+_logFactorial(c2)
+        -_logFactorial(n)-_logFactorial(a)-_logFactorial(b)-_logFactorial(c)-_logFactorial(d);
+}
+function fisherExact2x2(a,b,c,d){
+  a=Math.max(0,Math.round(a));b=Math.max(0,Math.round(b));c=Math.max(0,Math.round(c));d=Math.max(0,Math.round(d));
+  const n=a+b+c+d;
+  if(n===0)return {p:1,pLeft:1,pRight:1,n:0,error:'Total=0'};
+  const r1=a+b,c1=a+c;
+  const pObs=Math.exp(_logHyper2x2(a,b,c,d));
+  const aMin=Math.max(0,r1+c1-n),aMax=Math.min(r1,c1);
+  let pTwo=0,pLeft=0,pRight=0; const EPS=1e-7;
+  for(let x=aMin;x<=aMax;x++){
+    const px=Math.exp(_logHyper2x2(x,r1-x,c1-x,n-r1-c1+x));
+    if(px<=pObs*(1+EPS))pTwo+=px;
+    if(x<=a)pLeft+=px;
+    if(x>=a)pRight+=px;
+  }
+  return {p:Math.min(1,+pTwo.toFixed(6)),pLeft:Math.min(1,+pLeft.toFixed(6)),pRight:Math.min(1,+pRight.toFixed(6)),n};
+}
+window.fisherExact2x2=fisherExact2x2;
+// Selección automática del test correcto para una tabla 2×2 según tamaño (CLSI/epi):
+//   n<30 o alguna celda esperada <5 → Fisher exacto; si no → χ² (Yates si aplica).
+function testAuto2x2(a,b,c,d){
+  const n=a+b+c+d; if(!n)return {test:'—',p:1,n:0};
+  const r1=a+b,r2=c+d,c1=a+c,c2=b+d;
+  const minExp=Math.min(r1*c1,r1*c2,r2*c1,r2*c2)/n;
+  if(n<30||minExp<5){const f=fisherExact2x2(a,b,c,d);return {test:'Fisher exacto',p:f.p,n,minExp:+minExp.toFixed(2)};}
+  const ch=chiSquareTest([[a,b],[c,d]]);return {test:'χ²',p:ch.pValue,n,minExp:+minExp.toFixed(2)};
+}
+window.testAuto2x2=testAuto2x2;
+
+// ── MIC50 / MIC90 (Fase 0.4) — percentiles de CMI por método CLSI M39 ───────────────────
+// parseMICnum: convierte el string de CMI ("16","<=0.12",">=32","0,25","≤4") a número para
+//   ordenar. Censuras: se usa el valor del límite de dilución reportado (<=x→x, >=x→x).
+function parseMICnum(v){
+  if(v==null)return null;
+  let s=String(v).trim().replace(',','.').replace(/≤/g,'<=').replace(/≥/g,'>=');
+  s=s.replace(/[<>]=?/g,'').trim();
+  const n=parseFloat(s);
+  return isFinite(n)?n:null;
+}
+// micStats: MIC50 = menor CMI con % acumulado ≥50; MIC90 = menor con ≥90 (nearest-rank, CLSI).
+function micStats(values){
+  const nums=(values||[]).map(parseMICnum).filter(v=>v!=null).sort((a,b)=>a-b);
+  const n=nums.length;
+  if(!n)return {n:0,mic50:null,mic90:null};
+  const at=q=>nums[Math.max(0,Math.min(n-1,Math.ceil(q*n)-1))];
+  return {n,mic50:at(0.5),mic90:at(0.9)};
+}
+window.parseMICnum=parseMICnum; window.micStats=micStats;
 
 // ── CLSI M39 Deduplication ──────────────────────────────────────────────
 // Mantiene SOLO el primer aislamiento por (paciente + especie + tipo de espécimen + período).
@@ -1314,6 +1457,9 @@ function _show(id,display='flex'){_hideAll();const el=document.getElementById(id
 
 // ── Auth ──
 onAuthStateChanged(auth,async u=>{
+  // v277: el módulo cargó y Firebase respondió → la app "abrió". Cancela el watchdog de
+  // auto-recuperación y oculta la pantalla de recuperación si llegó a mostrarse.
+  try{window._appReady=true;var _rec=document.getElementById('steward-recover');if(_rec)_rec.style.display='none';}catch(_){}
   if(u){
     U=u;
     _resetIdle(); // arma el cierre por inactividad al iniciar sesión
@@ -1371,7 +1517,10 @@ onAuthStateChanged(auth,async u=>{
         else if(window._pendingCodigo){
           const _cod=window._pendingCodigo;window._pendingCodigo=null;
           const _joined=await _unirseConCodigo(u,_cod);
-          if(!_joined){_show('screen-hospital');return;}
+          if(!_joined){
+            toast('⚠ El código "'+_cod+'" no es válido. Pídele a tu administrador el código correcto e ingrésalo aquí.','rd');
+            _show('screen-hospital');return;
+          }
         }else{_show('screen-hospital');return;}
       }
     }else{
@@ -1453,6 +1602,7 @@ async function cargarApp(u,isAdmin){
   // ── RBAC v214 — sistema de roles completo ────────────────────────────────
   window._isAdmin=isAdmin||(userDoc?.status==='admin')||(userDoc?.status==='aprobado'&&(userDoc?.rol==='Líder PROA'||userDoc?.rol==='Infectólogo'));
   const _rol=userDoc?.rol||'Médico PROA';
+  window._rolActual=_rol; // v277: expuesto para el Centro de Ayuda (FAQ por rol)
   window._userRol=_rol;
   // Farmacia
   window._isFarmaceutico    =!window._isAdmin&&(_rol==='Farmacéutico'||_rol==='QFB/QBP'||_rol==='Auxiliar Farmacia');
@@ -1622,6 +1772,7 @@ async function cargarApp(u,isAdmin){
   // que corre ANTES que el módulo diferido → window._vaInit aún no existía → FAB nunca
   // aparecía. Se llama aquí, tras login, donde la función ya está definida y hay sesión.
   try{window._vaInit&&window._vaInit();}catch(e){console.warn('[vaInit]',e);}
+  try{window._mountHelpFab&&window._mountHelpFab();}catch(e){console.warn('[helpFab]',e);} // v277: botón ❓ Ayuda
   // ── FABs por rol v214 ──────────────────────────────────────────────────────
   // Interconsultante: FAB de interconsulta
   // UCI / Urgencias: FAB de registro rápido
@@ -1940,8 +2091,8 @@ async function _unirseConCodigo(u,codigo){
       hospId=rcSnap.data().hospitalId;
       autoRol=rcSnap.data().rol;
     }else{
-      toast('Código no encontrado en BD: '+codigo,'am');
-      // 2. No es código de rol → verificar que el hospital existe
+      // No es un código de rol → quizá es el ID del hospital directo (ej. código de Líder).
+      // (Sin toast de depuración: confundía al equipo durante el alta aunque el código fuera válido.)
       let hospOk=false;
       try{const rs=await getDoc(doc(db,'hospitals_registry',hospId));if(rs.exists()){hospOk=true;hospNombre=rs.data().nombre||hospId;}}catch(_){}
       if(!hospOk){
@@ -2212,6 +2363,10 @@ window.cargarPlataforma=async()=>{
               <button onclick="toggleVoiceEnabled('${h.id}',${!h.voice_enabled})" style="background:${h.voice_enabled?'rgba(0,212,168,.15)':'rgba(255,255,255,.05)'};border:1px solid ${h.voice_enabled?'rgba(0,212,168,.4)':'var(--brd2)'};color:${h.voice_enabled?'var(--teal)':'var(--t3)'};border-radius:5px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600;">${h.voice_enabled?'✅ Activada':'🔇 Desactivada'}</button>
               ${h.voice_enabled?`<select onchange="setVoiceCap('${h.id}',this.value)" title="Cap mensual de minutos Whisper" style="background:var(--s1);border:1px solid var(--brd2);color:var(--t2);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;">${[100,300,600,1200,-1].map(v=>`<option value="${v}"${((h.voice_cap_min||300)===v||(v===-1&&h.voice_cap_min===-1))?' selected':''}>${v===-1?'♾ Sin límite':v+' min/mes'}</option>`).join('')}</select>`:''}
             </div>
+            <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <span style="font-size:10px;color:var(--t3);white-space:nowrap;flex-shrink:0;">🧠 IA clínica:</span>
+              <select onchange="setAICap('${h.id}',this.value)" title="Tope mensual de consultas de IA (controla el costo del plan)" style="background:var(--s1);border:1px solid var(--brd2);color:var(--t2);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;">${[500,1500,3000,6000,-1].map(v=>`<option value="${v}"${(((typeof h.ai_cap_month==='number'?h.ai_cap_month:1500)===v)||(v===-1&&h.ai_cap_month===-1))?' selected':''}>${v===-1?'♾ Sin límite':v+' consultas/mes'}</option>`).join('')}</select>
+            </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;">
             ${btonesHTML}
@@ -2251,6 +2406,15 @@ window.setVoiceCap=async(hospId,val)=>{
   try{
     await setDoc(doc(db,'hospitals_registry',hospId),{voice_cap_min:cap},{merge:true});
     toast('Cap de voz actualizado: '+(cap===-1?'sin límite':cap+' min/mes')+' ✓');
+  }catch(e){toast('Error: '+e.message,'rd');}
+};
+// v276: tope mensual de IA por hospital (control de costo / plan comercial). Lo lee anthropicProxy.
+window.setAICap=async(hospId,val)=>{
+  if(!requireManagerAccess())return;
+  const cap=parseInt(val);
+  try{
+    await setDoc(doc(db,'hospitals_registry',hospId),{ai_cap_month:cap},{merge:true});
+    toast('Tope de IA actualizado: '+(cap===-1?'sin límite':cap+' consultas/mes')+' ✓');
   }catch(e){toast('Error: '+e.message,'rd');}
 };
 window.guardarNota=async(hospId)=>{
@@ -3516,27 +3680,28 @@ window._confirmarAprobacionDemo=async(id,nombreContacto,contacto)=>{
     });
     // 5. Cerrar modal de confirmación
     document.getElementById('_aprov-modal')?.remove();
-    // 6. Abrir WhatsApp si hay número, sino mostrar código
+    // 6. SIEMPRE mostrar el código en un modal (nunca depender solo de WhatsApp).
+    //    v277 FIX: antes se hacía window.open(wa.me) tras varios await → el navegador lo BLOQUEABA
+    //    (popup blocker rompe el gesto, error #5 CLAUDE.md) y el código nunca aparecía. Ahora el
+    //    código SIEMPRE se muestra, y el botón de WhatsApp lo abre con un CLIC real (sin bloqueo).
     const tel=(contacto||'').replace(/\D/g,'');
-    if(/^\d{10}$/.test(tel)){
-      const msg=encodeURIComponent(`Hola ${nombreContacto} 👋, soy el Dr. Rodríguez del equipo StewardMX.\n\nSu hospital *${hospNombre}* ya está listo en la plataforma. Para acceder:\n\n1️⃣ Abra: stewardmx-1.web.app\n2️⃣ Clic en "Crear cuenta"\n3️⃣ Use este código de acceso: *${liderCode}*\n\nCon ese código quedará registrado automáticamente como Líder PROA y administrador. Cualquier duda, con gusto le ayudo.`);
-      window.open(`https://wa.me/52${tel}?text=${msg}`,'_blank');
-    } else {
-      // Mostrar modal con el código para copiar manualmente
-      const m=document.createElement('div');
-      m.style.cssText='position:fixed;inset:0;background:rgba(4,11,18,.92);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;box-sizing:border-box;';
-      m.innerHTML=`<div style="background:var(--s1);border:1px solid rgba(0,212,168,.3);border-radius:16px;padding:28px 24px;width:100%;max-width:380px;text-align:center;">
-        <div style="font-size:36px;margin-bottom:12px;">✅</div>
-        <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:6px;">Hospital creado</div>
-        <div style="font-size:12px;color:var(--t3);margin-bottom:16px;">Comparte este código con <b>${escHtml(nombreContacto)}</b>:</div>
-        <div style="background:var(--s2);border:2px solid rgba(0,212,168,.5);border-radius:10px;padding:14px;font-family:var(--mono);font-size:18px;font-weight:700;color:var(--teal);letter-spacing:3px;cursor:pointer;margin-bottom:8px;" onclick="navigator.clipboard.writeText('${liderCode}').then(()=>this.style.background='rgba(0,212,168,.15)')">${liderCode}</div>
-        <div style="font-size:10px;color:var(--t3);margin-bottom:18px;">Clic en el código para copiar</div>
-        <button onclick="navigator.clipboard.writeText('${liderCode}').then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='📋 Copiar código',2000);})" style="width:100%;padding:11px;background:rgba(0,212,168,.12);border:1px solid var(--teal);color:var(--teal);border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:8px;">📋 Copiar código</button>
-        <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;padding:10px;background:var(--s2);border:1px solid var(--brd2);color:var(--t3);border-radius:8px;cursor:pointer;font-size:12px;">Cerrar</button>
-      </div>`;
-      document.body.appendChild(m);
-      m.addEventListener('click',e=>{if(e.target===m)m.remove();});
-    }
+    const tieneTel=/^\d{10}$/.test(tel);
+    const _waMsg=encodeURIComponent(`Hola ${nombreContacto} 👋, soy el Dr. Rodríguez del equipo StewardMX.\n\nSu hospital *${hospNombre}* ya está listo en la plataforma. Para acceder:\n\n1️⃣ Abra: stewardmx-1.web.app\n2️⃣ Clic en "Crear cuenta"\n3️⃣ Use este código de acceso: *${liderCode}*\n\nCon ese código quedará registrado automáticamente como Líder PROA y administrador. Cualquier duda, con gusto le ayudo.`);
+    const _waUrl=`https://wa.me/52${tel}?text=${_waMsg}`;
+    const m=document.createElement('div');
+    m.style.cssText='position:fixed;inset:0;background:rgba(4,11,18,.92);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;box-sizing:border-box;';
+    m.innerHTML=`<div style="background:var(--s1);border:1px solid rgba(0,212,168,.3);border-radius:16px;padding:28px 24px;width:100%;max-width:400px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:12px;">✅</div>
+      <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:6px;">Hospital creado</div>
+      <div style="font-size:12px;color:var(--t3);margin-bottom:16px;">Código de acceso para <b>${escHtml(nombreContacto)}</b> (Líder PROA):</div>
+      <div style="background:var(--s2);border:2px solid rgba(0,212,168,.5);border-radius:10px;padding:14px;font-family:var(--mono);font-size:18px;font-weight:700;color:var(--teal);letter-spacing:3px;cursor:pointer;margin-bottom:8px;word-break:break-all;" onclick="navigator.clipboard.writeText('${liderCode}').then(()=>this.style.background='rgba(0,212,168,.15)')">${liderCode}</div>
+      <div style="font-size:10px;color:var(--t3);margin-bottom:18px;">Clic en el código para copiar</div>
+      ${tieneTel?`<a href="${_waUrl}" target="_blank" rel="noopener noreferrer" style="display:block;width:100%;box-sizing:border-box;padding:12px;background:rgba(37,211,102,.15);border:1px solid #25D366;color:#25D366;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:8px;text-decoration:none;">📲 Enviar por WhatsApp a +52 ${tel}</a>`:`<div style="font-size:11px;color:var(--amber);margin-bottom:8px;">⚠ Sin número de WhatsApp válido — copia el código y compártelo manualmente.</div>`}
+      <button onclick="navigator.clipboard.writeText('${liderCode}').then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='📋 Copiar código',2000);})" style="width:100%;padding:11px;background:rgba(0,212,168,.12);border:1px solid var(--teal);color:var(--teal);border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;margin-bottom:8px;">📋 Copiar código</button>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;padding:10px;background:var(--s2);border:1px solid var(--brd2);color:var(--t3);border-radius:8px;cursor:pointer;font-size:12px;">Cerrar</button>
+    </div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click',e=>{if(e.target===m)m.remove();});
     toast('✓ Hospital '+hospNombre+' creado');
     window._cargarSolicitudesDemo();
   }catch(e){
@@ -4214,7 +4379,19 @@ window.guardar=async()=>{
   document.querySelectorAll('.mec-item input[type=checkbox]:checked').forEach(el=>{
     mecsList.push(el.id.replace('mec-',''));
   });
-  const prev=editId?PACS.find(p=>p.id===editId):null;
+  let prev=editId?PACS.find(p=>p.id===editId):null;
+  // v279 FIX PÉRDIDA DE DATOS: si editamos pero el paciente NO está en PACS (memoria) —porque
+  // cambió el mes, recargó la app, o un deploy refrescó a media edición— leerlo de Firestore.
+  // SIN esto, prev=null vaciaba p.muestras y BORRABA los cultivos al guardar (caso San Luis).
+  if(editId&&!prev){
+    try{
+      let _fresh=await getDoc(doc(db,..._pacPath(),editId));
+      if(!_fresh.exists())_fresh=await getDoc(doc(db,'hospitals',HOSP,'patients',editId));
+      if(_fresh.exists())prev={id:editId,..._fresh.data()};
+    }catch(_pf){console.warn('[guardar] no se pudo releer paciente:',_pf);}
+    // Salvaguarda dura: si aún no hay datos previos, NO continuar con la edición a ciegas.
+    if(!prev){toast('⚠ No se pudo leer el paciente para editar (revisa tu conexión). No se guardó para no borrar datos.','rd');window._guardarBusy=false;return;}
+  }
   // Historial de movimientos de cama
   const _newSvc=gv('f-svc')||'';const _newCama=gv('f-cama')||'';
   const _prevSvc=prev?.servicio||'';const _prevCama=prev?.cama||'';
@@ -4234,6 +4411,11 @@ window.guardar=async()=>{
     _proaNuevas=(typeof _getVisitaProaMuestras==='function')?_getVisitaProaMuestras():[];
     const _muestrasBase=Array.isArray(prev?.muestras)?prev.muestras.filter(m=>m._fuente!=='proa'):[];
     _muestrasMerged=[..._muestrasBase,..._proaNuevas];
+    // v279 salvaguarda anti-borrado: si el merge quedó vacío PERO el paciente YA tenía muestras
+    // guardadas, conservar las originales (nunca sobrescribir cultivos con un array vacío).
+    if(_muestrasMerged.length===0&&Array.isArray(prev?.muestras)&&prev.muestras.length>0){
+      _muestrasMerged=prev.muestras;
+    }
     const _firstVisitM=(_visitaMicIds.length>0?_muestrasBase.find(m=>_visitaMicIds.includes(m.id)):null)||_proaNuevas[0]||_muestrasBase[0]||null;
     _cultVal=_firstVisitM?'sí':'no';
     _cultFechaVal=_firstVisitM?.fecha||'';
@@ -4302,6 +4484,15 @@ window.guardar=async()=>{
     urgenciasSofa:parseInt(gv('f-urgencias-sofa')||'0')||(window._sofaGateScore||0),
     ts:serverTimestamp(),updatedBy:U.email,updatedAt:new Date().toISOString()
   };
+  // v281 BLINDAJE: nunca dejar que un formulario vacío borre datos clínicos previos.
+  // Corre SIEMPRE antes de escribir (los GATEs de abajo solo abortan, no guardan).
+  if(editId&&prev){
+    const _conservados=window._blindarCamposClinicos(data, prev);
+    if(_conservados.length){
+      console.warn('[guardar] BLINDAJE conservó datos clínicos que el formulario traía vacíos:',_conservados);
+      toast('🛡 Conservé '+_conservados.join(', ')+' del registro previo (el formulario llegó sin ellos). Si querías eliminarlos, hazlo elemento por elemento.','am');
+    }
+  }
   // ── GATE: Reserve AWaRe → justificación obligatoria ──
   // FIX v201 MAESTRO (Samuel Jimenez bug report):
   // El GATE de justificación SOLO se aplica para ATBs Reserve que son REALMENTE NUEVOS
@@ -4648,6 +4839,55 @@ function calcDiaATB(a, hoy){
   const dias=Math.floor((corte.getTime()-ini.getTime())/86400000)+1;
   return {dias:Math.max(1,dias), activo, inicio:ini, fin:finRaw};
 }
+// v279: detecta TERAPIA COMBINADA — cuántos ATB están activos simultáneamente HOY.
+// Activo = sin fechaFinIV, o fechaFinIV en el futuro. Devuelve {n, combinada, nombres}.
+// Expuesta en window para reutilizar en resumen, censo y Excel, y para pruebas.
+window.calcTerapiaCombinada=function(p, hoy){
+  const _hoy=(hoy||new Date().toISOString().slice(0,10));
+  const items=(p&&Array.isArray(p.atbList)&&p.atbList.length)?p.atbList
+    :(p&&p.atb?[{nombre:p.atb,fechaFinIV:p.fechaFinIV||''}]:[]);
+  const activos=items.filter(a=>a&&a.nombre&&(!a.fechaFinIV||a.fechaFinIV>=_hoy));
+  return {n:activos.length, combinada:activos.length>=2, nombres:activos.map(a=>a.nombre)};
+};
+// v281 BLINDAJE ANTI-BORRADO — generaliza el fix de cultivos (v279) a TODO dato clínico
+// acumulativo. Si el formulario llega SIN un campo clínico (vacío) pero el paciente YA tenía
+// datos guardados, conserva los previos en vez de borrarlos. Devuelve las etiquetas de lo
+// conservado para AVISAR al usuario (preservación transparente, nunca silenciosa).
+// Solo protege los campos de la lista PROTEGIDOS — campos escalares editables (alergias, dx,
+// notas) NO se tocan. En esos arrays/objetos clínicos, "vacío" casi siempre significa "el
+// formulario no cargó", no "el médico borró a propósito" (eso se hace elemento por elemento).
+window._blindarCamposClinicos=function(data, prev){
+  if(!data||!prev)return [];
+  // _count: nº de elementos con contenido. NaN para números/booleanos → nunca se tocan.
+  const _count=v=>{
+    if(v==null)return 0;
+    if(Array.isArray(v))return v.length;
+    if(typeof v==='object')return Object.keys(v).length;
+    if(typeof v==='string')return v.trim().length?1:0;
+    return NaN;
+  };
+  const PROTEGIDOS=[
+    {k:'atbList',        label:'antibióticos'},
+    {k:'muestras',       label:'cultivos'},
+    {k:'comorbilidades', label:'comorbilidades'},
+    {k:'charlsonItems',  label:'índice de Charlson'},
+    {k:'atbPrevios',     label:'ATB previos'},
+    {k:'abg',            label:'antibiograma'},
+    {k:'abgFoto',        label:'foto de antibiograma'},
+  ];
+  const conservados=[];
+  PROTEGIDOS.forEach(({k,label})=>{
+    if(_count(data[k])===0&&_count(prev[k])>0){
+      data[k]=prev[k];
+      // charlsonScore viaja con charlsonItems: si restauramos los ítems, restaurar el puntaje.
+      if(k==='charlsonItems'&&(data.charlsonScore==null||data.charlsonScore==='')&&prev.charlsonScore!=null){
+        data.charlsonScore=prev.charlsonScore;
+      }
+      conservados.push(label);
+    }
+  });
+  return conservados;
+};
 // Resumen legible "Día N" o "N días (suspendido)" para mostrar junto a cada ATB.
 function diaATBLabel(a, hoy){
   const r=calcDiaATB(a, hoy);
@@ -4700,6 +4940,50 @@ function calcDia(p){
   }
   return p.dia||1;
 }
+
+// ── DÍAS-PACIENTE reales + DOT NHSN-AUR (Fase 0.2) ──────────────────────────────────────
+// Reemplaza el denominador artificial "camas×30" por DÍAS-PACIENTE reales = Σ por paciente de
+// (egreso | fecha de corte) − ingreso. Es el estándar NHSN-AUR para tasas de uso por densidad.
+// DOT/1000 días-paciente (NHSN) y DDD/100 días-cama (ESAC/OMS) son métricas distintas y ambas válidas.
+function _fechaADate(v){
+  if(!v)return null;
+  if(typeof v==='string'){const d=new Date(v.length<=10?v+'T00:00:00':v);return isNaN(d.getTime())?null:d;}
+  if(v.toDate)try{return v.toDate();}catch(_){}
+  if(v.toMillis)try{return new Date(v.toMillis());}catch(_){}
+  if(v.seconds!=null)return new Date(v.seconds*1000);
+  if(v instanceof Date)return v;
+  return null;
+}
+// Días de estancia de UN paciente: ingreso → (alta | corte), inclusivo, mín 1, sin pasar del corte.
+window.calcDiasEstancia=function(p, hasta){
+  const ini=_fechaADate(p&&p.ingreso); if(!ini)return 0;
+  const corte=_fechaADate(hasta)||new Date();
+  let fin=(p&&p.alta&&p.fechaAlta)?_fechaADate(p.fechaAlta):corte;
+  if(!fin)fin=corte;
+  if(fin>corte)fin=corte;
+  const dias=Math.floor((fin.getTime()-ini.getTime())/86400000)+1;
+  return dias>0?dias:(fin>=ini?1:0);
+};
+// Días-paciente del censo completo (denominador NHSN).
+window.calcDiasPaciente=function(pacs, hasta){
+  return (pacs||[]).reduce((s,p)=>s+window.calcDiasEstancia(p,hasta),0);
+};
+// DOT correcto (NHSN): Σ paciente, Σ antibiótico, de los días activos de ESE agente.
+// Terapia combinada de 2 ATB × 5 días = 10 DOT (cada agente cuenta por separado).
+window.calcDOT=function(pacs, hasta){
+  const hoyISO=(typeof hasta==='string'?hasta:new Date().toISOString().slice(0,10));
+  return (pacs||[]).reduce((s,p)=>{
+    const items=(p&&Array.isArray(p.atbList)&&p.atbList.length)?p.atbList
+      :(p&&p.atb?[{nombre:p.atb,fechaInicioIV:p.inicio,fechaFinIV:p.fechaFinIV}]:[]);
+    return s+items.filter(a=>a&&a.nombre).reduce((ss,a)=>{const r=calcDiaATB(a,hoyISO);return ss+((r&&r.dias)?r.dias:0);},0);
+  },0);
+};
+// DOT por 1000 días-paciente (NHSN-AUR). Devuelve {dot, diasPaciente, por1000}.
+window.dotPer1000=function(pacs, hasta){
+  const dot=window.calcDOT(pacs,hasta);
+  const dp=window.calcDiasPaciente(pacs,hasta);
+  return {dot, diasPaciente:dp, por1000: dp>0?+(dot/dp*1000).toFixed(1):0};
+};
 
 const ABG_ATBS=[
   {g:'Penicilinas',a:[{k:'amp',n:'Ampicilina'},{k:'amsul',n:'Amp-Sulbactam'},{k:'amcl',n:'Amox-Clav'},{k:'oxa',n:'Oxacilina'},{k:'pitaz',n:'Pip-Tazobactam'}]},
@@ -5635,14 +5919,23 @@ function renderCamas(){
 
 // ── Tabla censo ──
 function isMDR(p){
-  // Chequeo rápido por campos booleanos específicos (más confiable que texto libre)
+  if(!p)return false;
+  // Fase 0.3 — UNIFICADO: si hay antibiograma estructurado, usar la clasificación formal
+  // Magiorakos (que ya excluye resistencia intrínseca). Es el criterio más riguroso.
+  const abg=(p.abg&&Object.keys(p.abg).length)?p.abg:null;
+  if(abg){
+    const r=clasificarMagiorakos(abg,p.organismo||'');
+    if(r&&(r.mdr||r.xdr||r.pdr))return true;
+  }
+  // Respaldo SIEMPRE con marcadores fenotípicos (no se pierde sensibilidad cuando el panel
+  // es incompleto o no hay antibiograma): flags booleanos + texto libre legado.
   if(p.mec_mrsa||p.mec_vrsa||p.mec_visa||p.mec_vre||p.mec_vre_vanb)return true;
   if(p.mec_kpc||p.mec_ndm||p.mec_vim||p.mec_imp||p.mec_oxa48||p.mec_oxa23||p.mec_ges)return true;
   if(p.mec_blee||p.mec_blee_ctxm||p.mec_blee_shv||p.mec_blee_tem)return true;
   if(p.mec_triple||p.mec_metalo_blee||p.mec_metalo_kpc||p.mec_metalo_ampc)return true;
-  // Fallback: texto libre (datos legado o ingreso libre)
   return/BLEE|MRSA|CRE|MDR|XDR|VRE|KPC|NDM|OXA[-.]48|OXA[-.]23|VISA|VRSA|GES|VIM|IMP[^a-z]/i.test((p.organismo||'')+(p.fenotipo||'')+(p.mecRaw||''));
 }
+window.isMDR=isMDR;
 
 // Ordena pacientes según el orden físico del mapa de camas:
 // 1º por índice de sala en CAMAS, 2º por índice de cama dentro de la sala.
@@ -9021,6 +9314,8 @@ window.generarResumenPROA=async function(pid){
     if(!_atbItems.length){
       txt+='  Sin ATB documentado\n';
     }else{
+      // v279: aviso de terapia combinada (2+ ATB activos simultáneos) — clave para PROA
+      try{const _tc=window.calcTerapiaCombinada&&window.calcTerapiaCombinada(p);if(_tc&&_tc.combinada)txt+='  ⚠ TERAPIA COMBINADA: '+_tc.n+' antimicrobianos activos ('+_tc.nombres.join(' + ')+')\n';}catch(_){}
       if(_atbActivos.length){
         txt+='  ACTIVOS:\n';
         _atbActivos.forEach(a=>{
@@ -11960,6 +12255,17 @@ window.exportCSV=()=>{const h=['Nombre','Exp','Edad','Sexo','Servicio','Cama','M
 // ══════════════════════════════════════════
 // MÓDULO DDD/ATC AWaRe — 39 ATB
 // ══════════════════════════════════════════
+// FUENTE DDD: WHO Collaborating Centre for Drug Statistics Methodology, ATC/DDD Index
+//   (atcddd.fhi.no, antes whocc.no). Auditado 2026-06. ddd en GRAMOS por la ruta indicada (vd).
+// CORRECCIONES v283 (auditoría de credibilidad científica):
+//   · Meropenem J01DH02: 2 → 3 g (P)   [valor oficial WHO; antes subestimaba el consumo].
+//   · Colistina  J01XB01: 0.006 → 0.24 g (P). WHO DDD oficial = 3 MU (millones de unidades).
+//       Como este motor calcula en gramos, se convierte 3 MU × 80 mg/MU (colistimetato sódico,
+//       CMS) ≈ 240 mg = 0.24 g. Es una APROXIMACIÓN documentada (existe ambigüedad CBA vs CMS);
+//       el 0.006 g previo era un error de ~40× que inflaba el consumo de colistina.
+// NOTA conocida (pendiente, NO corregida para no orfanar datos ya capturados por clave ATC):
+//   Cefotaxima está etiquetada J01DC07 (cefonicid); el código oficial es J01DD01. El DDD (4 g)
+//   sí es correcto. Cambiar la clave migraría datos históricos → se deja flagged.
 const ATB_DB=[
 {n:1,atc:'J01CE02',nom:'Penicilina G',pres:'Frasco 5MU',aw:'Access',ddd:3.6,vd:'P',gxu:0,svc:'General'},
 {n:2,atc:'J01CA01',nom:'Ampicilina',pres:'Frasco 1g IV',aw:'Access',ddd:2,vd:'P',gxu:1,svc:'General'},
@@ -11985,7 +12291,7 @@ const ATB_DB=[
 {n:22,atc:'J01GB06',nom:'Amikacina',pres:'Frasco 500mg IV',aw:'Watch',ddd:1,vd:'P',gxu:0.5,svc:'General'},
 {n:23,atc:'J01CR01',nom:'Ampicilina-sulbactam',pres:'Frasco 1.5g IV',aw:'Watch',ddd:6,vd:'P',gxu:1.5,svc:'General'},
 {n:24,atc:'J02AC01',nom:'Fluconazol',pres:'Tab 150mg',aw:'Watch',ddd:0.2,vd:'O',gxu:0.15,svc:'General'},
-{n:25,atc:'J01DH02',nom:'Meropenem',pres:'Frasco 500mg IV',aw:'Reserve',ddd:2,vd:'P',gxu:0.5,svc:'UCI'},
+{n:25,atc:'J01DH02',nom:'Meropenem',pres:'Frasco 500mg IV',aw:'Reserve',ddd:3,vd:'P',gxu:0.5,svc:'UCI'},
 {n:26,atc:'J01DH51',nom:'Imipenem/cilastatina',pres:'Frasco 500mg IV',aw:'Reserve',ddd:2,vd:'P',gxu:0.5,svc:'UCI'},
 {n:27,atc:'J01DH03',nom:'Ertapenem',pres:'Frasco 1g IV',aw:'Reserve',ddd:1,vd:'P',gxu:1,svc:'General'},
 {n:28,atc:'J01CR05',nom:'Piperacilina-tazobactam',pres:'Frasco 4.5g IV',aw:'Reserve',ddd:14,vd:'P',gxu:4.5,svc:'UCI'},
@@ -11994,7 +12300,7 @@ const ATB_DB=[
 {n:31,atc:'J01XX08',nom:'Linezolid',pres:'Tab/Sol 600mg',aw:'Reserve',ddd:1.2,vd:'O',gxu:0.6,svc:'General'},
 {n:32,atc:'J01XX09',nom:'Daptomicina',pres:'Frasco 500mg IV',aw:'Reserve',ddd:0.28,vd:'P',gxu:0.5,svc:'General'},
 {n:33,atc:'J01AA12',nom:'Tigeciclina',pres:'Frasco 50mg IV',aw:'Reserve',ddd:0.1,vd:'P',gxu:0.05,svc:'UCI'},
-{n:34,atc:'J01XB01',nom:'Colistina',pres:'Frasco 150mg IV',aw:'Reserve',ddd:0.006,vd:'P',gxu:0.15,svc:'UCI'},
+{n:34,atc:'J01XB01',nom:'Colistina',pres:'Frasco 150mg IV',aw:'Reserve',ddd:0.24,vd:'P',gxu:0.15,svc:'UCI'},
 {n:35,atc:'J01DD52',nom:'Ceftazidima-avibactam',pres:'Frasco 2.5g IV',aw:'Reserve',ddd:6,vd:'P',gxu:2.5,svc:'UCI'},
 {n:36,atc:'J01DI54',nom:'Ceftolozano-tazobactam',pres:'Frasco 1.5g IV',aw:'Reserve',ddd:6,vd:'P',gxu:1.5,svc:'UCI'},
 {n:37,atc:'J02AX04',nom:'Caspofungina',pres:'Frasco 50mg IV',aw:'Reserve',ddd:0.05,vd:'P',gxu:0.05,svc:'UCI'},
@@ -20898,6 +21204,9 @@ window.calcularAsociacion=function(){
   const res=stat_chi2_2x2(a,b,c,d);
   const nntRes=stat_nnt(a,b,c,d);
   const fisherWarn=stat_fishers_warning(a,b,c,d);
+  // Fase 0.5: p-value EXACTO de Fisher + selección automática del test correcto (n<30 / esp<5).
+  const _auto=testAuto2x2(a,b,c,d);
+  const _fish=fisherExact2x2(a,b,c,d);
   const el=document.getElementById('an-chi2-result');
   if(el){
     const expLabel=document.getElementById('an-exp-var').selectedOptions[0]?.text||expKey;
@@ -20907,10 +21216,11 @@ window.calcularAsociacion=function(){
       <b style="color:var(--teal);">Exposición:</b> ${expLabel} (n=${a+b}) &nbsp;·&nbsp; <b style="color:var(--teal);">Desenlace:</b> ${outLabel} (n=${a+c})<br>
       <b>Tabla 2×2:</b> &nbsp;Exp+/Des+=${a} &nbsp;Exp+/Des-=${b} &nbsp;Exp-/Des+=${c} &nbsp;Exp-/Des-=${d}<br>
       <b style="color:var(--blue);">χ² (Yates):</b> ${res.chi2} &nbsp;<b>p:</b> <span style="color:${res.p_approx.startsWith('<')?'var(--teal)':'var(--t3)'};">${res.p_approx}</span>
-      ${res.or!=null?`&nbsp;&nbsp;<b>OR:</b> ${res.or} (IC95% ${res.or_ci95[0]}–${res.or_ci95[1]})`:''}
+      <br><b style="color:var(--purple);">Fisher exacto (bilateral):</b> <span style="color:var(--teal);">p = ${_fish.p}</span> ${_auto.test==='Fisher exacto'?`&nbsp;<span style="color:var(--amber);">◄ test recomendado (n=${_auto.n}${_auto.minExp!=null?', esperado mín. '+_auto.minExp:''})</span>`:`&nbsp;<span style="font-size:9px;color:var(--t3);">(con esta n, χ² también es válido)</span>`}
+      ${res.or!=null?`<br><b>OR:</b> ${res.or} (IC95% ${res.or_ci95[0]}–${res.or_ci95[1]})`:''}
       ${res.rr!=null?`&nbsp;&nbsp;<b>RR:</b> ${res.rr}`:''}
       ${nntRes.ard!=null?`<br><b>ARD:</b> ${nntRes.ard}% &nbsp;&nbsp;<b>${nntRes.beneficio?'NNT (beneficio)':'NNH (daño)'}:</b> ${nntRes.nnt??'∞'}`:''}
-      <br><span style="font-size:9px;color:var(--t3);">Corrección de Yates aplicada · Haldane-Anscombe para OR con celdas=0</span>
+      <br><span style="font-size:9px;color:var(--t3);">Yates en χ² · Haldane-Anscombe para OR con celdas=0 · Fisher exacto para n&lt;30 o esperado&lt;5</span>
     </div>`;
   }
 };
@@ -21445,6 +21755,9 @@ async function _buildGoogleSheet(token,pacs,mode){
   const desesc=pacs.filter(p=>p.accion==='desescalar').length;
   const indicSi=pacs.filter(p=>p.indicacion==='sí'||p.indicacion==='si').length;
   const dc=HInfo.camas||100;
+  // Fase 0.2 — denominador REAL días-paciente + DOT NHSN-AUR (cada agente cuenta).
+  const _nhsn=window.dotPer1000(pacs,hasta);
+  const _diasPac=_nhsn.diasPaciente;
 
   // ── Hoja 1: Dashboard KPIs ──
   const dashRows=[
@@ -21455,9 +21768,12 @@ async function _buildGoogleSheet(token,pacs,mode){
     ['','','',''],
     ['INDICADORES PRINCIPALES','','',''],
     ['Total pacientes en ATB',n,'',''],
-    ['DOT total (días-tratamiento)',dotTot,'',''],
+    ['DOT total (días-tratamiento, nivel paciente)',dotTot,'',''],
     ['DOT promedio por paciente',n?+(dotTot/n).toFixed(1):0,'≤7 días',n&&dotTot/n<=7?'CUMPLE':n?'REVISAR':''],
-    ['DOT/100 camas-día',dc?+(dotTot/(dc*30)*100).toFixed(1):0,'',''],
+    ['Días-paciente (real: ingreso→alta/corte)',_diasPac,'denominador NHSN-AUR',''],
+    ['DOT total NHSN (cada agente cuenta)',_nhsn.dot,'',''],
+    ['DOT/1000 días-paciente (NHSN-AUR)',_nhsn.por1000,'estándar CDC/NHSN',''],
+    ['DOT/100 camas-día (proxy camas×30 — legacy)',dc?+(dotTot/(dc*30)*100).toFixed(1):0,'usar DOT/1000 días-paciente',''],
     ['','','',''],
     ['CALIDAD MICROBIOLÓGICA','','',''],
     ['% Cultivo tomado',n?+(cultN/n*100).toFixed(1):0,'≥60%',n&&cultN/n>=0.6?'CUMPLE':'REVISAR'],
@@ -21499,7 +21815,7 @@ async function _buildGoogleSheet(token,pacs,mode){
     'COAGULACIÓN','COAGULACIÓN','COAGULACIÓN','COAGULACIÓN','COAGULACIÓN',
     'MARCADORES INFLAMATORIOS','MARCADORES INFLAMATORIOS','MARCADORES INFLAMATORIOS','MARCADORES INFLAMATORIOS','MARCADORES INFLAMATORIOS',
     'PROA','PROA','PROA','PROA','PROA',
-    'HISTORIAL ATB','HISTORIAL ATB','HISTORIAL ATB'
+    'HISTORIAL ATB','HISTORIAL ATB','HISTORIAL ATB','HISTORIAL ATB','HISTORIAL ATB'
   ];
   const censoVarRow=[
     '#','ID_Pac','Nombre','Expediente','Edad','Sexo','Peso_kg','Servicio','Cama','Fecha_Ingreso','Médico','Tipo_Ingreso','Registrado_Rol',
@@ -21514,7 +21830,7 @@ async function _buildGoogleSheet(token,pacs,mode){
     'TP_seg','INR','Fibrinógeno_mgdL','DímeroD_ngmL','TTP_seg',
     'PCR_mgL','VSG_mmh','Procalcitonina_ngmL','Ferritina_ngmL','LDH_UL',
     'Bacteriemia','Riesgo_MDR','Acción_PROA','Revisado_PROA','Notas',
-    'ATBs_Total_n','ATBs_Activos_n','Trayectoria_ATB'
+    'ATBs_Total_n','ATBs_Activos_n','Terapia_Combinada','Esquemas_ATB_Detalle','Trayectoria_ATB'
   ];
   const _hoyC=new Date().toISOString().slice(0,10);
   const censoRows=[censoSecRow,censoVarRow];
@@ -21523,6 +21839,19 @@ async function _buildGoogleSheet(token,pacs,mode){
     const _cnTotal=_citems.length;
     const _cnActivos=_citems.filter(a=>!a.fechaFinIV||a.fechaFinIV>_hoyC).length;
     const _ctray=_citems.map(a=>a.nombre||'').filter(Boolean).join(' → ')||'—';
+    // v279: detalle COMPLETO de cada esquema ATB con fechas y días exactos (para la base de datos)
+    const _cesq=_citems.map(a=>{
+      if(!a||!a.nombre)return '';
+      const _r=(typeof calcDiaATB==='function')?calcDiaATB(a):{dias:null,activo:!a.fechaFinIV};
+      const _ini=a.fechaInicioIV||a.inicio||'';
+      const _fin=a.fechaFinIV||'';
+      const _est=_r.activo?'activo':'suspendido';
+      const _d=(_r.dias!=null)?(_r.dias+'d'):'';
+      return (a.nombre||'')+(a.dosis?' '+a.dosis:'')+(a.via?' '+a.via:'')
+        +' ['+(_ini||'?')+(_fin?('→'+_fin):'→en curso')+(_d?' · '+_d:'')+' · '+_est+']';
+    }).filter(Boolean).join('  ||  ')||'—';
+    const _ccomb=(typeof window.calcTerapiaCombinada==='function')?window.calcTerapiaCombinada(p,_hoyC):{combinada:false,n:_cnActivos};
+    const _ccombTxt=_ccomb.combinada?('SÍ ('+_ccomb.n+' ATB activos)'):'No';
     // Muestras del array unificado
     const _mArr=Array.isArray(p.muestras)?p.muestras:[];
     const _mDet=_mArr.map(m=>(m.tipo||'')+(m.rechazada?'[rechazada]':m.organismo?' ['+m.organismo+']':'')).filter(Boolean).join(' | ');
@@ -21549,7 +21878,7 @@ async function _buildGoogleSheet(token,pacs,mode){
     labFirst(p.id,'tp')||'', labFirst(p.id,'inr')||'', labFirst(p.id,'fibr')||'', labFirst(p.id,'dimerd')||'', labFirst(p.id,'ttp')||'',
     labFirst(p.id,'pcr')||'', labFirst(p.id,'vsg')||'', labFirst(p.id,'pct')||'', labFirst(p.id,'ferr')||'', labFirst(p.id,'ldh')||'',
     p.bacteriemia||'', (p.riesgo||'').toUpperCase(), (p.accion||'').toUpperCase(), p.rev||'', p.notas||'',
-    _cnTotal,_cnActivos,_ctray
+    _cnTotal,_cnActivos,_ccombTxt,_cesq,_ctray
   ]);
   });
 
@@ -21755,9 +22084,11 @@ async function _buildGoogleSheet(token,pacs,mode){
   // ── Hoja 10: Servicios ──
   const servM={};pacs.forEach(p=>{if(p.servicio){const s=(p.servicio||'').trim();if(s)servM[s]=(servM[s]||0)+1;}});
   const topServ=Object.entries(servM).sort((a,b)=>b[1]-a[1]).slice(0,20);
-  const servRows=[['Servicio','Pacientes','% total','DOT acumulado'],...topServ.map(([s,c])=>{
-    const sDOT=pacs.filter(p=>(p.servicio||'').trim()===s).reduce((acc,p)=>acc+calcDia(p),0);
-    return[s,c,n?+(c/n*100).toFixed(1):0,sDOT];
+  const servRows=[['Servicio','Pacientes','% total','DOT acumulado','Días-paciente','DOT/1000 días-paciente (NHSN)'],...topServ.map(([s,c])=>{
+    const _sp=pacs.filter(p=>(p.servicio||'').trim()===s);
+    const sDOT=_sp.reduce((acc,p)=>acc+calcDia(p),0);
+    const _sNhsn=window.dotPer1000(_sp,hasta);   // denominador real por servicio (Fase 0.2)
+    return[s,c,n?+(c/n*100).toFixed(1):0,sDOT,_sNhsn.diasPaciente,_sNhsn.por1000];
   })];
 
   // ── Hoja 11: Gravedad ──
@@ -22212,16 +22543,24 @@ async function _buildGoogleSheet(token,pacs,mode){
   const _antibiogramaHosp=[];
   _orgSet.forEach(org=>{
     const _oa=_allAislamientos.filter(a=>(a.organismo||'Sin identificar')===org);
-    if(_oa.length<3)return; // CLSI: mínimo 3 (idealmente 30+)
-    const fila={Organismo:org,Total:_oa.length,_clsiOk:_oa.length>=30?'✅ ≥30 (CLSI)':_oa.length>=10?'⚠ 10-29':'⚠⚠ <10'};
+    if(_oa.length<3)return; // se incluye desde n=3 (no se borra dato); el nivel M39 marca la confiabilidad
+    // Fase 0.4 — regla CLSI M39 (Analysis and Presentation of Cumulative AST Data):
+    //   ≥30 = Reportable (confiable) · 10-29 = Cautela (orientativo) · <10 = No reportable.
+    const _n=_oa.length;
+    const fila={Organismo:org,Total:_n,
+      _clsiOk:_n>=30?'✅ Reportable (n≥30)':_n>=10?'⚠ Cautela (n 10-29)':'⛔ No reportable (n<10)'};
     _abgKeys.forEach(([k,label])=>{
       const tested=_oa.filter(a=>(a.abg||{})[k]);
       if(!tested.length){fila[label]='—';return;}
       const s=tested.filter(a=>(a.abg||{})[k]==='S').length;
       const r=tested.filter(a=>(a.abg||{})[k]==='R').length;
       const i=tested.filter(a=>(a.abg||{})[k]==='I').length;
-      const pctS=+(s/tested.length*100).toFixed(0);
-      fila[label]=pctS+'%S ('+s+'/'+tested.length+')'+(r?' R'+r:'')+(i?' I'+i:'');
+      const nt=tested.length;
+      const pctS=+(s/nt*100).toFixed(0),pctI=+(i/nt*100).toFixed(0),pctR=+(r/nt*100).toFixed(0);
+      // MIC50/MIC90 desde los CMI de la subcolección (— si no hay valores numéricos)
+      const _mic=micStats(tested.map(a=>(a.mic||{})[k]));
+      const _micTxt=_mic.n?(' · MIC50 '+_mic.mic50+'/MIC90 '+_mic.mic90):'';
+      fila[label]=pctS+'%S '+pctI+'%I '+pctR+'%R (n='+nt+')'+_micTxt;
     });
     _antibiogramaHosp.push(fila);
   });
@@ -22569,10 +22908,21 @@ async function _buildGoogleSheet(token,pacs,mode){
     ['','—'],
     ['BREAKPOINTS','—'],
     ['Estándar utilizado','CLSI M100-S35 (2025) — predominante'],
-    ['Algoritmo MDR/XDR/PDR','Magiorakos et al. 2012 (CMI 18:268)'],
+    ['Algoritmo MDR/XDR/PDR','Magiorakos et al. 2012 (CMI 18:268) — excluye resistencia intrínseca (EUCAST); I = no-susceptible'],
     ['Deduplicación','CLSI M39 (1 aislamiento/paciente/especie/espécimen)'],
-    ['Análisis estadístico','χ² test (Wilson-Hilferty p-value approximation)'],
+    ['Análisis estadístico','χ² (Yates) para n≥30 y esperados≥5; TEST EXACTO DE FISHER para n<30 o esperado<5'],
+    ['Antibiograma acumulado','%S/%I/%R + MIC50/MIC90; CLSI M39: ≥30 Reportable / 10-29 Cautela / <10 No reportable'],
     ['Filtro de exclusión','n < 30 marcado con ⚠ (no apto para inferencia)'],
+    ['','—'],
+    ['METODOLOGÍA DE DENOMINADORES (NHSN-AUR / ESAC)','—'],
+    ['Días-paciente (denominador real)','Σ por paciente de (egreso | fecha de corte) − ingreso, inclusivo. NO usa camas×30.'],
+    ['Días-paciente del período',_diasPac],
+    ['DOT (días de terapia)','Σ por paciente, Σ por antibiótico, de los días activos de cada agente (NHSN: terapia combinada suma cada agente)'],
+    ['DOT total NHSN del período',_nhsn.dot],
+    ['DOT por 1000 días-paciente','Estándar CDC/NHSN-AUR — métrica principal de consumo: '+_nhsn.por1000],
+    ['DDD por 100 días-cama','Estándar ESAC/OMS — días-cama capturados por Farmacia (módulo DDD)'],
+    ['Nota','DOT/100 camas-día (camas×30) se conserva como proxy legacy; la métrica válida es DOT/1000 días-paciente'],
+    ['Versión del esquema de reporte','v283 (Fase 0: credibilidad científica)'],
   ];
 
   // ── Definir hojas ──
@@ -29147,6 +29497,118 @@ window._bloqueoRapidoCenso=async function(atbNombre){
 // ══════════════════════════════════════════════════════════════════════════
 // v197 — ERROR HANDLER GLOBAL: hace visible cualquier error JS no manejado
 // para diagnosticar problemas de botones que "no responden".
+// ══════════════════════════════════════════════════════════════════════════
+// v277 ANTI-SOPORTE: Centro de Ayuda en la app (S1+S3+S4). Reduce llamadas de soporte:
+// el usuario resuelve sus dudas solo (FAQ por rol), reporta problemas por formulario (no
+// por teléfono) y puede reabrir el tour. Botón ❓ flotante siempre visible tras login.
+// ══════════════════════════════════════════════════════════════════════════
+window._faqGeneral=[
+  ['¿Cómo agrego un paciente nuevo?','Toca «+ Paciente» en el Censo, o usa el botón «🎙️ Dictar» para llenarlo hablando. Llena los campos y guarda. Solo el nombre y el diagnóstico son obligatorios.'],
+  ['La app no carga o se ve rara','Toca el botón verde «Recargar la app» si aparece, o cierra y vuelve a abrir. Tus datos están en la nube, no se pierden. Si usas computadora: Ctrl+Shift+R (o Cmd+Shift+R en Mac).'],
+  ['¿Se guardan mis datos si se va el internet?','El sistema guarda en la nube en tiempo real. Si no hay internet, espera a que regrese antes de capturar datos críticos. Verás un aviso cuando estés sin conexión.'],
+  ['¿Cómo busco a un paciente?','Usa la barra «🔍 Buscar» arriba del censo. Puedes buscar por nombre, antibiótico, servicio u organismo.'],
+  ['¿Cómo cambio de mes?','En el Censo, usa las flechas ◀ ▶ junto al selector de mes. Cada mes inicia con censo limpio; los datos previos se conservan.'],
+  ['El dictado por voz no me entiende bien','Habla claro y cerca del micrófono. Revisa siempre lo que extrajo antes de aplicar — verás un ⚠ en los datos que necesitan tu revisión. Nada se guarda sin tu confirmación.'],
+];
+window._faqPorRol=function(){
+  if(window._isFarmaceutico)return [
+    ['¿Cómo libero un antibiótico aprobado?','En la pestaña Farmacia, busca la solicitud «Aprobada» y toca «💊 Confirmar stock». Pasa al almacén para liberarse a Enfermería.'],
+    ['¿Cómo retengo una prescripción?','Toca «🔒 Retener» en la solicitud — pídele justificación al médico o escálala a PROA con «📤 Enviar a PROA».'],
+  ];
+  if(window._isInfectologo||window._isMedicoProa)return [
+    ['¿Cómo apruebo o deniego una solicitud?','En la pestaña ATB, abre la solicitud pendiente y elige Aprobar (con duración y justificación) o Denegar (con motivo). Farmacia recibe el aviso.'],
+    ['Me llegó una interconsulta, ¿cómo respondo?','En la pestaña ATB verás las interconsultas pendientes. Toca «✍️ Responder», escribe tu recomendación y guárdala. El solicitante la verá en «Mis Solicitudes».'],
+    ['¿Cómo veo el antibiograma acumulado?','En Micro, toca «📊 Antibiograma acumulado» — muestra el % de sensibilidad por organismo (CLSI M39).'],
+  ];
+  if(window._isEnfermeria)return [
+    ['¿Cómo confirmo que administré un ATB?','En la pestaña Farmacia → Enfermería, busca el medicamento «Entregado» y toca «💉 Administración confirmada».'],
+  ];
+  if(window._isInterconsultante||window._isEspecialista)return [
+    ['¿Cómo pido una interconsulta a Infectología?','Toca el botón «🔔 Nueva Interconsulta PROA», llena sala, cama, paciente, motivo y urgencia. El equipo PROA recibe el aviso al instante.'],
+    ['¿Dónde veo la respuesta a mi interconsulta?','En la pestaña «Mis Solicitudes» o abriendo al paciente. Cuando Infectología responde, lo verás ahí.'],
+  ];
+  return [];
+};
+window.abrirCentroAyuda=function(){
+  const faqs=window._faqGeneral.concat(window._faqPorRol());
+  const faqHtml=faqs.map((f,i)=>`<details style="border:1px solid var(--brd2);border-radius:8px;margin-bottom:6px;overflow:hidden;">
+    <summary style="padding:10px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--t1);background:var(--s2);list-style:none;">❓ ${escHtml(f[0])}</summary>
+    <div style="padding:10px 12px;font-size:12px;color:var(--t2);line-height:1.6;">${escHtml(f[1])}</div></details>`).join('');
+  const html=`<div style="padding:4px 2px;">
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <button onclick="window._vaReabrirTour&&window._vaReabrirTour();cerrarModal();" style="flex:1;min-width:130px;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.4);color:var(--purple);border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">🎓 Ver tutorial de nuevo</button>
+      <button onclick="window.abrirReportarProblema()" style="flex:1;min-width:130px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:var(--amber);border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">🐞 Reportar un problema</button>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-family:var(--mono);">Preguntas frecuentes</div>
+    ${faqHtml}
+    <div style="margin-top:14px;padding:10px 12px;background:var(--s2);border:1px solid var(--brd2);border-radius:8px;font-size:11px;color:var(--t3);line-height:1.6;">
+      ¿No encontraste tu respuesta? Toca «🐞 Reportar un problema» arriba — tu reporte nos llega directo. Soporte: <b style="color:var(--t2);">soporte@stewardmx.com</b>
+    </div>
+  </div>`;
+  abrirContenido('🆘 Centro de Ayuda',html);
+};
+// S3: formulario de reporte de problema → guarda en Firestore (te llega ordenado, sin teléfono)
+window.abrirReportarProblema=function(){
+  const html=`<div style="padding:4px 2px;">
+    <div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">Cuéntanos qué pasó. Tu reporte llega con el contexto técnico para resolverlo rápido — <b>no necesitas llamar a nadie</b>.</div>
+    <label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;">¿Qué intentabas hacer?</label>
+    <input id="rp-accion" placeholder="ej. Guardar un paciente nuevo" style="width:100%;box-sizing:border-box;border:1px solid var(--brd2);background:var(--s1);color:var(--t1);border-radius:6px;padding:8px;font-size:12px;margin-bottom:10px;">
+    <label style="font-size:10px;color:var(--t3);display:block;margin-bottom:3px;">¿Qué pasó / qué error viste?</label>
+    <textarea id="rp-detalle" rows="4" placeholder="Describe el problema con tus palabras…" style="width:100%;box-sizing:border-box;border:1px solid var(--brd2);background:var(--s1);color:var(--t1);border-radius:6px;padding:8px;font-size:12px;resize:vertical;margin-bottom:12px;"></textarea>
+    <div id="rp-msg" style="display:none;font-size:11px;margin-bottom:8px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button id="rp-enviar" onclick="window._enviarReporteProblema()" style="flex:1;background:var(--teal);color:#04110b;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;">📤 Enviar reporte</button>
+      <button onclick="window.abrirCentroAyuda()" style="background:var(--s2);border:1px solid var(--brd2);color:var(--t2);border-radius:8px;padding:11px 16px;font-size:12px;cursor:pointer;">← Volver</button>
+    </div>
+  </div>`;
+  abrirContenido('🐞 Reportar un problema',html);
+};
+window._enviarReporteProblema=async function(){
+  const accion=(document.getElementById('rp-accion')?.value||'').trim();
+  const detalle=(document.getElementById('rp-detalle')?.value||'').trim();
+  const msg=document.getElementById('rp-msg');
+  const btn=document.getElementById('rp-enviar');
+  if(!detalle){if(msg){msg.style.display='block';msg.style.color='var(--amber)';msg.textContent='⚠ Describe brevemente el problema.';}return;}
+  if(btn){btn.disabled=true;btn.textContent='Enviando…';}
+  try{
+    // Contexto técnico automático (sin datos sensibles de pacientes)
+    const ctx={
+      accion, detalle,
+      hosp:(typeof HOSP!=='undefined'?HOSP:''),
+      rol:(window._rolActual||''),
+      email:(U&&U.email)||'',
+      vista:(window.currentView||''),
+      sw:('serviceWorker'in navigator)?'sw':'no-sw',
+      online:navigator.onLine,
+      ua:(navigator.userAgent||'').slice(0,160),
+      pantalla:(window.innerWidth+'x'+window.innerHeight),
+      ts:serverTimestamp(),
+      estado:'nuevo'
+    };
+    await addDoc(collection(db,'soporte_tickets'),ctx);
+    try{logAudit&&logAudit('reporte_problema',{accion});}catch(_){}
+    if(msg){msg.style.display='block';msg.style.color='var(--teal)';msg.textContent='✅ Reporte enviado. Gracias — lo revisaremos pronto.';}
+    if(btn){btn.textContent='✅ Enviado';}
+    setTimeout(()=>{try{cerrarModal();}catch(_){}} ,1500);
+  }catch(e){
+    if(msg){msg.style.display='block';msg.style.color='var(--red)';msg.textContent='No se pudo enviar. Escríbenos a soporte@stewardmx.com';}
+    if(btn){btn.disabled=false;btn.textContent='📤 Reintentar';}
+  }
+};
+// Botón ❓ flotante (se crea tras login en cargarApp)
+window._mountHelpFab=function(){
+  if(document.getElementById('help-fab'))return;
+  const b=document.createElement('div');
+  b.id='help-fab';
+  b.title='Centro de Ayuda';
+  b.textContent='❓';
+  b.setAttribute('style','position:fixed;bottom:22px;left:22px;z-index:9988;width:44px;height:44px;border-radius:50%;background:var(--s1);border:1.5px solid var(--brd2);color:var(--t2);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:all .2s;');
+  b.onmouseover=()=>{b.style.transform='scale(1.1)';b.style.borderColor='var(--teal)';};
+  b.onmouseout=()=>{b.style.transform='scale(1)';b.style.borderColor='var(--brd2)';};
+  b.onclick=()=>window.abrirCentroAyuda();
+  document.body.appendChild(b);
+};
+
 // ══════════════════════════════════════════════════════════════════════════
 (function(){
   if(window._errorHandlerInstalled)return;

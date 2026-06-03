@@ -65,12 +65,37 @@ exports.anthropicProxy = onCall(
       throw new HttpsError('invalid-argument', 'messages requerido');
     }
 
-    // Rate limiting básico: máx 30 req/min/usuario
+    // Rate limiting básico: máx 30 req/min/usuario (anti-abuso instantáneo)
     const rlKey = `rate:${uid}:${Math.floor(Date.now() / 60000)}`;
     const rl = await db.doc(`_ratelimits/${rlKey}`).get();
     const count = (rl.exists ? rl.data().n : 0) + 1;
     if (count > 30) throw new HttpsError('resource-exhausted', 'Rate limit excedido (30/min)');
     await db.doc(`_ratelimits/${rlKey}`).set({ n: count, ts: Date.now() });
+
+    // ── TOPE MENSUAL DE IA POR HOSPITAL (control de costo / plan comercial) ──
+    // Protege el margen: cada plan incluye N consultas de IA/mes. Al llegar al tope, se detiene
+    // (igual que Whisper con voice_cap_min). El super-admin queda exento. Configurable por hospital
+    // en hospitals_registry/{hospId}.ai_cap_month (number) — default 1500; -1 = ilimitado.
+    if (!isSA && hospitalId) {
+      try {
+        const _reg = await db.collection('hospitals_registry').doc(hospitalId).get();
+        const _regD = _reg.exists ? _reg.data() : {};
+        const _aiCap = _regD.ai_cap_month === -1 ? Infinity : (typeof _regD.ai_cap_month === 'number' ? _regD.ai_cap_month : 1500);
+        if (_aiCap !== Infinity) {
+          const _mes = new Date().toISOString().slice(0, 7);
+          const _aiUseRef = db.collection('hospitals').doc(hospitalId).collection('ai_usage').doc(_mes);
+          const _aiUseSnap = await _aiUseRef.get();
+          const _aiUsed = _aiUseSnap.exists ? (_aiUseSnap.data().calls || 0) : 0;
+          if (_aiUsed >= _aiCap) {
+            throw new HttpsError('resource-exhausted',
+              `Límite mensual de IA alcanzado (${_aiCap} consultas). Contacta al administrador para ampliar el plan.`);
+          }
+        }
+      } catch (e) {
+        if (e instanceof HttpsError) throw e; // re-lanzar el tope; tragar errores de lectura para no bloquear
+        console.warn('[anthropicProxy] ai_cap check falló (continúa):', e.message);
+      }
+    }
 
     // Acceso al secret via process.env (inyectado por Firebase al tenerlo en secrets:[])
     const apiKey = process.env.ANTHROPIC_KEY;
@@ -111,6 +136,17 @@ exports.anthropicProxy = onCall(
         model: usedModel, tokens_in: j.usage?.input_tokens || 0, tokens_out: j.usage?.output_tokens || 0,
         ts: admin.firestore.FieldValue.serverTimestamp(),
       });
+      // Contador mensual de consultas IA (para el tope del plan). Suma tokens para reporte de costo.
+      if (hospitalId) {
+        const _mes = new Date().toISOString().slice(0, 7);
+        await db.collection('hospitals').doc(hospitalId).collection('ai_usage').doc(_mes).set({
+          calls: admin.firestore.FieldValue.increment(1),
+          tokens_in: admin.firestore.FieldValue.increment(j.usage?.input_tokens || 0),
+          tokens_out: admin.firestore.FieldValue.increment(j.usage?.output_tokens || 0),
+          month: _mes, hospId: hospitalId,
+          lastCallAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
     } catch (_) { /* no bloquea */ }
     return j;
   }

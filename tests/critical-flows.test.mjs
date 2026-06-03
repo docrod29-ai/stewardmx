@@ -496,3 +496,221 @@ test('VOZ norm: TRAMPA "comió pera" → NO inventa antibiótico', () => {
 test('VOZ norm: TRAMPA "sala de espera" → NO inventa', () => {
   assert.doesNotMatch(_norm('la sala de espera'), /ertapenem|VDRL/i);
 });
+
+/* ═══════════ ATB — Terapia combinada (v279) ═══════════ */
+const _mTC = _idx.match(/window\.calcTerapiaCombinada=function\(p, hoy\)\{[\s\S]*?\n\};/);
+let _calcTC = () => ({combinada:false,n:0,nombres:[]});
+if (_mTC) { _calcTC = new Function('const window={};' + _mTC[0] + ' return window.calcTerapiaCombinada;')(); }
+test('ATB combinada: existe calcTerapiaCombinada', () => { assert.ok(_mTC); });
+test('ATB combinada: 2 activos → combinada', () => {
+  assert.equal(_calcTC({atbList:[{nombre:'Meropenem',fechaFinIV:''},{nombre:'Vancomicina',fechaFinIV:''}]},'2026-06-01').combinada, true);
+});
+test('ATB combinada: 1 activo + 1 suspendido → NO combinada', () => {
+  assert.equal(_calcTC({atbList:[{nombre:'Meropenem',fechaFinIV:''},{nombre:'Ceftriaxona',fechaFinIV:'2026-05-20'}]},'2026-06-01').combinada, false);
+});
+test('ATB combinada: 1 solo activo → NO combinada', () => {
+  assert.equal(_calcTC({atbList:[{nombre:'Nitrofurantoína',fechaFinIV:''}]},'2026-06-01').combinada, false);
+});
+test('ATB combinada: sin ATB → n=0', () => {
+  assert.equal(_calcTC({},'2026-06-01').n, 0);
+});
+
+/* ═══════════ BLINDAJE anti-borrado de datos clínicos (v281) ═══════════ */
+const _mBl = _idx.match(/window\._blindarCamposClinicos=function\(data, prev\)\{[\s\S]*?\n\};/);
+let _blindar = () => [];
+if (_mBl) { _blindar = new Function('const window={};' + _mBl[0] + ' return window._blindarCamposClinicos;')(); }
+test('BLINDAJE: existe _blindarCamposClinicos', () => { assert.ok(_mBl); });
+
+test('BLINDAJE: atbList vacío + prev con ATB → restaura (caso San Luis generalizado)', () => {
+  const data = { atbList: [] };
+  const prev = { atbList: [{ nombre: 'Meropenem' }, { nombre: 'Vancomicina' }] };
+  const cons = _blindar(data, prev);
+  assert.equal(data.atbList.length, 2);
+  assert.match(cons.join(','), /antibi/i);
+});
+
+test('BLINDAJE: atbList con datos NO se sobrescribe (edición legítima respetada)', () => {
+  const data = { atbList: [{ nombre: 'Ceftriaxona' }] };
+  const prev = { atbList: [{ nombre: 'Meropenem' }, { nombre: 'Vancomicina' }] };
+  const cons = _blindar(data, prev);
+  assert.equal(data.atbList.length, 1);
+  assert.equal(data.atbList[0].nombre, 'Ceftriaxona');
+  assert.equal(cons.length, 0);
+});
+
+test('BLINDAJE: muestras vacío + prev con cultivos → restaura cultivos', () => {
+  const data = { muestras: [] };
+  const prev = { muestras: [{ tipo: 'Hemocultivo', organismo: 'E. coli' }] };
+  _blindar(data, prev);
+  assert.equal(data.muestras.length, 1);
+});
+
+test('BLINDAJE: abg objeto vacío {} + prev con antibiograma → restaura', () => {
+  const data = { abg: {} };
+  const prev = { abg: { meropenem: 'S', ceftriaxona: 'R' } };
+  const cons = _blindar(data, prev);
+  assert.equal(Object.keys(data.abg).length, 2);
+  assert.match(cons.join(','), /antibiograma/i);
+});
+
+test('BLINDAJE: abgFoto vacía + prev con foto → restaura foto', () => {
+  const data = { abgFoto: null };
+  const prev = { abgFoto: 'data:image/png;base64,AAAA' };
+  _blindar(data, prev);
+  assert.equal(data.abgFoto, 'data:image/png;base64,AAAA');
+});
+
+test('BLINDAJE: charlsonItems restaurados también restauran charlsonScore', () => {
+  const data = { charlsonItems: [], charlsonScore: null };
+  const prev = { charlsonItems: [{ k: 'icc' }], charlsonScore: 3 };
+  _blindar(data, prev);
+  assert.equal(data.charlsonItems.length, 1);
+  assert.equal(data.charlsonScore, 3);
+});
+
+test('BLINDAJE: comorbilidades vacías + prev con datos → restaura', () => {
+  const data = { comorbilidades: [] };
+  const prev = { comorbilidades: ['DM2', 'ERC'] };
+  _blindar(data, prev);
+  assert.equal(data.comorbilidades.length, 2);
+});
+
+test('BLINDAJE: atbPrevios vacíos + prev con datos → restaura', () => {
+  const data = { atbPrevios: [] };
+  const prev = { atbPrevios: [{ nombre: 'Piperacilina' }] };
+  _blindar(data, prev);
+  assert.equal(data.atbPrevios.length, 1);
+});
+
+test('BLINDAJE: paciente nuevo (prev null) → no protege, permite vacío', () => {
+  const data = { atbList: [], muestras: [] };
+  const cons = _blindar(data, null);
+  assert.equal(cons.length, 0);
+  assert.equal(data.atbList.length, 0);
+});
+
+test('BLINDAJE: prev vacío + data vacío → no hay falso positivo', () => {
+  const data = { atbList: [], muestras: [] };
+  const prev = { atbList: [], muestras: [] };
+  const cons = _blindar(data, prev);
+  assert.equal(cons.length, 0);
+});
+
+test('BLINDAJE: campos escalares editables (notas, alergias) NUNCA se tocan', () => {
+  const data = { notas: '', alergias: '', atbList: [{ nombre: 'X' }] };
+  const prev = { notas: 'nota vieja', alergias: 'penicilina', atbList: [{ nombre: 'X' }] };
+  const cons = _blindar(data, prev);
+  assert.equal(data.notas, '');        // el médico puede borrar notas a propósito
+  assert.equal(data.alergias, '');     // y corregir alergias
+  assert.equal(cons.length, 0);
+});
+
+test('BLINDAJE: múltiples campos vacíos → conserva todos y los reporta', () => {
+  const data = { atbList: [], muestras: [], comorbilidades: [] };
+  const prev = { atbList: [{ nombre: 'A' }], muestras: [{ tipo: 'B' }], comorbilidades: ['C'] };
+  const cons = _blindar(data, prev);
+  assert.equal(cons.length, 3);
+});
+
+/* ═══════════ Fisher's Exact Test 2×2 (Fase 0.5) — vs valores de R ═══════════ */
+const _mFish = _idx.match(/function _logFactorial\(n\)\{[\s\S]*?window\.fisherExact2x2=fisherExact2x2;/);
+let _fisher = () => ({p:1});
+if (_mFish) { _fisher = new Function('const window={};' + _mFish[0] + ' return window.fisherExact2x2;')(); }
+const _near = (x, y, tol=0.001) => Math.abs(x - y) <= tol;
+test('FISHER: existe fisherExact2x2', () => { assert.ok(_mFish); });
+test('FISHER: c(3,1,1,3) → p≈0.4857 (R)', () => { assert.ok(_near(_fisher(3,1,1,3).p, 0.4857), 'p='+_fisher(3,1,1,3).p); });
+test('FISHER: c(2,3,3,2) simétrica → p=1', () => { assert.ok(_near(_fisher(2,3,3,2).p, 1.0), 'p='+_fisher(2,3,3,2).p); });
+test('FISHER: c(0,5,5,0) → p≈0.007937 (R)', () => { assert.ok(_near(_fisher(0,5,5,0).p, 0.007937), 'p='+_fisher(0,5,5,0).p); });
+test('FISHER: c(10,0,0,10) → p muy pequeño (<0.0001)', () => { assert.ok(_fisher(10,0,0,10).p < 0.0001, 'p='+_fisher(10,0,0,10).p); });
+test('FISHER: tabla grande balanceada c(20,20,20,20) → p=1', () => { assert.ok(_near(_fisher(20,20,20,20).p, 1.0), 'p='+_fisher(20,20,20,20).p); });
+test('FISHER: n=0 → p=1 sin crash', () => { assert.equal(_fisher(0,0,0,0).p, 1); });
+test('FISHER: selector testAuto2x2 usa umbral n<30', () => { assert.match(_idx, /function testAuto2x2[\s\S]{0,400}n<30\|\|minExp<5/); });
+
+/* ═══════════ MIC50 / MIC90 (Fase 0.4) ═══════════ */
+const _mMic = _idx.match(/function parseMICnum\(v\)\{[\s\S]*?window\.parseMICnum=parseMICnum; window\.micStats=micStats;/);
+let _parseMIC = () => null, _micStats = () => ({});
+if (_mMic) {
+  _parseMIC = new Function('const window={};' + _mMic[0] + ' return window.parseMICnum;')();
+  _micStats = new Function('const window={};' + _mMic[0] + ' return window.micStats;')();
+}
+test('MIC: existe parseMICnum/micStats', () => { assert.ok(_mMic); });
+test('MIC: parse "16" → 16', () => assert.equal(_parseMIC('16'), 16));
+test('MIC: parse "<=0.12" → 0.12', () => assert.equal(_parseMIC('<=0.12'), 0.12));
+test('MIC: parse ">=32" → 32', () => assert.equal(_parseMIC('>=32'), 32));
+test('MIC: parse "0,25" (coma) → 0.25', () => assert.equal(_parseMIC('0,25'), 0.25));
+test('MIC: parse "≤4" (símbolo) → 4', () => assert.equal(_parseMIC('≤4'), 4));
+test('MIC: basura → null', () => assert.equal(_parseMIC('ND'), null));
+test('MIC50/90: serie dilución estándar n=10', () => {
+  const r = _micStats(['0.5','1','2','4','8','16','32','64','128','256']);
+  assert.equal(r.n, 10); assert.equal(r.mic50, 8); assert.equal(r.mic90, 128);
+});
+test('MIC50/90: ignora valores no numéricos', () => {
+  const r = _micStats(['<=1','2','ND','4','>=8','']);
+  assert.equal(r.n, 4);
+});
+test('MIC50/90: sin datos → null', () => {
+  const r = _micStats([]);
+  assert.equal(r.n, 0); assert.equal(r.mic50, null);
+});
+
+/* ═══════════ Días-paciente reales / DOT NHSN (Fase 0.2) ═══════════ */
+const _mDP = _idx.match(/function _fechaADate\(v\)\{[\s\S]*?window\.calcDiasPaciente=function[\s\S]*?\n\};/);
+let _diasEst = () => 0, _diasPac = () => 0;
+if (_mDP) {
+  _diasEst = new Function('const window={};' + _mDP[0] + ' return window.calcDiasEstancia;')();
+  _diasPac = new Function('const window={};' + _mDP[0] + ' return window.calcDiasPaciente;')();
+}
+test('DIASPAC: existe calcDiasEstancia/calcDiasPaciente', () => { assert.ok(_mDP); });
+test('DIASPAC: ingreso→corte = días inclusivos', () => {
+  assert.equal(_diasEst({ingreso:'2026-06-01'}, '2026-06-10'), 10);
+});
+test('DIASPAC: alta antes del corte usa fechaAlta', () => {
+  assert.equal(_diasEst({ingreso:'2026-06-01', alta:true, fechaAlta:'2026-06-05'}, '2026-06-10'), 5);
+});
+test('DIASPAC: fechaAlta como Timestamp {seconds}', () => {
+  const secs = Math.floor(new Date('2026-06-05T00:00:00').getTime()/1000);
+  assert.equal(_diasEst({ingreso:'2026-06-01', alta:true, fechaAlta:{seconds:secs}}, '2026-06-10'), 5);
+});
+test('DIASPAC: no cuenta más allá del corte (alta futura clamp)', () => {
+  assert.equal(_diasEst({ingreso:'2026-06-01', alta:true, fechaAlta:'2026-06-20'}, '2026-06-10'), 10);
+});
+test('DIASPAC: sin ingreso → 0', () => { assert.equal(_diasEst({}, '2026-06-10'), 0); });
+test('DIASPAC: suma del censo', () => {
+  const pacs = [{ingreso:'2026-06-01'},{ingreso:'2026-06-06'},{}];
+  assert.equal(_diasPac(pacs, '2026-06-10'), 10 + 5 + 0);
+});
+test('DIASPAC: DOT NHSN y dotPer1000 existen en el código', () => {
+  assert.match(_idx, /window\.calcDOT=function/);
+  assert.match(_idx, /window\.dotPer1000=function/);
+  assert.match(_idx, /DOT\/1000 días-paciente \(NHSN-AUR\)/);
+});
+
+/* ═══════════ Magiorakos + intrínsecos (Fase 0.3) ═══════════ */
+const _mMag = _idx.match(/const CLSI_CATEGORIES=\{[\s\S]*?\n\}\nwindow\._intrinsicResistanceKeys=_intrinsicResistanceKeys;[\s\S]*?\n\}\n\n\/\/ ── Estandarización NHSN/);
+let _clasif = () => ({mdr:false}), _intrin = () => new Set();
+if (_mMag) {
+  const blk = _mMag[0].replace(/\n\/\/ ── Estandarización NHSN/, '');
+  _clasif = new Function('const window={};' + blk + ' return clasificarMagiorakos;')();
+  _intrin = new Function('const window={};' + blk + ' return _intrinsicResistanceKeys;')();
+}
+test('MAG: bloque Magiorakos extraíble', () => { assert.ok(_mMag); });
+test('MAG: intrínseco Klebsiella incluye ampicilina', () => { assert.ok(_intrin('Klebsiella pneumoniae').has('amp')); });
+test('MAG: E. coli NO tiene ampicilina intrínseca', () => { assert.ok(!_intrin('Escherichia coli').has('amp')); });
+test('MAG: Klebsiella solo ampicilina-R → NO MDR (intrínseco excluido)', () => {
+  assert.equal(_clasif({amp:'R'}, 'Klebsiella pneumoniae').mdr, false);
+});
+test('MAG: Klebsiella amp-R + 3 categorías adquiridas R → MDR', () => {
+  assert.equal(_clasif({amp:'R',cip:'R',gen:'R',cro:'R'}, 'Klebsiella pneumoniae').mdr, true);
+});
+test('MAG: E. coli R en 3 categorías → MDR', () => {
+  assert.equal(_clasif({cip:'R',gen:'R',cro:'R'}, 'Escherichia coli').mdr, true);
+});
+test('MAG: "I" cuenta como no-susceptible (Magiorakos)', () => {
+  assert.equal(_clasif({cip:'I',gen:'I',cro:'I'}, 'Escherichia coli').mdr, true);
+});
+test('MAG: E. coli R en 2 categorías → NO MDR', () => {
+  assert.equal(_clasif({cip:'R',gen:'R'}, 'Escherichia coli').mdr, false);
+});
+test('MAG: isMDR unificado llama a clasificarMagiorakos', () => {
+  assert.match(_idx, /function isMDR\(p\)\{[\s\S]{0,400}clasificarMagiorakos\(abg/);
+});

@@ -372,6 +372,12 @@ service cloud.firestore {
       allow read, update, delete: if isSuperAdmin();
     }
 
+    // ── Tickets de soporte (v277) — usuario autenticado reporta; solo super-admin gestiona ──
+    match /soporte_tickets/{docId} {
+      allow create: if isAuth();
+      allow read, update, delete: if isSuperAdmin();
+    }
+
     // ══════════════════════════════════════════════════════
     //  DENEGACIÓN GLOBAL POR DEFECTO
     //  Cualquier colección no listada arriba queda cerrada.
