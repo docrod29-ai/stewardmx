@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v289 (FASE 4: tasas de IAAS por densidad + LOT/DOT)
+//  NUEVA HOJA "📉 Tasas IAAS (densidad)" — la métrica que pide NOM-045/NHSN y que faltaba:
+//    · CLABSI /1000 días-catéter-central · CAUTI /1000 días-sonda — con IC95% Poisson (Byar).
+//    · Días-dispositivo REALES (inserción→retiro/corte) desde dispositivos.cvc/foley.
+//    · Razón de utilización de dispositivo (días-disp / días-paciente).
+//    · LOT (días de terapia nivel paciente), DOT (cada agente), razón DOT/LOT (redundancia),
+//      DOT/1000 días-paciente (NHSN).
+//  HONESTIDAD: numeradores CLABSI/CAUTI INFERIDOS (dispositivo presente + dx/bacteriemia) y
+//    etiquetados "inferido"; VAP marcado N/D porque no se captura el dispositivo ventilador.
+//  Reúsa ci95_poisson_rate/fmtRateIC ya existentes. 142 pruebas en verde + node --check.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v288 (FASE 2: gráficas embebidas en el .xlsx)
 //  Las gráficas se renderizan con Chart.js a un <canvas> oculto de alta resolución (2×),
 //  se exportan a PNG y se incrustan con ExcelJS.addImage ancladas junto a su tabla:
@@ -215,7 +226,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v288';
+const CACHE = 'stewardmx-v289';
 const SHELL = [
   '/',
   '/index.html',

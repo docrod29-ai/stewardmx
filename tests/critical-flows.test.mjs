@@ -791,3 +791,21 @@ test('XLSX gráficas: builder genera AWaRe/política/DOT/organismos', () => {
   assert.match(_idx, /DOT por antibiótico \(top 10\)/);
   assert.match(_idx, /Microorganismos \(top 10\)/);
 });
+
+/* ═══════════ Tasas IAAS por densidad — Fase 4 (guardas) ═══════════ */
+test('XLSX IAAS: hoja Tasas IAAS registrada + row-array', () => {
+  assert.match(_idx, /Tasas IAAS \(densidad\)/);
+  assert.match(_idx, /iaasDensRows,\s*\/\/.*IAAS/);
+});
+test('XLSX IAAS: CLABSI/CAUTI por 1000 días-dispositivo con IC Poisson', () => {
+  const blk = _idx.match(/const iaasDensRows=\[[\s\S]*?\n  \];/)[0];
+  assert.match(blk, /CLABSI/); assert.match(blk, /CAUTI/);
+  assert.match(blk, /fmtRateIC\(_clabsi,_cvcDays/);
+  assert.match(blk, /fmtRateIC\(_cauti,_foleyDays/);
+  assert.match(blk, /inferido/);   // numeradores etiquetados como inferidos (honestidad)
+});
+test('XLSX IAAS: días-dispositivo reales (inserción→retiro) + LOT/DOT', () => {
+  assert.match(_idx, /const _devDays=\(dev\)=>/);
+  assert.match(_idx, /Razón DOT\/LOT/);
+  assert.match(_idx, /VAP no calculable|requiere capturar el dispositivo ventilador/);
+});
