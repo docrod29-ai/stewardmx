@@ -35,6 +35,9 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700;800;900&family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Scripts CDN diferidos para no bloquear el primer paint -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" defer></script>
+<!-- ExcelJS: .xlsx con listas desplegables (data validation), formato condicional nativo (semáforos,
+     color scales/heatmap, data bars), tablas, freeze e imágenes. Complementa a xlsx-js-style. -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 <!-- v277 ANTI-SOPORTE: watchdog de auto-recuperación. Script CLÁSICO (no módulo) que corre
      ANTES del módulo. Si la app no marca "lista" en 14s (módulo no cargó / SW roto / caché viejo),
@@ -21524,7 +21527,9 @@ window.exportarExcelCompleto=async(mode)=>{
     const pacs=(window._sheetsExportMode==='analytics'&&window._anPacsCache?.length)?window._anPacsCache:PACS;
     if(!pacs.length){toast('Sin datos para exportar','am');return;}
     await _buildGoogleSheet('__XLSX__',pacs,window._sheetsExportMode);
-    toast('✅ Excel completo descargado — 44 hojas con fórmulas, ábrelo en Excel o Google Sheets','tl');
+    toast(window._xlsxEngine==='ExcelJS'
+      ? '✅ Excel descargado (motor ExcelJS: menús desplegables + semáforos). Ábrelo en Excel o Google Sheets — NO en Numbers.'
+      : '✅ Excel descargado (motor SheetJS de respaldo: sin menús desplegables). ExcelJS no cargó — revisa tu conexión.','tl');
   }catch(e){
     toast('Error al generar Excel: '+((e&&e.message)||'').slice(0,120),'rd');
     console.warn('[exportarExcelCompleto]',e);
@@ -21704,6 +21709,135 @@ window.exportarGoogleSheets=async(mode)=>{
     _sheetsTC=null; // reset para reintentar
     toast('Error inicializando Google Auth: '+e.message,'rd');
   }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//  v285 FASE 1 — Renderer .xlsx con ExcelJS (dropdowns + formato condicional NATIVO + heatmaps)
+//  Consume el MISMO writeData ([{range:"'Titulo'!A1", values:[[...]]}]) + sheetDefs que el path
+//  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
+//  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
+// ═══════════════════════════════════════════════════════════════════════════════════════
+window._APP_VER='v287'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+async function _buildExcelJSWorkbook(opts){
+  const {sheetDefs, writeData, nameMap, origTitles, ctx={}} = opts;
+  const wb = new ExcelJS.Workbook();
+  wb.creator='StewardMX'; try{wb.created=new Date();}catch(_){}
+  const TEAL='FF0E7C66', NAVY='FF0A1A2F', SEC='FF374151', ALT='FFF3F6F9', BORD='FFD0D7DE';
+  const _thin={style:'thin',color:{argb:BORD}};
+  const _bd={top:_thin,left:_thin,bottom:_thin,right:_thin};
+  const _isTitleRow=row=>Array.isArray(row)&&row.length&&String(row[0]||'').length>0&&row.slice(1).every(c=>c===''||c==null);
+  const _cleanName=t=>nameMap[t]||String(t||'Hoja').slice(0,28);
+  const _colLetter=n=>{let s='';while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26;}return s;};
+  // Fórmulas vivas del Dashboard (idéntico al path SheetJS)
+  const _spssClean=(nameMap['\u{1F50C} Análisis SPSS/R']||'Análisis SPSS R').replace(/'/g,"''");
+  const _spssNm="'"+_spssClean+"'";
+  const _col=L=>_spssNm+'!'+L+'2:'+L+'10000';
+  const _nTot='COUNTA('+_spssNm+'!A2:A10000)';
+  const _pct=cnt=>'IFERROR(ROUND(100*('+cnt+')/'+_nTot+',1),"—")';
+  const _dashFx={
+    'Total pacientes en ATB':_nTot,'DOT promedio por paciente':'IFERROR(ROUND(AVERAGE('+_col('P')+'),1),"—")',
+    '% Cultivo tomado':_pct('COUNTIF('+_col('U')+',1)'),'Cultivos positivos':'COUNTIF('+_col('V')+',1)','% MDR documentados':_pct('COUNTIF('+_col('Y')+',1)'),
+    'Access (n)':'COUNTIF('+_col('Q')+',1)','Watch (n)':'COUNTIF('+_col('Q')+',2)','Reserve (n)':'COUNTIF('+_col('Q')+',3)',
+    '% Access':_pct('COUNTIF('+_col('Q')+',1)'),'% Watch':_pct('COUNTIF('+_col('Q')+',2)'),'% Reserve':_pct('COUNTIF('+_col('Q')+',3)'),
+    '% Restringidos':_pct('COUNTIF('+_col('R')+',1)'),'Desescaladas documentadas':'COUNTIF('+_col('AG')+',1)','% Desescalada':_pct('COUNTIF('+_col('AG')+',1)'),
+    'Indicación documentada (Sí)':'COUNTIF('+_col('S')+',1)','% Indicación documentada':_pct('COUNTIF('+_col('S')+',1)'),
+  };
+  // ── PORTADA ──
+  const port=wb.addWorksheet('Portada',{views:[{showGridLines:false}]});
+  port.columns=[{width:6},{width:34},{width:58}];
+  port.addRow(['StewardMX — Reporte Epidemiológico PROA']); port.addRow([ctx.hospNombre||'']);
+  port.addRow(['Periodo: '+(ctx.desde===ctx.hasta?ctx.desde:(ctx.desde+' a '+ctx.hasta))]); port.addRow(['Generado: '+(ctx.userName||'')]);
+  port.addRow(['Motor: ExcelJS '+(ctx.appVer||'')+' — con menús desplegables y semáforos nativos']); port.addRow([]);
+  const ph=port.addRow(['#','HOJA','CONTENIDO']);
+  port.mergeCells('A1:C1');port.mergeCells('A2:C2');port.mergeCells('A3:C3');port.mergeCells('A4:C4');
+  port.getCell('A1').font={bold:true,size:18,color:{argb:'FFFFFFFF'}}; port.getCell('A1').fill={type:'pattern',pattern:'solid',fgColor:{argb:NAVY}}; port.getRow(1).height=30;
+  port.getCell('A2').font={bold:true,size:13,color:{argb:TEAL}};
+  ph.eachCell(c=>{c.font={bold:true,color:{argb:'FFFFFFFF'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:TEAL}};c.border=_bd;});
+  const _descMap=[
+    [/dashboard/i,'Indicadores clave (KPIs) del periodo'],[/censo/i,'1 fila por paciente — demografía, dx, ATB, micro'],
+    [/spss|análisis spss/i,'Datos crudos para SPSS/R/Stata + códigos CIE-10'],[/codebook/i,'Diccionario de variables (definiciones y categorías)'],
+    [/bioestad/i,'Proporciones con IC95% (Wilson) + fórmulas vivas'],[/historial/i,'1 fila POR ANTIBIÓTICO — inicio, fin y días de cada uno'],
+    [/whonet/i,'1 fila por aislamiento — formato compatible WHONET (OPS)'],[/glass/i,'Agregado RIS para WHO GLASS (patógeno×ATB×espécimen)'],
+    [/control de calidad/i,'Completitud por variable, faltantes, outliers, duplicados'],[/scripts/i,'Código listo para importar en SPSS / R / Python'],
+    [/antibiograma hosp/i,'%S/I/R + MIC50/90 por organismo (CLSI M39)'],[/magiorakos/i,'Clasificación MDR/XDR/PDR (Magiorakos 2012)'],
+    [/carbapenemasa/i,'Genes de carbapenemasa (KPC/NDM/OXA/VIM)'],[/resistencia/i,'Resistencia estratificada (sitio/espécimen/edad/sexo)'],
+    [/chi|χ²/i,'Pruebas χ²/Fisher + valores p (asociaciones)'],[/endocarditis|bacteriemia|itu|neumon|difficile|iaas|ifi|neutropenia/i,'Cohorte por síndrome infeccioso'],
+    [/farmacia/i,'Solicitudes y dispensación de ATB'],[/ddd|dot|servicios/i,'Consumo DDD/DOT por antibiótico y servicio'],[/metadat/i,'Período, métodos, breakpoints y metodología'],
+    [/alertas/i,'Pacientes que requieren intervención HOY'],[/readme/i,'Guía de lectura del libro'],
+  ];
+  const _descDe=t=>{for(const[re,d]of _descMap)if(re.test(t))return d;return 'Hoja de análisis epidemiológico';};
+  sheetDefs.forEach((sd,i)=>{
+    const nm=_cleanName(sd.title); const r=port.addRow([i+1,nm,_descDe(sd.title)]); r.getCell(1).alignment={horizontal:'center'};
+    const link=r.getCell(2); link.value={text:nm,hyperlink:"#'"+nm.replace(/'/g,"''")+"'!A1"}; link.font={color:{argb:'FF1D4ED8'},underline:true};
+    r.eachCell(c=>{c.border=_bd;});
+  });
+  // ── HOJAS DE DATOS ──
+  sheetDefs.forEach(sd=>{
+    const wd=writeData.find(w=>w.range.startsWith("'"+sd.title.replace(/'/g,"''")+"'!")||w.range.startsWith(sd.title+'!'));
+    let aoa=(wd&&wd.values&&wd.values.length)?wd.values:[['(sin datos en este periodo)']];
+    if(/Dashboard/i.test(sd.title)) aoa=aoa.map(row=>{if(!Array.isArray(row)||row.length<2)return row;const fx=_dashFx[String(row[0]||'').trim()];if(fx){const r=row.slice();r[1]='='+fx;return r;}return row;});
+    const nm=_cleanName(sd.title);
+    const hdrRowIdx=(aoa[0]&&_isTitleRow(aoa[0]))?1:0;
+    const nCols=aoa.reduce((m,r)=>Math.max(m,Array.isArray(r)?r.length:0),1);
+    const wide=nCols>=13;
+    const ws=wb.addWorksheet(nm,{views:[{state:'frozen',xSplit:wide?1:0,ySplit:hdrRowIdx+1}]});
+    aoa.forEach((row,ri)=>{
+      const vals=(Array.isArray(row)?row:[row]).map(v=>{
+        if(typeof v==='string'&&v.charAt(0)==='='&&v.length>1){let f=v.slice(1);origTitles.forEach(orig=>{const q="'"+orig.replace(/'/g,"''")+"'";if(f.indexOf(q)>=0)f=f.split(q).join("'"+_cleanName(orig).replace(/'/g,"''")+"'");});return {formula:f};}
+        if(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v.trim())){const d=new Date(v.trim()+'T00:00:00');if(!isNaN(d.getTime()))return d;}
+        return v==null?'':v;
+      });
+      const xr=ws.addRow(vals);
+      const isTitle=ri===0&&_isTitleRow(row), isHdr=ri===hdrRowIdx&&!isTitle, isSec=ri>hdrRowIdx&&_isTitleRow(row), isTotal=ri>hdrRowIdx&&/^(total|totales|gran total|suma)/i.test(String((row||[])[0]||'').trim());
+      xr.eachCell({includeEmpty:true},(cell)=>{
+        cell.border=_bd;
+        if(cell.value instanceof Date)cell.numFmt='yyyy-mm-dd';
+        else if(typeof cell.value==='number'){if(!Number.isInteger(cell.value))cell.numFmt='#,##0.00';else if(Math.abs(cell.value)>=1000)cell.numFmt='#,##0';}
+        if(isTitle){cell.font={bold:true,size:13,color:{argb:'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:NAVY}};}
+        else if(isHdr){cell.font={bold:true,size:10,color:{argb:'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:TEAL}};cell.alignment={horizontal:'center',vertical:'center',wrapText:true};}
+        else if(isSec){cell.font={bold:true,size:10,color:{argb:'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:SEC}};}
+        else if(isTotal){cell.font={bold:true,color:{argb:NAVY}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE5EAF0'}};}
+        else if(ri%2===0){cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:ALT}};}
+      });
+    });
+    for(let c=1;c<=nCols;c++){let mx=10;aoa.forEach(r=>{const v=Array.isArray(r)?r[c-1]:undefined;if(v!=null){const l=String(typeof v==='object'&&v.formula?v.formula:v).length;if(l>mx)mx=l;}});ws.getColumn(c).width=Math.min(Math.max(mx+2,8),48);}
+    const lastRow=aoa.length, hdrExcel=hdrRowIdx+1, lastColL=_colLetter(nCols);
+    if(lastRow>hdrExcel)ws.autoFilter={from:{row:hdrExcel,column:1},to:{row:hdrExcel,column:nCols}};
+    const headers=(aoa[hdrRowIdx]||[]).map(h=>String(h||''));
+    const bodyFrom=hdrExcel+1, bodyTo=Math.max(bodyFrom,lastRow);
+    const _semR={fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFFEE2E2'}},font:{color:{argb:'FF991B1B'}}};
+    const _semA={fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFFEF3C7'}},font:{color:{argb:'FF92400E'}}};
+    const _semG={fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFD1FAE5'}},font:{color:{argb:'FF065F46'}}};
+    headers.forEach((h,ci)=>{
+      const L=_colLetter(ci+1), ref=L+bodyFrom+':'+L+bodyTo;
+      const dd=list=>{for(let r=bodyFrom;r<=Math.min(bodyTo,bodyFrom+2000);r++)ws.getCell(L+r).dataValidation={type:'list',allowBlank:true,formulae:['"'+list.join(',')+'"']};};
+      if(/AWaRe/i.test(h)){dd(['Access','Watch','Reserve']);ws.addConditionalFormatting({ref,rules:[{type:'cellIs',operator:'equal',priority:1,formulae:['"Reserve"'],style:_semR},{type:'cellIs',operator:'equal',priority:2,formulae:['"Watch"'],style:_semA},{type:'cellIs',operator:'equal',priority:3,formulae:['"Access"'],style:_semG}]});}
+      else if(/Pol[ií]tica/i.test(h))dd(['Libre','Vigilado','Restringido']);
+      else if(/Acci[oó]n/i.test(h))dd(['desescalar','suspender','continuar','vo','ampliar']);
+      else if(/Gravedad/i.test(h))dd(['Leve','Moderada','Grave','Crítica']);
+      else if(/^S[ií]\/No$|^Sí\/No$/i.test(h))dd(['Sí','No']);
+      else if(/%\s*R\b|%R/i.test(h))ws.addConditionalFormatting({ref,rules:[{type:'colorScale',priority:1,cfvo:[{type:'min'},{type:'percentile',value:50},{type:'max'}],color:[{argb:'FFD1FAE5'},{argb:'FFFEF3C7'},{argb:'FFFEE2E2'}]}]});
+      else if(/%\s*S\b|%S/i.test(h))ws.addConditionalFormatting({ref,rules:[{type:'colorScale',priority:1,cfvo:[{type:'min'},{type:'percentile',value:50},{type:'max'}],color:[{argb:'FFFEE2E2'},{argb:'FFFEF3C7'},{argb:'FFD1FAE5'}]}]});
+      else if(/^DOT\b|DOT \(|conteo|aislamient/i.test(h))ws.addConditionalFormatting({ref,rules:[{type:'dataBar',priority:1,cfvo:[{type:'min'},{type:'max'}],color:{argb:'FF3D9BFF'}}]});
+    });
+    if(lastRow>hdrExcel)ws.addConditionalFormatting({ref:'A'+bodyFrom+':'+lastColL+bodyTo,rules:[
+      {type:'cellIs',operator:'equal',priority:10,formulae:['"R"'],style:_semR},{type:'cellIs',operator:'equal',priority:11,formulae:['"I"'],style:_semA},{type:'cellIs',operator:'equal',priority:12,formulae:['"S"'],style:_semG},
+      {type:'containsText',operator:'containsText',priority:13,text:'ALERTA',style:_semR},{type:'containsText',operator:'containsText',priority:14,text:'CUMPLE',style:_semG},{type:'containsText',operator:'containsText',priority:15,text:'REVISAR',style:_semA},
+    ]});
+    const retCell=ws.getCell(1,nCols+1); retCell.value={text:'↩ Portada',hyperlink:"#'Portada'!A1"}; retCell.font={color:{argb:'FF1D4ED8'},underline:true,size:9}; ws.getColumn(nCols+1).width=11;
+    ws.getRow(hdrExcel).height=(hdrRowIdx===1)?20:22;
+  });
+  return wb;
+}
+// Wrapper de descarga (navegador): construye el workbook y lo descarga como .xlsx.
+window._renderXLSXWithExcelJS=async function(opts){
+  const wb=await _buildExcelJSWorkbook(opts);
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=opts.fname||'StewardMX.xlsx';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{try{URL.revokeObjectURL(url);a.remove();}catch(_){}},1500);
 };
 
 async function _buildGoogleSheet(token,pacs,mode){
@@ -22978,6 +23112,10 @@ async function _buildGoogleSheet(token,pacs,mode){
     // v268 Fase 1+3: hojas aditivas (no alteran índices previos; van al final)
     {title:'\u{1F6A8} Alertas PROA'},
     {title:'\u{1F4D8} README'},
+    {title:'\u{1F9EB} WHONET'},
+    {title:'\u{1F30D} GLASS-AMR (OMS)'},
+    {title:'\u{2705} Control de Calidad'},
+    {title:'\u{1F4BB} Scripts (SPSS-R-Python)'},
   ];
 
   // ── Crear o reusar spreadsheet ──
@@ -23236,6 +23374,66 @@ async function _buildGoogleSheet(token,pacs,mode){
 
   // ═══ NUEVAS HOJAS EPIDEMIOLÓGICAS (v194+v195) ═══
   // Orden DEBE coincidir con el orden de sheetDefs arriba
+  // ═══ v287 FASE 3 — HOJAS LISTAS PARA ANÁLISIS: WHONET · GLASS · Control de Calidad · Scripts ═══
+  // Códigos WHONET (OPS/PAHO) para organismo y espécimen.
+  const _whoOrg=org=>{const s=(org||'').toLowerCase();
+    if(/escherichia|e\. coli|coli/.test(s))return 'eco'; if(/klebsiella pneumon/.test(s))return 'kpn'; if(/klebsiella/.test(s))return 'kln';
+    if(/pseudomonas|aeruginosa/.test(s))return 'pae'; if(/acinetobacter|baumannii/.test(s))return 'aba';
+    if(/staphylococcus aureus|s\. aureus|aureus/.test(s))return 'sau'; if(/enterococcus faecium|faecium/.test(s))return 'efm';
+    if(/enterococcus faecalis|faecalis/.test(s))return 'efa'; if(/enterobacter/.test(s))return 'ecl'; if(/serratia/.test(s))return 'sma';
+    if(/proteus/.test(s))return 'pmi'; if(/streptococcus/.test(s))return 'str'; if(/candida/.test(s))return 'can';
+    if(/staphylococcus/.test(s))return 'sco'; return 'xxx';};
+  const _whoSpec=t=>{const s=(t||'').toLowerCase();
+    if(/hemoculti|sangre|blood/.test(s))return 'bl'; if(/orin|urin/.test(s))return 'ur'; if(/esput|sputum|expector/.test(s))return 'sp';
+    if(/lcr|cefalor/.test(s))return 'csf'; if(/herida|wound/.test(s))return 'wo'; if(/absces/.test(s))return 'ab';
+    if(/lavado|bal|bronq/.test(s))return 'rs'; return 'ot';};
+  // ── WHONET (1 fila por aislamiento deduplicado CLSI M39) ──
+  const whonetRows=[['ID','SEX','AGE','SPEC_DATE','SPEC_TYPE','ORG_CODE','ORGANISM',..._abgKeys.map(([,l])=>l)]];
+  _isolatesDedup.forEach((a,i)=>{const org=a.organismo||'';whonetRows.push([
+    a.exp||a._pid||('ISO'+(i+1)),(String(a.sexo||'').charAt(0).toUpperCase()||''),a.edad||'',a.fecha||'',
+    _whoSpec(a.muestra||a.sitio),_whoOrg(org),org,..._abgKeys.map(([k])=>(a.abg||{})[k]||'')]);});
+  if(whonetRows.length===1)whonetRows.push(['(sin aislamientos con antibiograma en el periodo)']);
+  // ── GLASS-AMR (agregado RIS: espécimen × patógeno × antibiótico) ──
+  const _glass={};
+  _isolatesDedup.forEach(a=>{const org=a.organismo||'Sin identificar',spec=_whoSpec(a.muestra||a.sitio);
+    _abgKeys.forEach(([k,lbl])=>{const v=(a.abg||{})[k];if(!v)return;const key=spec+'|'+org+'|'+lbl;
+      if(!_glass[key])_glass[key]={spec,org,lbl,n:0,R:0,I:0,S:0};_glass[key].n++;
+      if(v==='R')_glass[key].R++;else if(v==='I')_glass[key].I++;else if(v==='S')_glass[key].S++;});});
+  const glassRows=[['Especimen','Patogeno','Cod_organismo','Antibiotico','n_tested','n_R','n_I','n_S','pct_R','pct_I','pct_S']];
+  Object.values(_glass).sort((a,b)=>b.n-a.n).forEach(g=>glassRows.push([g.spec,g.org,_whoOrg(g.org),g.lbl,g.n,g.R,g.I,g.S,
+    g.n?+(g.R/g.n*100).toFixed(1):0,g.n?+(g.I/g.n*100).toFixed(1):0,g.n?+(g.S/g.n*100).toFixed(1):0]));
+  if(glassRows.length===1)glassRows.push(['(sin datos RIS en el periodo)']);
+  // ── Control de Calidad / Completitud ──
+  const _npQC=pacs.length||1;
+  const _qcVars=[['nombre','Nombre'],['exp','Expediente'],['edad','Edad'],['sexo','Sexo'],['peso','Peso'],['servicio','Servicio'],['ingreso','Fecha ingreso'],['dx','Diagnóstico'],['atb','Antibiótico'],['creat','Creatinina'],['organismo','Organismo']];
+  const qcRows=[['CONTROL DE CALIDAD / COMPLETITUD','','','',''],['Variable','n presente','% presente','n faltante','# fuera de rango fisiológico']];
+  _qcVars.forEach(([f,lbl])=>{let pres=0,oob=0;pacs.forEach(p=>{const v=p[f];const has=v!=null&&String(v).trim()!=='';if(has)pres++;
+    if(f==='edad'&&has&&(+v<0||+v>120))oob++; if(f==='peso'&&has&&(+v<0||+v>300))oob++; if(f==='creat'&&has&&(+v<0||+v>20))oob++;});
+    qcRows.push([lbl,pres,+(pres/_npQC*100).toFixed(1),pacs.length-pres,oob]);});
+  qcRows.push(['','','','','']);
+  qcRows.push(['Aislamientos crudos',_isolatesForReport.length,'','','']);
+  qcRows.push(['Aislamientos tras dedup CLSI M39',_isolatesDedup.length,'','','']);
+  qcRows.push(['# duplicados removidos',_isolatesForReport.length-_isolatesDedup.length,'','','']);
+  // ── Scripts de importación (SPSS / R / Python) — copia y pega ──
+  const _spssCols=(typeof spssRows!=='undefined'&&spssRows&&spssRows[0])?spssRows[0]:[];
+  const _spssSheet='Análisis SPSS R';
+  const scriptsRows=[
+    ['SCRIPTS DE IMPORTACIÓN — copia y pega (la hoja de datos es "'+_spssSheet+'")'],
+    ['Nombres exactos de variables: ver hoja "Codebook". Variables detectadas: '+_spssCols.length],[''],
+    ['── R (readxl) ──'],['library(readxl); library(dplyr)'],
+    ['df <- read_excel("StewardMX.xlsx", sheet = "'+_spssSheet+'")'],
+    ['# Ejemplo de factor con etiquetas (ajusta el nombre de columna según Codebook):'],
+    ['# df$aware <- factor(df$aware, levels=c(1,2,3), labels=c("Access","Watch","Reserve"))'],
+    ['glimpse(df); summary(df)'],[''],
+    ['── Python (pandas) ──'],['import pandas as pd'],
+    ['df = pd.read_excel("StewardMX.xlsx", sheet_name="'+_spssSheet+'")'],
+    ['df.info(); df.describe(include="all")'],[''],
+    ['── SPSS (sintaxis .sps) ──'],
+    ['GET DATA /TYPE=XLSX /FILE="StewardMX.xlsx" /SHEET=NAME "'+_spssSheet+'" /READNAMES=ON.'],
+    ['* VALUE LABELS y VARIABLE LABELS: copia las definiciones desde la hoja Codebook.'],
+    ['EXECUTE.'],
+  ];
+
   const _newSheets=[
     bioRows,                  // 🧮 Bioestadística (IC95% + fórmulas vivas) — v221
     catPivotRows,             // 🎯 Categorías Dx (Pivot)
@@ -23263,6 +23461,10 @@ async function _buildGoogleSheet(token,pacs,mode){
     metaRows,                 // 🏥 Metadatos del Centro
     _alertRows,               // 🚨 Alertas PROA (v268)
     _readmeRows,              // 📘 README (v268)
+    whonetRows,               // 🧫 WHONET (v287)
+    glassRows,                // 🌍 GLASS-AMR OMS (v287)
+    qcRows,                   // ✅ Control de Calidad (v287)
+    scriptsRows,              // 💻 Scripts SPSS/R/Python (v287)
   ];
   _newSheets.forEach(rows=>{
     if(_abgSheetIdx<sttl.length)writeData.push({range:sttl[_abgSheetIdx]+'!A1',values:rows});
@@ -23288,6 +23490,21 @@ async function _buildGoogleSheet(token,pacs,mode){
     };
     sheetDefs.forEach(sd=>{_nameMap[sd.title]=_san(sd.title);});
     const _origTitles=Object.keys(_nameMap).sort((a,b)=>b.length-a.length); // largos primero
+
+    // v285 FASE 1: intentar ExcelJS (dropdowns + formato condicional NATIVO + heatmaps). Si la
+    // librería no cargó o falla, continúa el render SheetJS de abajo (fallback — no se rompe nada).
+    if(typeof ExcelJS!=='undefined' && window._renderXLSXWithExcelJS){
+      try{
+        const _fnE='StewardMX_'+((HInfo.nombre||HOSP||'reporte')).replace(/[^a-zA-Z0-9]/g,'_')+'_'+(desde===hasta?desde:desde+'_a_'+hasta)+'.xlsx';
+        window._xlsxEngine='ExcelJS';
+        await window._renderXLSXWithExcelJS({
+          sheetDefs, writeData, nameMap:_nameMap, origTitles:_origTitles,
+          ctx:{hospNombre:(HInfo.nombre||HOSP||''), desde, hasta, userName:(window._userName||U?.email||''), appVer:(window._APP_VER||'')},
+          fname:_fnE
+        });
+        return '__XLSX_DONE__';
+      }catch(_ejsErr){ console.warn('[XLSX][ExcelJS] falló, usando SheetJS:',_ejsErr); }
+    }
 
     // ── 2) ESTILOS (xlsx-js-style) — diseño profesional con colores ──
     const _B={style:'thin',color:{rgb:'FFD0D7DE'}};
@@ -23492,6 +23709,7 @@ async function _buildGoogleSheet(token,pacs,mode){
       XLSX.utils.book_append_sheet(_wb,ws,_nameMap[sd.title]);
     });
     const _fname='StewardMX_'+(HInfo.nombre||HOSP||'reporte').replace(/[^a-zA-Z0-9]/g,'_')+'_'+(desde===hasta?desde:desde+'_a_'+hasta)+'.xlsx';
+    window._xlsxEngine='SheetJS';   // fallback: ExcelJS no estaba disponible
     XLSX.writeFile(_wb,_fname,{cellStyles:true});
     return '__XLSX_DONE__';
   }

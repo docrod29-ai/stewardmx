@@ -714,3 +714,63 @@ test('MAG: E. coli R en 2 categorías → NO MDR', () => {
 test('MAG: isMDR unificado llama a clasificarMagiorakos', () => {
   assert.match(_idx, /function isMDR\(p\)\{[\s\S]{0,400}clasificarMagiorakos\(abg/);
 });
+
+/* ═══════════ Renderer ExcelJS — Fase 1 (guardas de presencia) ═══════════ */
+/* Verificación funcional profunda hecha en Node con exceljs (datos intactos + XML con
+   pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
+   Estas guardas protegen contra borrado accidental de las piezas clave. */
+test('XLSX ExcelJS: existe _buildExcelJSWorkbook y wrapper de descarga', () => {
+  assert.match(_idx, /async function _buildExcelJSWorkbook\(opts\)\{/);
+  assert.match(_idx, /window\._renderXLSXWithExcelJS=async function/);
+});
+test('XLSX ExcelJS: cargado por <script src> en head', () => {
+  assert.match(_idx, /exceljs(@[\d.]+)?\/dist\/exceljs(\.min)?\.js/);
+});
+test('XLSX ExcelJS: branch con fallback a SheetJS en __XLSX__', () => {
+  assert.match(_idx, /typeof ExcelJS!=='undefined'[\s\S]{0,400}_renderXLSXWithExcelJS/);
+  assert.match(_idx, /usando SheetJS/); // mensaje de fallback presente
+});
+test('XLSX ExcelJS: features clave en el renderer', () => {
+  const blk = _idx.match(/async function _buildExcelJSWorkbook[\s\S]*?\n  return wb;\n\}/)[0];
+  assert.match(blk, /state:'frozen'/);          // freeze panes
+  assert.match(blk, /autoFilter/);              // autofilter
+  assert.match(blk, /dataValidation=\{type:'list'/); // dropdowns
+  assert.match(blk, /addConditionalFormatting/); // formato condicional
+  assert.match(blk, /colorScale/);              // heatmap
+  assert.match(blk, /dataBar/);                 // data bars
+  assert.match(blk, /hyperlink/);               // portada + ↩ links
+  assert.match(blk, /_dashFx/);                 // fórmulas vivas dashboard
+});
+test('XLSX ExcelJS: consume el MISMO writeData (no pierde hojas)', () => {
+  const blk = _idx.match(/async function _buildExcelJSWorkbook[\s\S]*?\n  return wb;\n\}/)[0];
+  assert.match(blk, /writeData\.find/);
+  assert.match(blk, /sheetDefs\.forEach/);
+});
+
+/* ═══════════ Hojas nuevas WHONET/GLASS/QC/Scripts — Fase 3 (guardas) ═══════════ */
+test('XLSX nuevas hojas: registradas en sheetDefs', () => {
+  assert.match(_idx, /title:'\\u\{1F9EB\} WHONET'/);
+  assert.match(_idx, /GLASS-AMR \(OMS\)/);
+  assert.match(_idx, /Control de Calidad/);
+  assert.match(_idx, /Scripts \(SPSS-R-Python\)/);
+});
+test('XLSX nuevas hojas: row-arrays en _newSheets', () => {
+  assert.match(_idx, /whonetRows,\s*\/\/.*WHONET/);
+  assert.match(_idx, /glassRows,\s*\/\/.*GLASS/);
+  assert.match(_idx, /qcRows,\s*\/\/.*Calidad/);
+  assert.match(_idx, /scriptsRows,\s*\/\/.*Scripts/);
+});
+test('XLSX WHONET: usa aislamientos deduplicados CLSI M39 + códigos WHONET', () => {
+  const blk = _idx.match(/const whonetRows=\[[\s\S]*?if\(whonetRows\.length===1\)/)[0];
+  assert.match(blk, /_isolatesDedup\.forEach/);
+  assert.match(blk, /_whoOrg/);   // código de organismo WHONET
+});
+test('XLSX GLASS: agregado RIS por espécimen×patógeno×antibiótico', () => {
+  const blk = _idx.match(/const glassRows=\[[\s\S]*?if\(glassRows\.length===1\)/)[0];
+  assert.match(blk, /n_tested/); assert.match(blk, /pct_R/);
+});
+test('XLSX Portada: columna CONTENIDO con descripciones (no vacía)', () => {
+  const blk = _idx.match(/async function _buildExcelJSWorkbook[\s\S]*?\n  return wb;\n\}/)[0];
+  assert.match(blk, /_descDe\(sd\.title\)/);
+  assert.match(blk, /formato compatible WHONET/);
+});

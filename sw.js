@@ -1,4 +1,44 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v287 (FASE 3: hojas listas para análisis + CONTENIDO Portada)
+//  4 HOJAS NUEVAS en el .xlsx, calculadas de datos reales y con todo el estilo ExcelJS:
+//    · 🧫 WHONET — 1 fila por aislamiento (dedup CLSI M39) con códigos de organismo/espécimen
+//      WHONET (OPS/PAHO) + S/I/R por antibiótico → importable a WHONET.
+//    · 🌍 GLASS-AMR (OMS) — agregado RIS: espécimen×patógeno×antibiótico con n_tested/R/I/S y %R.
+//    · ✅ Control de Calidad — completitud por variable (% presente/faltante), outliers fuera de
+//      rango fisiológico (edad/peso/creatinina) y duplicados removidos (dedup CLSI M39).
+//    · 💻 Scripts (SPSS-R-Python) — código listo para copiar e importar el dataset.
+//  Además: se rellenó la columna CONTENIDO de la Portada (descripción de cada hoja) que había
+//    quedado vacía al migrar a ExcelJS. Sello de versión actualizado a v287.
+//  Verificación Node con exceljs: hojas presentes, datos intactos (E. coli en WHONET),
+//    CONTENIDO con descripciones, sello "Motor: ExcelJS v287". 136 pruebas en verde.
+//  PENDIENTE: gráficas embebidas (Chart.js→PNG→addImage) + sparklines (etapa browser-only).
+// ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v286 (sello de motor en el .xlsx — diagnóstico "se ve igual")
+//  El usuario reportó que el Excel "se ve exactamente igual". Como el path SheetJS de respaldo
+//  YA tenía colores, era imposible saber a simple vista qué motor generó el archivo. Ahora:
+//    · La Portada del .xlsx estampa "Motor: ExcelJS vXXX — con menús desplegables y semáforos".
+//    · El aviso (toast) al descargar dice el motor usado: ExcelJS (con dropdowns) o SheetJS
+//      (respaldo, sin dropdowns) y recuerda NO abrirlo en Numbers.
+//    · window._xlsxEngine registra el motor; window._APP_VER = versión visible.
+//  Diagnóstico del servidor (verificado): CDN ExcelJS responde 200 y define window.ExcelJS;
+//    la versión en vivo trae el script + branch. Si el usuario ve "igual" es por (a) app no
+//    actualizada o (b) abrir en Numbers. El sello permite distinguirlo sin ambigüedad.
+// ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v285 (FASE 1: motor .xlsx migrado a ExcelJS)
+//  El .xlsx ahora se genera con ExcelJS (carga por <script src>), ganando NATIVO en Excel:
+//    · Listas desplegables (data validation) en columnas categóricas: AWaRe, Política, Acción,
+//      Gravedad, Sí/No → el usuario edita con menú sin romper la estructura.
+//    · Formato condicional NATIVO (semáforos): Access/S verde, Watch/I ámbar, Reserve/R rojo,
+//      ALERTA/CUMPLE/REVISAR; color scale (heatmap) en %R/%S; data bars en DOT/conteos.
+//    · Freeze de encabezado (+1ª col en hojas anchas), autofiltro, zebra, anchos, fechas serial,
+//      fórmulas vivas del Dashboard, Portada con hipervínculos + "↩ Portada" en cada hoja.
+//  CLAVE: consume el MISMO writeData que el path SheetJS → NO se pierde ninguna hoja/columna.
+//  SheetJS queda como FALLBACK automático si ExcelJS no cargó. Verificado en Node con exceljs:
+//    5 hojas, datos intactos, fórmula viva, y XML con pane/autoFilter/dataValidation/
+//    conditionalFormatting/colorScale/dataBar/hyperlinks. 131 pruebas en verde.
+//  PENDIENTE (siguientes etapas Fase 1-5): gráficas embebidas (Chart.js→PNG→addImage),
+//    sparklines, hojas nuevas WHONET/GLASS/Control de Calidad/Scripts SPSS-R-Python.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v284 (FASE 0 COMPLETA: F0.2 denominadores + F0.3 Magiorakos)
 //  · F0.2 DENOMINADORES REALES: días-paciente = Σ(egreso|corte − ingreso) por paciente
 //    (calcDiasPaciente/calcDiasEstancia). DOT NHSN correcto (calcDOT: cada agente cuenta) y
@@ -164,7 +204,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v284';
+const CACHE = 'stewardmx-v287';
 const SHELL = [
   '/',
   '/index.html',
