@@ -1,4 +1,20 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v291 (FIX CRÍTICO: agregar/modificar ATB en pacientes existentes)
+//  REPORTE (médico, vía Dr. Rodríguez): "no me deja agregar atb a los px que ya estaban".
+//  Ningún paciente es estático — debe poder cambiarse el manejo de ATB en cualquier momento.
+//  CAUSA RAÍZ (dos defectos del GATE de Reserve en guardar()):
+//    1) Usaba PACS.find (frágil) para saber qué ATB ya existían. Si el paciente no estaba en
+//       PACS, sus ATB Reserve EXISTENTES se trataban como NUEVOS → exigía re-justificar →
+//       BLOQUEABA. FIX: usar el `prev` robusto (re-leído de Firestore, v279).
+//    2) El GATE BLOQUEABA el guardado por completo si un ATB Reserve nuevo no tenía 50+ chars.
+//       FIX: ya NO bloquea — muestra un confirm ("Guardar igual / justifico después"); el cambio
+//       de tratamiento SIEMPRE se puede documentar. Los Reserve sin justificar quedan marcados
+//       (reserveJusPendiente) y se listan en el Resumen y en el Excel para seguimiento PROA.
+//  REFLEJADO EN: Resumen del paciente (⚠ Justificación Reserve PENDIENTE) y hoja Excel
+//    "Historial ATBs" (nueva columna Justificación Reserve: Documentada / ⚠ PENDIENTE).
+//  El historial/evolución de ATB ya se mostraba (ACTIVOS + SUSPENDIDOS con fechas) — verificado.
+//  152 pruebas en verde + node --check.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v290 (FASE 4.3+4.8: Cockcroft-Gault + días libres de ATB)
 //  · Cockcroft-Gault (window.cockcroftGault): aclaramiento de creatinina para ajuste de dosis,
 //    mostrado JUNTO a la TFG (CKD-EPI 2021) en el formulario cuando hay peso. Verificado vs
@@ -235,7 +251,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v290';
+const CACHE = 'stewardmx-v291';
 const SHELL = [
   '/',
   '/index.html',

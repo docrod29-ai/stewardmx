@@ -823,3 +823,22 @@ test('IAAS: días libres de antibiótico + % exposición', () => {
   assert.match(_idx, /Días libres de antibiótico/);
   assert.match(_idx, /% días con exposición antibiótica/);
 });
+
+/* ═══════════ FIX v291: agregar/modificar ATB en pacientes existentes (GATE Reserve) ═══════════ */
+test('GATE Reserve: usa prev ROBUSTO (no solo PACS.find)', () => {
+  assert.match(_idx, /const _prevForGate=prev\|\|\(editId\?\(PACS\.find/);
+});
+test('GATE Reserve: NO bloquea — confirma y permite guardar igual', () => {
+  // ya no debe existir el return duro que abortaba el guardado por Reserve
+  assert.match(_idx, /Guardar igual \(justifico después\)/);
+  assert.match(_idx, /reserveJusPendiente=true/);
+  // el flujo usa confirm en vez de cortar
+  assert.match(_idx, /_decision==='volver'/);
+});
+test('Resumen: marca Justificación Reserve PENDIENTE', () => {
+  assert.match(_idx, /Justificación Reserve PENDIENTE \(documentar\)/);
+});
+test('Excel Historial ATBs: columna Justificación Reserve', () => {
+  assert.match(_idx, /'Indicación Clínica','Justificación Reserve'/);
+  assert.match(_idx, /\?'Documentada':'⚠ PENDIENTE'/);
+});

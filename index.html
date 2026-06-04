@@ -4503,7 +4503,10 @@ window.guardar=async()=>{
   // pacientes legacy SIN campo reserveJus persistido), la justificación NO se vuelve a pedir.
   // RAZÓN: el médico no debe re-justificar cada vez que modifica una nota/lab/cultivo.
   // La justificación es decisión clínica de ALTA inicial del antibiótico.
-  const _prevForGate=editId?(PACS.find(p=>p.id===editId)||{}):{};
+  // v291 FIX: usar el `prev` ROBUSTO (re-leído de Firestore en v279), no el frágil PACS.find.
+  // Antes, si el paciente no estaba en PACS, sus ATB Reserve EXISTENTES se trataban como nuevos
+  // y el GATE bloqueaba el guardado al "agregar/modificar ATB a pacientes que ya tenían ATB".
+  const _prevForGate=prev||(editId?(PACS.find(p=>p.id===editId)||{}):{});
   const _prevAtbsForGate=Array.isArray(_prevForGate.atbList)?_prevForGate.atbList:[];
   // Set de nombres de ATB que YA estaban prescritos en la versión anterior del paciente
   const _prevAtbNames=new Set(_prevAtbsForGate.map(a=>(a.nombre||'').toLowerCase().trim()).filter(Boolean));
@@ -4535,18 +4538,30 @@ window.guardar=async()=>{
     }
   });
   if(reserveRows.length>0){
+    // v291: la justificación Reserve es IMPORTANTE (PROA/NOM-045) pero NO debe impedir documentar
+    // un cambio de tratamiento — ningún paciente es estático. Se NUDGE-ea, nunca se bloquea.
     const nombres=reserveRows.map(r=>r.nom).join(', ');
-    const confirmMsg='🔴 ANTIBIÓTICO(S) RESERVE sin justificación clínica completa:\n\n'+nombres+'\n\nDebes documentar la justificación clínica (mín. 50 caracteres) en el campo de cada antibiótico Reserve antes de guardar.\n\nHaz clic en la sección roja del ATB Reserve para completarla.';
-    toast('Reserve ATB sin justificación — ver campo rojo debajo del ATB','rd');
-    window._guardarBusy=false;
-    if(btnGuardar){btnGuardar.disabled=false;btnGuardar.style.opacity='';}
-    // Scroll to first offending row
     const firstRow=document.getElementById(reserveRows[0].id);
-    if(firstRow){firstRow.scrollIntoView({behavior:'smooth',block:'center'});}
+    if(firstRow)firstRow.scrollIntoView({behavior:'smooth',block:'center'});
     const jField=document.getElementById(reserveRows[0].id+'-reserve-jus');
-    if(jField){jField.style.borderColor='rgba(255,77,109,.8)';jField.focus();}
-    sfx&&sfx.error&&sfx.error();
-    return;
+    if(jField)jField.style.borderColor='rgba(255,77,109,.8)';
+    const _decision=await new Promise(res=>{
+      _confirmModal(
+        '🔴 ATB Reserve sin justificación de 50+ caracteres:\n\n'+nombres+'\n\nLa justificación es importante para PROA/NOM-045 — pero NO debe impedir registrar el cambio de tratamiento.\n\n¿Cómo continúas?',
+        ()=>res('guardar'),
+        {labelYes:'Guardar igual (justifico después)',colorYes:'rgba(0,212,168,.15)',borderYes:'rgba(0,212,168,.4)',textYes:'var(--teal)',onCancel:()=>res('volver')}
+      );
+    });
+    if(_decision==='volver'){
+      window._guardarBusy=false;
+      if(btnGuardar){btnGuardar.disabled=false;btnGuardar.style.opacity='';}
+      if(jField)jField.focus();
+      return;
+    }
+    // "Guardar igual": se procede. Los ATB Reserve sin justificar quedan marcados como pendientes
+    // (reserveJusPendiente=true) para seguimiento PROA, sin contaminar el texto de justificación.
+    reserveRows.forEach(r=>{ try{ const _ar=(atbListData||[]).find(a=>(a.nombre||'')===r.nom); if(_ar)_ar.reserveJusPendiente=true; }catch(_){} });
+    toast('Guardado. ⚠ Falta justificación Reserve de: '+nombres+' — documéntala cuando puedas.','am');
   }
   // ── GATE: Urgencias + ATB amplio espectro → requiere criterios de sepsis ──
   const svcActual=(data.servicio||'').toLowerCase();
@@ -9341,6 +9356,11 @@ window.generarResumenPROA=async function(pid){
           }
           if(a.pol||a.aware)txt+='     Política: '+(a.pol||'libre')+' · AWaRe: '+(a.aware||'—')+'\n';
           if(a.indicacionClin)txt+='     Indicación: '+a.indicacionClin+'\n';
+          // v291: marcar Reserve sin justificación documentada (seguimiento PROA)
+          if(a.aware==='Reserve'){
+            const _rj=(a.reserveJus||a.justificacionReserve||'').trim();
+            txt+=_rj?'     Justificación Reserve: ✓ documentada\n':'     ⚠ Justificación Reserve PENDIENTE (documentar)\n';
+          }
         });
       }
       if(_atbSusp.length){
@@ -21729,7 +21749,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v290'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v291'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
@@ -22385,7 +22405,7 @@ async function _buildGoogleSheet(token,pacs,mode){
 
   // ── Hoja Historial ATBs — una fila por ATB por paciente ──
   const _hoy3=new Date().toISOString().slice(0,10);
-  const atbHistRows=[['Paciente','Expediente','Servicio','Cama','# ATBs Total','# ATBs Activos','ATB','Dosis','Vía','Fecha Inicio','Fecha Fin','Días','Estado','AWaRe','Política','Indicación Clínica']];
+  const atbHistRows=[['Paciente','Expediente','Servicio','Cama','# ATBs Total','# ATBs Activos','ATB','Dosis','Vía','Fecha Inicio','Fecha Fin','Días','Estado','AWaRe','Política','Indicación Clínica','Justificación Reserve']];
   pacs.forEach(p=>{
     const _items=(p.atbList&&p.atbList.length)
       ?p.atbList
@@ -22393,7 +22413,7 @@ async function _buildGoogleSheet(token,pacs,mode){
     const _nTotal=_items.length;
     const _nActivos=_items.filter(a=>!a.fechaFinIV||a.fechaFinIV>_hoy3).length;
     if(!_items.length){
-      atbHistRows.push([p.nombre||'',p.exp||'',p.servicio||'',p.cama||'',0,0,'Sin ATB','','','','','','','','','']);
+      atbHistRows.push([p.nombre||'',p.exp||'',p.servicio||'',p.cama||'',0,0,'Sin ATB','','','','','','','','','','']);
       return;
     }
     _items.forEach(a=>{
@@ -22412,7 +22432,8 @@ async function _buildGoogleSheet(token,pacs,mode){
         _activo?'ACTIVO':'SUSPENDIDO',
         a.aware||'',
         (a.pol||'libre').toUpperCase(),
-        a.indicacionClin||''
+        a.indicacionClin||'',
+        a.aware==='Reserve'?((a.reserveJus||a.justificacionReserve||'').trim()?'Documentada':'⚠ PENDIENTE'):'N/A'
       ]);
     });
   });
