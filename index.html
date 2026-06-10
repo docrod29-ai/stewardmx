@@ -2908,7 +2908,11 @@ function _estadoBadgeMicro(m,dias){
   if(m.estado==='contaminante') return`<span style="font-size:9px;padding:2px 6px;border-radius:10px;background:rgba(245,166,35,.1);color:var(--amber);border:1px solid rgba(245,166,35,.3);">🟠 Contaminante</span>`;
   if(m.estado==='en_proceso'){
     const _prelLabel=m.gram&&!m.gram.includes('No aplica')?m.gram.replace('Gram positivos','GP').replace('Gram negativos','GN').replace(' en bacilos','').replace(' en racimos','').replace(' en cadenas','').replace(' en pares','').slice(0,20):m.preliminarResumen?m.preliminarResumen.slice(0,22):'pendiente ID';
-    return`<span style="font-size:9px;padding:2px 6px;border-radius:10px;background:rgba(99,179,237,.1);color:#63b3ed;border:1px solid rgba(99,179,237,.3);" title="${escHtml(m.preliminarResumen||'')}">🟡 Prelim: ${escHtml(_prelLabel)}</span>`;
+    // v292: sello de origen del preliminar (Micro vs PROA) visible
+    const _pf=m.preliminar&&m.preliminar.fuente;
+    const _src=_pf==='micro'?' · 🔬Micro':_pf==='proa'?' · ⭐PROA':'';
+    const _srcTitle=m.preliminar?(' — Capturado por: '+(m.preliminar.capturadoNombre||'')+' ('+(m.preliminar.capturadoRol||m.preliminar.fuente||'')+')'):'';
+    return`<span style="font-size:9px;padding:2px 6px;border-radius:10px;background:rgba(99,179,237,.1);color:#63b3ed;border:1px solid rgba(99,179,237,.3);" title="${escHtml((m.preliminarResumen||'')+_srcTitle)}">🟡 Prelim: ${escHtml(_prelLabel)}${_src}</span>`;
   }
   // pendiente
   const d=dias||0;
@@ -3407,16 +3411,31 @@ window.guardarReporteMicro=async function(pid){
     if(window._mrCurrentMuestraId){
       const _muesBase=Array.isArray(p.muestras)&&p.muestras.length?p.muestras:
         (p.muestra||p.cult?[{id:window._mrCurrentMuestraId,tipo:p.muestra||p.cult||'',fecha:p.cultFecha||'',rechazada:false,estado:'pendiente'}]:[]);
-      const nuevasMuestras=_muesBase.map(m=>m.id===window._mrCurrentMuestraId?{
-        ...m,estado:nuevoEstado,resultado:res,
-        organismo:organismo||m.organismo||null,
-        gram:(gram&&gram!=='— No aplica —')?gram:(m.gram||null),
-        fenotipo:fenotipo||m.fenotipo||null,
-        notas:notas||m.notas||null,
-        preliminarResumen:preliminarResumen||m.preliminarResumen||null,
-        fechaReporte:fecha||new Date().toISOString().slice(0,10),
-        reportadoPor:U.uid,reportadoNombre:window._userName||U.email,
-      }:m);
+      // v292: 1 preliminar activo por cultivo, con sello de origen. Micro REEMPLAZA al de PROA;
+      // si PROA intenta capturar y YA hay uno de micro, prevalece micro (no se sobrescribe).
+      const _fuente=window._isMicrobiologo?'micro':'proa';
+      const _targetM=_muesBase.find(m=>m.id===window._mrCurrentMuestraId);
+      const _bloqueaProa=(res==='positivo_preliminar')&&_fuente==='proa'&&_targetM&&_targetM.preliminar&&_targetM.preliminar.fuente==='micro';
+      if(_bloqueaProa)toast('Ya hay un preliminar de Microbiología — prevalece. No se sobrescribió.','am');
+      const nuevasMuestras=_muesBase.map(m=>{
+        if(m.id!==window._mrCurrentMuestraId||_bloqueaProa)return m;
+        return {
+          ...m,estado:nuevoEstado,resultado:res,
+          organismo:organismo||m.organismo||null,
+          gram:(gram&&gram!=='— No aplica —')?gram:(m.gram||null),
+          fenotipo:fenotipo||m.fenotipo||null,
+          notas:notas||m.notas||null,
+          preliminarResumen:preliminarResumen||m.preliminarResumen||null,
+          fechaReporte:fecha||new Date().toISOString().slice(0,10),
+          reportadoPor:U.uid,reportadoNombre:window._userName||U.email,
+          // sello de origen del preliminar (capturadoPor/rol/fecha + fuente)
+          preliminar:(res==='positivo_preliminar')?{
+            resumen:preliminarResumen||'',gram:gram||'',organismo:organismo||'',
+            fuente:_fuente,capturadoPor:U.uid,capturadoNombre:window._userName||U.email,
+            capturadoRol:window._userRol||'',fechaCaptura:new Date().toISOString()
+          }:(m.preliminar||null),
+        };
+      });
       // Await para que PACS se actualice antes de renderMicro
       await setDoc(doc(db,'hospitals',HOSP,'months',currentMonth,'patients',pid),
         {muestras:nuevasMuestras,updatedAt:serverTimestamp()},{merge:true});
@@ -4342,9 +4361,17 @@ window.guardar=async()=>{
   if(_camaSel&&_svcSel){
     const _camaRobadaLocal=PACS.find(p=>p.servicio===_svcSel&&p.cama===_camaSel&&p.id!==editId);
     if(_camaRobadaLocal){
-      toast('⚠ Cama '+_camaSel+' ya está ocupada por '+(_camaRobadaLocal.nombre||'otro paciente'),'rd');
       window._guardarBusy=false;
       if(btnGuardar){btnGuardar.disabled=false;btnGuardar.style.opacity='';}
+      // v292: crear "nuevo" sobre una cama ocupada casi siempre es el MISMO paciente (micro/PROA
+      // querían agregarle un resultado). En vez de un callejón sin salida, ofrecer su ficha.
+      if(!editId){
+        _confirmModal('La cama '+_camaSel+' la ocupa '+(_camaRobadaLocal.nombre||'otro paciente')+'.\n\n¿Querías agregarle un resultado/preliminar a ESE paciente?',
+          ()=>{cerrarModal();setTimeout(()=>abrirReporteMicro(_camaRobadaLocal.id),300);},
+          {labelYes:'Sí, abrir su ficha',colorYes:'rgba(0,212,168,.15)',borderYes:'rgba(0,212,168,.4)',textYes:'var(--teal)'});
+      }else{
+        toast('⚠ Cama '+_camaSel+' ya está ocupada por '+(_camaRobadaLocal.nombre||'otro paciente'),'rd');
+      }
       return;
     }
     // Verificación server-side atómica vía Cloud Function (checkBedAvailable).
@@ -4371,9 +4398,16 @@ window.guardar=async()=>{
         if(_c)_bedConflict=_c.data().nombre||'otro paciente';
       }
       if(_bedConflict){
-        toast('⚠ Cama '+_camaSel+' acaba de ser tomada por '+_bedConflict,'rd');
         window._guardarBusy=false;
         if(btnGuardar){btnGuardar.disabled=false;btnGuardar.style.opacity='';}
+        const _occ=PACS.find(p=>p.servicio===_svcSel&&p.cama===_camaSel&&p.id!==editId&&!p.alta);
+        if(!editId&&_occ){
+          _confirmModal('La cama '+_camaSel+' la ocupa '+_bedConflict+'.\n\n¿Querías agregarle un resultado/preliminar a ESE paciente?',
+            ()=>{cerrarModal();setTimeout(()=>abrirReporteMicro(_occ.id),300);},
+            {labelYes:'Sí, abrir su ficha',colorYes:'rgba(0,212,168,.15)',borderYes:'rgba(0,212,168,.4)',textYes:'var(--teal)'});
+        }else{
+          toast('⚠ Cama '+_camaSel+' acaba de ser tomada por '+_bedConflict,'rd');
+        }
         return;
       }
     }catch(_){/* si todo falla, la validación local ya capturó el caso obvio */}
@@ -9079,7 +9113,11 @@ window.abrirDetalle=pid=>{
   html+='<div class="ftab-c" id="dt-abg">';
   html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
   html+='<span style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Aislamientos / cultivos registrados</span>';
+  html+='<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+  // v292: PROA (además de micro) puede capturar resultados/preliminares desde la ficha.
+  if(window._isMicrobiologo||window._isPROA)html+='<button class="btn-sm" style="border-color:rgba(245,166,35,.5);color:var(--amber);" onclick="abrirReporteMicro(\''+escJs(pid)+'\')" title="Capturar resultado o preliminar de microbiología (PROA o Micro)">🟡 Capturar preliminar</button>';
   html+='<button class="btn-sm btn-sm-teal" onclick="abrirNuevoAntibiograma(\''+escJs(pid)+'\')">+ Agregar aislamiento</button>';
+  html+='</div>';
   html+='</div>';
   // Mostrar abg del registro principal (legacy) si existe
   if(p.abg&&Object.keys(p.abg).length){
@@ -9293,6 +9331,8 @@ window.generarResumenPROA=async function(pid){
         if(m.gram)txt+='    Gram: '+m.gram+'\n';
         if(m.preliminarResumen)txt+='    Datos preliminares: '+m.preliminarResumen+'\n';
         if(m.organismo)txt+='    Organismo (parcial): '+m.organismo+'\n';
+        // v292: origen del preliminar (Micro vs PROA)
+        if(m.preliminar&&m.preliminar.fuente)txt+='    Capturado por: '+(m.preliminar.fuente==='micro'?'🔬 Microbiología':'⭐ Equipo PROA')+(m.preliminar.capturadoNombre?' ('+m.preliminar.capturadoNombre+')':'')+'\n';
         txt+='    ⏳ Esperando ID definitivo / antibiograma final\n';
       });
       txt+='\n';
@@ -18162,9 +18202,11 @@ window.onMicSvcChange=function(){
   const sel=document.getElementById('mic-cama');
   if(!sel||sel.tagName!=='SELECT')return;
   const beds=CAMAS[svc]||[];
-  const ocupadas=new Set(PACS.filter(p=>p.servicio===svc).map(p=>p.cama).filter(Boolean));
+  // v292: NO deshabilitar la cama ocupada — micro debe poder elegirla para reportar sobre ESE
+  // paciente (el guardado enruta al pid existente). Se muestra quién la ocupa como ayuda.
+  const _ocup={}; PACS.filter(p=>p.servicio===svc&&!p.alta).forEach(p=>{if(p.cama)_ocup[p.cama]=p.nombre||'ocupada';});
   sel.innerHTML='<option value="">— Selecciona cama —</option>'+
-    beds.map(b=>{const ocu=ocupadas.has(b);return`<option value="${escHtml(b)}"${ocu?' disabled':''}>${escHtml(b)}${ocu?' (Ocupada)':''}</option>`;}).join('');
+    beds.map(b=>{const who=_ocup[b];return`<option value="${escHtml(b)}">${escHtml(b)}${who?' — '+escHtml(who):''}</option>`;}).join('');
 };
 
 window.guardarPacienteMicro=async function(){
@@ -18194,10 +18236,23 @@ window.guardarPacienteMicro=async function(){
   if(muestras.some(m=>m.rechazada&&!m.motivoRechazo)){toast('Indica el motivo de rechazo de cada muestra rechazada','am');return;}
 
   const primera=muestras[0];
-  // Duplicado: solo bloquea si nombre + servicio + cama coinciden (los tres no vacíos)
-  const existe=(svc&&cama)?PACS.find(p=>p.nombre?.toLowerCase()===nombre.toLowerCase()&&(p.servicio||'').toLowerCase()===svc.toLowerCase()&&(p.cama||'').toLowerCase()===cama.toLowerCase()):null;
+  // v292 FIX: una cama ocupada = el MISMO paciente. Matching robusto por cama+servicio (primario)
+  // o nombre+servicio → SIEMPRE enlazar al pid existente (updateDoc), nunca crear un duplicado.
+  const _norm=s=>(s||'').toString().trim().toLowerCase();
+  const existe=PACS.find(p=>!p.alta && (
+     (svc&&cama && _norm(p.servicio)===_norm(svc) && _norm(p.cama)===_norm(cama)) ||
+     (nombre && _norm(p.nombre)===_norm(nombre) && (!svc||_norm(p.servicio)===_norm(svc)))
+  ))||null;
   if(existe){
-    toast('⚠ Ya existe un paciente con ese nombre y cama en el censo','am');
+    // Adjuntar las muestras nuevas al paciente EXISTENTE (merge sobre su pid), sin duplicar.
+    try{
+      const _prevM=Array.isArray(existe.muestras)?existe.muestras:[];
+      const _merged=[..._prevM,...muestras];
+      await setDoc(doc(db,'hospitals',HOSP,'months',currentMonth,'patients',existe.id),
+        {muestras:_merged,updatedAt:serverTimestamp()},{merge:true});
+      const _i=PACS.findIndex(x=>x.id===existe.id); if(_i>=0)PACS[_i]={...PACS[_i],muestras:_merged};
+      toast('🧫 Muestras agregadas a '+(existe.nombre||'paciente existente')+' — abre su ficha para reportar','tl');
+    }catch(_e){toast('Error al adjuntar muestras: '+_e.message,'rd');console.warn('[MicroPac merge]',_e);}
     cerrarModal();
     setTimeout(()=>abrirReporteMicro(existe.id),400);
     return;
@@ -21749,7 +21804,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v291'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v292'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){

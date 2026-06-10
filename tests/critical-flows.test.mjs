@@ -842,3 +842,34 @@ test('Excel Historial ATBs: columna Justificación Reserve', () => {
   assert.match(_idx, /'Indicación Clínica','Justificación Reserve'/);
   assert.match(_idx, /\?'Documentada':'⚠ PENDIENTE'/);
 });
+
+/* ═══════════ v292: micro/cama + preliminares PROA ═══════════ */
+test('MICRO: guardarPacienteMicro enlaza al paciente existente (no duplica)', () => {
+  // matching robusto por cama+servicio o nombre+servicio
+  assert.match(_idx, /_norm\(p\.servicio\)===_norm\(svc\) && _norm\(p\.cama\)===_norm\(cama\)/);
+  // adjunta muestras al existente con merge (no addDoc nuevo)
+  assert.match(_idx, /Muestras agregadas a '\+\(existe\.nombre/);
+});
+test('MICRO: cama del formulario micro YA no se deshabilita', () => {
+  const blk = _idx.match(/const sel=document\.getElementById\('mic-cama'\);[\s\S]*?\n};/)[0];
+  assert.doesNotMatch(blk, /disabled/);
+  assert.match(blk, /_ocup\[b\]/);
+});
+test('GUARDAR: cama ocupada ofrece abrir ficha del ocupante (no callejón)', () => {
+  assert.match(_idx, /¿Querías agregarle un resultado\/preliminar a ESE paciente\?/);
+  assert.match(_idx, /abrirReporteMicro\(_camaRobadaLocal\.id\)/);
+});
+test('PRELIM: sello de origen (fuente/capturadoPor/rol/fecha)', () => {
+  assert.match(_idx, /preliminar:\(res==='positivo_preliminar'\)\?\{/);
+  assert.match(_idx, /fuente:_fuente,capturadoPor:U\.uid/);
+  assert.match(_idx, /const _fuente=window\._isMicrobiologo\?'micro':'proa'/);
+});
+test('PRELIM: micro reemplaza a PROA; PROA no pisa a micro', () => {
+  assert.match(_idx, /_bloqueaProa=\(res==='positivo_preliminar'\)&&_fuente==='proa'&&_targetM&&_targetM\.preliminar&&_targetM\.preliminar\.fuente==='micro'/);
+});
+test('PRELIM: PROA puede capturar desde la ficha (botón)', () => {
+  assert.match(_idx, /_isMicrobiologo\|\|window\._isPROA\)html\+='<button[\s\S]*?Capturar preliminar/);
+});
+test('PRELIM: UI muestra el origen (Micro/PROA)', () => {
+  assert.match(_idx, /_pf==='micro'\?' · 🔬Micro':_pf==='proa'\?' · ⭐PROA'/);
+});

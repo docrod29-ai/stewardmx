@@ -1,4 +1,23 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v292 (FIX micro/cama + nueva capacidad: PROA captura preliminares)
+//  BUG (reporte de usuarios): al agregar un preliminar a un paciente YA hospitalizado salía
+//  "cama ocupada" y no se enlazaba sobre el mismo paciente. CAUSA: el preliminar se registraba
+//  por un flujo de CREACIÓN de paciente (matching frágil → duplicado / choque de cama en guardar()),
+//  no como updateDoc sobre el pid existente.
+//  FIX (blinda AMBOS caminos):
+//    · guardarPacienteMicro: matching robusto (cama+servicio o nombre+servicio) → ADJUNTA las
+//      muestras al pid existente (merge) y abre su ficha; nunca crea duplicado.
+//    · Formulario micro: la cama ocupada ya NO se deshabilita (se muestra el ocupante).
+//    · guardar(): si la cama está ocupada al crear "nuevo", ofrece abrir la ficha de ESE paciente
+//      (abrirReporteMicro) en vez de un callejón sin salida (local + chequeo server-side).
+//  NUEVA CAPACIDAD: PROA (no solo Micro) captura preliminares — botón "🟡 Capturar preliminar"
+//  en la ficha (visible si _isMicrobiologo||_isPROA). Modelo: 1 preliminar activo por cultivo
+//  con SELLO DE ORIGEN (preliminar:{fuente:'micro'|'proa',capturadoPor,capturadoRol,fechaCaptura}).
+//  Regla: Micro REEMPLAZA al de PROA; si PROA intenta sobre uno de Micro, prevalece Micro. La UI
+//  muestra el origen (🔬Micro / ⭐PROA) en chips y resumen.
+//  firestore.rules: SIN CAMBIOS (permisos por membresía isHospMember, no por rol → PROA ya puede).
+//  159 pruebas en verde + node --check.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v291 (FIX CRÍTICO: agregar/modificar ATB en pacientes existentes)
 //  REPORTE (médico, vía Dr. Rodríguez): "no me deja agregar atb a los px que ya estaban".
 //  Ningún paciente es estático — debe poder cambiarse el manejo de ATB en cualquier momento.
@@ -251,7 +270,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v291';
+const CACHE = 'stewardmx-v292';
 const SHELL = [
   '/',
   '/index.html',
