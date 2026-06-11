@@ -1149,117 +1149,13 @@ function _grupoEdad(edad){
   return '≥60';
 }
 
-// ── Chi-square test (2 × k contingency table) ────────────────────────────
-// rows: [{label, counts:[n1,n2,...]}], where each row is a group
-// Returns: { chi2, df, pValue, expected, observed }
-function chiSquareTest(observed){
-  // observed: 2D array [rows][cols]
-  const nRows=observed.length;
-  if(!nRows)return {chi2:0,df:0,pValue:1,error:'Sin datos'};
-  const nCols=observed[0].length;
-  if(!nCols)return {chi2:0,df:0,pValue:1,error:'Sin columnas'};
-  // Totales
-  const rowTotals=observed.map(r=>r.reduce((s,v)=>s+v,0));
-  const colTotals=Array(nCols).fill(0).map((_,c)=>observed.reduce((s,r)=>s+r[c],0));
-  const grandTotal=rowTotals.reduce((s,v)=>s+v,0);
-  if(grandTotal===0)return {chi2:0,df:0,pValue:1,error:'Total=0'};
-  // Expected counts
-  const expected=observed.map((r,i)=>r.map((_,c)=>(rowTotals[i]*colTotals[c])/grandTotal));
-  // Chi-square statistic
-  let chi2=0;
-  for(let i=0;i<nRows;i++){
-    for(let c=0;c<nCols;c++){
-      if(expected[i][c]>0){
-        const diff=observed[i][c]-expected[i][c];
-        chi2+=(diff*diff)/expected[i][c];
-      }
-    }
-  }
-  const df=(nRows-1)*(nCols-1);
-  return {chi2:+chi2.toFixed(4),df,pValue:_chi2ToPvalue(chi2,df),expected,observed,grandTotal};
-}
-
-// Aproximación de p-value desde chi² y df usando Wilson-Hilferty (suficientemente exacta para df>=1)
-function _chi2ToPvalue(chi2,df){
-  if(df===0||chi2<=0)return 1;
-  // Wilson-Hilferty: Z = ((chi2/df)^(1/3) - (1 - 2/(9*df))) / sqrt(2/(9*df))
-  const x=Math.pow(chi2/df,1/3);
-  const a=1-2/(9*df);
-  const b=Math.sqrt(2/(9*df));
-  const z=(x-a)/b;
-  // Cumulative normal (Hastings approx)
-  const p=1-_normCDF(z);
-  return +p.toFixed(6);
-}
-function _normCDF(z){
-  // Abramowitz & Stegun 26.2.17 approximation (max error 7.5e-8)
-  if(z<-6)return 0; if(z>6)return 1;
-  const b1=0.319381530,b2=-0.356563782,b3=1.781477937,b4=-1.821255978,b5=1.330274429;
-  const p=0.2316419;
-  const c=1/Math.sqrt(2*Math.PI);
-  const t=1/(1+p*Math.abs(z));
-  const v=c*Math.exp(-z*z/2)*(b1*t+b2*t*t+b3*Math.pow(t,3)+b4*Math.pow(t,4)+b5*Math.pow(t,5));
-  return z<0?v:1-v;
-}
-
-// ── Fisher's Exact Test (2×2) — p-value EXACTO para tablas pequeñas (Fase 0.5) ──────────
-// Cuando n<30 o alguna celda esperada <5, χ² (incluso con Yates) no es válido; el estándar
-// epidemiológico (CLSI, GLASS, papers de AMR) exige el test exacto de Fisher. Implementado
-// con log-factoriales (sin overflow) y two-tailed por el método de sumar todas las tablas
-// con probabilidad ≤ la observada. Devuelve {p (bilateral), pLeft, pRight, n}.
-function _logFactorial(n){ if(n<2)return 0; let s=0; for(let i=2;i<=n;i++)s+=Math.log(i); return s; }
-function _logHyper2x2(a,b,c,d){
-  const r1=a+b,r2=c+d,c1=a+c,c2=b+d,n=a+b+c+d;
-  return _logFactorial(r1)+_logFactorial(r2)+_logFactorial(c1)+_logFactorial(c2)
-        -_logFactorial(n)-_logFactorial(a)-_logFactorial(b)-_logFactorial(c)-_logFactorial(d);
-}
-function fisherExact2x2(a,b,c,d){
-  a=Math.max(0,Math.round(a));b=Math.max(0,Math.round(b));c=Math.max(0,Math.round(c));d=Math.max(0,Math.round(d));
-  const n=a+b+c+d;
-  if(n===0)return {p:1,pLeft:1,pRight:1,n:0,error:'Total=0'};
-  const r1=a+b,c1=a+c;
-  const pObs=Math.exp(_logHyper2x2(a,b,c,d));
-  const aMin=Math.max(0,r1+c1-n),aMax=Math.min(r1,c1);
-  let pTwo=0,pLeft=0,pRight=0; const EPS=1e-7;
-  for(let x=aMin;x<=aMax;x++){
-    const px=Math.exp(_logHyper2x2(x,r1-x,c1-x,n-r1-c1+x));
-    if(px<=pObs*(1+EPS))pTwo+=px;
-    if(x<=a)pLeft+=px;
-    if(x>=a)pRight+=px;
-  }
-  return {p:Math.min(1,+pTwo.toFixed(6)),pLeft:Math.min(1,+pLeft.toFixed(6)),pRight:Math.min(1,+pRight.toFixed(6)),n};
-}
-window.fisherExact2x2=fisherExact2x2;
-// Selección automática del test correcto para una tabla 2×2 según tamaño (CLSI/epi):
-//   n<30 o alguna celda esperada <5 → Fisher exacto; si no → χ² (Yates si aplica).
-function testAuto2x2(a,b,c,d){
-  const n=a+b+c+d; if(!n)return {test:'—',p:1,n:0};
-  const r1=a+b,r2=c+d,c1=a+c,c2=b+d;
-  const minExp=Math.min(r1*c1,r1*c2,r2*c1,r2*c2)/n;
-  if(n<30||minExp<5){const f=fisherExact2x2(a,b,c,d);return {test:'Fisher exacto',p:f.p,n,minExp:+minExp.toFixed(2)};}
-  const ch=chiSquareTest([[a,b],[c,d]]);return {test:'χ²',p:ch.pValue,n,minExp:+minExp.toFixed(2)};
-}
-window.testAuto2x2=testAuto2x2;
-
-// ── MIC50 / MIC90 (Fase 0.4) — percentiles de CMI por método CLSI M39 ───────────────────
-// parseMICnum: convierte el string de CMI ("16","<=0.12",">=32","0,25","≤4") a número para
-//   ordenar. Censuras: se usa el valor del límite de dilución reportado (<=x→x, >=x→x).
-function parseMICnum(v){
-  if(v==null)return null;
-  let s=String(v).trim().replace(',','.').replace(/≤/g,'<=').replace(/≥/g,'>=');
-  s=s.replace(/[<>]=?/g,'').trim();
-  const n=parseFloat(s);
-  return isFinite(n)?n:null;
-}
-// micStats: MIC50 = menor CMI con % acumulado ≥50; MIC90 = menor con ≥90 (nearest-rank, CLSI).
-function micStats(values){
-  const nums=(values||[]).map(parseMICnum).filter(v=>v!=null).sort((a,b)=>a-b);
-  const n=nums.length;
-  if(!n)return {n:0,mic50:null,mic90:null};
-  const at=q=>nums[Math.max(0,Math.min(n-1,Math.ceil(q*n)-1))];
-  return {n,mic50:at(0.5),mic90:at(0.9)};
-}
-window.parseMICnum=parseMICnum; window.micStats=micStats;
+// ── Núcleo estadístico/clínico → js/core/stats.js (extraído v295, primer módulo del monolito) ──
+// chiSquareTest · fisherExact2x2 · testAuto2x2 · parseMICnum · micStats · cockcroftGault
+// Ahora viven en un módulo PURO y testeable (las pruebas importan la función REAL, no un espejo).
+// Se importan aquí (los import se elevan/hoisted) y se reexponen en window.* para los onclick.
+import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault } from './js/core/stats.js';
+window.chiSquareTest=chiSquareTest; window.fisherExact2x2=fisherExact2x2; window.testAuto2x2=testAuto2x2;
+window.parseMICnum=parseMICnum; window.micStats=micStats; window.cockcroftGault=cockcroftGault;
 
 // ── CLSI M39 Deduplication ──────────────────────────────────────────────
 // Mantiene SOLO el primer aislamiento por (paciente + especie + tipo de espécimen + período).
@@ -1333,7 +1229,6 @@ window.clasificarMagiorakos=clasificarMagiorakos;
 window._normalizeWardNHSN=_normalizeWardNHSN;
 window._normalizeSpecimen=_normalizeSpecimen;
 window._grupoEdad=_grupoEdad;
-window.chiSquareTest=chiSquareTest;
 window.clsim39Deduplicate=clsim39Deduplicate;
 window.detectPhenotypes=detectPhenotypes;
 window._organismToSpeciesKey=_organismToSpeciesKey;
@@ -8596,14 +8491,7 @@ function _updateICBadge(){
   if(solB){solB.textContent=solPend||'';solB.style.display=solPend>0?'inline':'none';}
 }
 
-// Cockcroft-Gault (Fase 4.8) — aclaramiento de creatinina (mL/min) para ajuste de dosis ATB.
-// CrCl = ((140 − edad) × peso × (0.85 si mujer)) / (72 × Cr). Devuelve null si faltan datos.
-window.cockcroftGault=function(edad, peso, creat, sexo){
-  edad=parseFloat(edad)||0; peso=parseFloat(peso)||0; creat=parseFloat(creat)||0;
-  if(!edad||!peso||!creat||creat<=0)return null;
-  const female=(String(sexo||'').toUpperCase()==='F');
-  return ((140-edad)*peso*(female?0.85:1))/(72*creat);
-};
+// cockcroftGault → js/core/stats.js (extraído v295). window.cockcroftGault se definió al importar el módulo (arriba).
 window.calcTFG=function(){
   const edad=parseFloat(gv('f-edad'))||0;
   const creat=parseFloat(gv('f-creat'))||0;
@@ -21824,7 +21712,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v294'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v295'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){

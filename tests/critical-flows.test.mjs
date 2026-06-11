@@ -10,6 +10,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+// Módulo extraído del monolito (v295): se prueba la función REAL, no un espejo regex de index.html.
+import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault } from '../js/core/stats.js';
 
 /* ─────────────── ESPEJOS de funciones puras (index.html v217) ─────────────── */
 
@@ -613,27 +615,28 @@ test('BLINDAJE: múltiples campos vacíos → conserva todos y los reporta', () 
 });
 
 /* ═══════════ Fisher's Exact Test 2×2 (Fase 0.5) — vs valores de R ═══════════ */
-const _mFish = _idx.match(/function _logFactorial\(n\)\{[\s\S]*?window\.fisherExact2x2=fisherExact2x2;/);
-let _fisher = () => ({p:1});
-if (_mFish) { _fisher = new Function('const window={};' + _mFish[0] + ' return window.fisherExact2x2;')(); }
+/* Se prueba la función REAL importada de js/core/stats.js (ya no un espejo regex de index.html). */
+const _fisher = fisherExact2x2;
 const _near = (x, y, tol=0.001) => Math.abs(x - y) <= tol;
-test('FISHER: existe fisherExact2x2', () => { assert.ok(_mFish); });
+test('FISHER: existe fisherExact2x2', () => { assert.equal(typeof fisherExact2x2, 'function'); });
 test('FISHER: c(3,1,1,3) → p≈0.4857 (R)', () => { assert.ok(_near(_fisher(3,1,1,3).p, 0.4857), 'p='+_fisher(3,1,1,3).p); });
 test('FISHER: c(2,3,3,2) simétrica → p=1', () => { assert.ok(_near(_fisher(2,3,3,2).p, 1.0), 'p='+_fisher(2,3,3,2).p); });
 test('FISHER: c(0,5,5,0) → p≈0.007937 (R)', () => { assert.ok(_near(_fisher(0,5,5,0).p, 0.007937), 'p='+_fisher(0,5,5,0).p); });
 test('FISHER: c(10,0,0,10) → p muy pequeño (<0.0001)', () => { assert.ok(_fisher(10,0,0,10).p < 0.0001, 'p='+_fisher(10,0,0,10).p); });
 test('FISHER: tabla grande balanceada c(20,20,20,20) → p=1', () => { assert.ok(_near(_fisher(20,20,20,20).p, 1.0), 'p='+_fisher(20,20,20,20).p); });
 test('FISHER: n=0 → p=1 sin crash', () => { assert.equal(_fisher(0,0,0,0).p, 1); });
-test('FISHER: selector testAuto2x2 usa umbral n<30', () => { assert.match(_idx, /function testAuto2x2[\s\S]{0,400}n<30\|\|minExp<5/); });
+test('FISHER: selector testAuto2x2 → Fisher para n<30, χ² para n grande', () => {
+  assert.equal(testAuto2x2(3,1,1,3).test, 'Fisher exacto');   // n=8 (<30) → exacto
+  assert.equal(testAuto2x2(20,20,20,20).test, 'χ²');          // n=80, esperado≥5 → χ²
+});
+test('χ²: independiente → p alto; asociación fuerte → p bajo', () => {
+  assert.ok(chiSquareTest([[10,10],[10,10]]).pValue > 0.9, 'indep');     // chi²=0 → p=1
+  assert.ok(chiSquareTest([[40,10],[10,40]]).pValue < 0.001, 'asociada'); // chi²=36,df=1
+});
 
 /* ═══════════ MIC50 / MIC90 (Fase 0.4) ═══════════ */
-const _mMic = _idx.match(/function parseMICnum\(v\)\{[\s\S]*?window\.parseMICnum=parseMICnum; window\.micStats=micStats;/);
-let _parseMIC = () => null, _micStats = () => ({});
-if (_mMic) {
-  _parseMIC = new Function('const window={};' + _mMic[0] + ' return window.parseMICnum;')();
-  _micStats = new Function('const window={};' + _mMic[0] + ' return window.micStats;')();
-}
-test('MIC: existe parseMICnum/micStats', () => { assert.ok(_mMic); });
+const _parseMIC = parseMICnum, _micStats = micStats;   // función REAL importada de js/core/stats.js
+test('MIC: existe parseMICnum/micStats', () => { assert.equal(typeof parseMICnum, 'function'); assert.equal(typeof micStats, 'function'); });
 test('MIC: parse "16" → 16', () => assert.equal(_parseMIC('16'), 16));
 test('MIC: parse "<=0.12" → 0.12', () => assert.equal(_parseMIC('<=0.12'), 0.12));
 test('MIC: parse ">=32" → 32', () => assert.equal(_parseMIC('>=32'), 32));
@@ -811,10 +814,8 @@ test('XLSX IAAS: días-dispositivo reales (inserción→retiro) + LOT/DOT', () =
 });
 
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
-const _mCG = _idx.match(/window\.cockcroftGault=function\(edad, peso, creat, sexo\)\{[\s\S]*?\n\};/);
-let _cg = () => null;
-if (_mCG) { _cg = new Function('const window={};' + _mCG[0] + ' return window.cockcroftGault;')(); }
-test('CG: existe cockcroftGault', () => assert.ok(_mCG));
+const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
+test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));
 test('CG: 60a/70kg/Cr1.0 hombre ≈ 77.8 mL/min', () => assert.ok(Math.abs(_cg(60,70,1.0,'M')-77.78)<0.5, _cg(60,70,1.0,'M')));
 test('CG: mujer aplica factor 0.85', () => assert.ok(Math.abs(_cg(60,70,1.0,'F')-66.1)<0.5, _cg(60,70,1.0,'F')));
 test('CG: sin peso → null', () => assert.equal(_cg(60,0,1.0,'M'), null));

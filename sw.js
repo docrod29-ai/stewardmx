@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v295 (1er módulo extraído del monolito: js/core/stats.js)
+//  Primer paso REAL de des-monolitización (deuda de arquitectura): el núcleo estadístico/clínico
+//  PURO (chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault) salió
+//  de index.html a js/core/stats.js (módulo ESM). index.html lo importa y reexpone en window.*.
+//  GANANCIA CLAVE: las pruebas importan la función REAL (no un espejo regex) — Fisher vs R, MIC50/90,
+//  Cockcroft-Gault y χ² se verifican contra el código que DE VERDAD corre. 162 pruebas en verde.
+//  CACHÉ: el módulo se precachea en SHELL; la invalidación es automática (activate borra cachés con
+//  nombre ≠ CACHE → al subir a v295 se re-descarga fresco). check-syntax escanea js/core/*.js solo.
+//  Sin cambio de comportamiento clínico: la misma matemática, ahora aislada y testeable.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v294 (CI en GitHub Actions + cierre de escalada de rol por servidor)
 //  · CI: .github/workflows/ci.yml corre en cada push — sintaxis + 161 pruebas + 8 pruebas de
 //    SEGURIDAD de firestore.rules en el emulador de Firestore (con Java del runner). package.json
@@ -302,12 +312,13 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v294';
+const CACHE = 'stewardmx-v295';
 const SHELL = [
   '/',
   '/index.html',
   '/guia.html',
   '/manifest.json',
+  '/js/core/stats.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',
   '/icons/icon-maskable.svg'

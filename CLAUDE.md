@@ -46,10 +46,17 @@ En `abrirSolicitudDesdeDetalle`, el campo dosis debe quedar vacío (`value=""`).
 
 ---
 
-### 4. Script externo vs módulo principal (v198)
-Todo el código JS debe estar dentro del único `<script type="module">`. Si se agrega código en un `<script>` regular separado, NO tiene acceso a `PACS`, `HOSP`, `db`, `doc`, `collection`, `getDocs`, etc. El error es `"Can't find variable: PACS"`.
+### 4. Script externo vs módulo principal (v198) — matizado en v295
+Si se agrega código en un `<script>` regular **separado**, NO tiene acceso a `PACS`, `HOSP`, `db`, `doc`, `collection`, `getDocs`, etc. El error es `"Can't find variable: PACS"`.
 
-**Regla:** Todo código nuevo va dentro del módulo principal. Nunca agregar un `<script>` extra.
+**Regla:** Todo código que toque estado/DOM/Firebase (`PACS`, `HOSP`, `db`, `SOLICITUDES`, `document`, …) va dentro del módulo principal. **Nunca agregar un `<script>` extra.**
+
+**EXCEPCIÓN (v295, des-monolitización):** funciones **puras y sin estado** (matemática/estadística determinista, sin tocar PACS/HOSP/db/DOM) SÍ pueden vivir en módulos ESM bajo `js/core/*.js` e importarse con `import {...} from './js/core/xxx.js'` al inicio del módulo principal. Esto NO es el error de arriba: un `<script>` separado no comparte scope, pero un `import` ESM SÍ crea binding de módulo. Patrón establecido en `js/core/stats.js` (Fisher, χ², MIC50/90, Cockcroft-Gault):
+- Definir `export function` en `js/core/xxx.js`.
+- `import {...}` + reexponer en `window.*` (para los `onclick`) al inicio del módulo.
+- Las pruebas importan la función REAL (`tests/critical-flows.test.mjs`) — no un espejo.
+- `js/core/*.js` debe añadirse a `SHELL` en `sw.js` (offline) — la invalidación es automática al subir `CACHE`.
+- `tests/check-syntax.mjs` ya escanea `js/core/*.js` con `node --check`.
 
 ---
 
@@ -155,7 +162,7 @@ El mensaje de timeout del AbortController es `160 s`, no `45 s`.
 
 Incrementar `CACHE = 'stewardmx-vXXX'` en `sw.js` con cada deploy que cambia lógica importante.
 Documentar el cambio en el bloque de comentarios al inicio de `sw.js`.
-Versión actual: **v280**
+Versión actual: **v295**
 
 ## Deploy
 
