@@ -4605,11 +4605,12 @@ window.guardar=async()=>{
     const qsofaDoc=parseInt(gv('f-urgencias-qsofa')||'0');
     const sofaDoc=parseInt(gv('f-urgencias-sofa')||'0');
     if(qsofaDoc<2&&sofaDoc<2){
-      _mostrarGateSepsis(()=>{
-        window._guardarBusy=false;
-        if(btnGuardar){btnGuardar.disabled=false;btnGuardar.style.opacity='';}
-        guardar(); // re-ejecutar guardar() ahora que qSOFA fue documentado
-      });
+      // v293 FIX (P1): liberar el flag ANTES de abrir el gate. Si el médico CANCELA o cierra el
+      // gate, el botón Guardar NO debe quedar bloqueado hasta recargar (antes _guardarBusy quedaba
+      // en true porque solo se reseteaba dentro del callback de confirmar).
+      window._guardarBusy=false;
+      if(btnGuardar){btnGuardar.disabled=false;btnGuardar.style.opacity='';}
+      _mostrarGateSepsis(()=>{ guardar(); }); // al confirmar, re-ejecuta guardar() (qSOFA documentado)
       return;
     }
   }
@@ -21804,7 +21805,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v292'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v293'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
@@ -25771,7 +25772,7 @@ window._vaApplyConfirmed=async function(d){
   // Detectar paciente y ofrecer abrir
   const pm=document.getElementById('va-pac-match');
   const pacM=d._foundPac;
-  if(pacM&&pm){pm.innerHTML=`<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:15px;">👤</span><div style="flex:1;"><div style="font-weight:700;color:var(--teal);font-size:11px;">Paciente en censo</div><div style="font-size:10px;color:var(--t2);">${escHtml(pacM.nombre)} — ${escHtml(pacM.servicio||'S/S')} — Cama ${escHtml(String(pacM.cama||'—'))}</div></div><button onclick="try{abrirFormPaciente('${escJs(pacM.id)}');}catch(_){} document.getElementById('va-pac-match').style.display='none';" style="background:var(--teal);border:none;color:#fff;border-radius:5px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">Abrir ↗</button></div>`;pm.style.display='block';}
+  if(pacM&&pm){pm.innerHTML=`<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:15px;">👤</span><div style="flex:1;"><div style="font-weight:700;color:var(--teal);font-size:11px;">Paciente en censo</div><div style="font-size:10px;color:var(--t2);">${escHtml(pacM.nombre)} — ${escHtml(pacM.servicio||'S/S')} — Cama ${escHtml(String(pacM.cama||'—'))}</div></div><button onclick="abrirEditar('${escJs(pacM.id)}');document.getElementById('va-pac-match').style.display='none';" style="background:var(--teal);border:none;color:#fff;border-radius:5px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">Abrir ↗</button></div>`;pm.style.display='block';}
   window._va._pendingData=null;
 };
 
@@ -27748,6 +27749,10 @@ function _clinicaCitaCard(a,pid,past=false){
     ${a.notas?`<div style="font-size:10px;color:var(--t3);margin-top:2px;">${escHtml(a.notas)}</div>`:''}
   </div>`;
 }
+// v293 FIX botón muerto: exponer a window (los handlers inline del módulo Expediente Clínico
+// las invocan en alcance global; sin esto, cada clic en paciente/pestaña daba ReferenceError).
+window._clinicaRenderDetalle=_clinicaRenderDetalle;
+window._clinicaRenderTab=_clinicaRenderTab;
 
 window._clinicaDeleteCita=function(aid){
   _confirmModal('¿Eliminar esta cita?',async()=>{
@@ -28707,6 +28712,7 @@ function _renderCensoHoy(pacs){
     </div>`;
   window._PACS_HOY=pacs;
 }
+window._renderCensoHoy=_renderCensoHoy; // v293 FIX botón muerto: el handler de colapsar lo invoca en window
 
 // Modal de decisión PROA
 let _decisionReqId = null;

@@ -1,4 +1,23 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v293 (AUDITORÍA: botones muertos + flag de guardado atascado)
+//  Pasada A (handler↔window): 385 handlers vs 676 expuestos. 4 BOTONES MUERTOS corregidos
+//  (ReferenceError silencioso porque la función no estaba en window):
+//    · Expediente Clínico: _clinicaRenderDetalle + _clinicaRenderTab (cada clic en paciente/pestaña
+//      no hacía nada) → expuestos a window.
+//    · Asistente de voz "Abrir ↗": llamaba abrirFormPaciente('id') (no expuesta + esperaba objeto)
+//      → corregido a abrirEditar('id'); se quitó el try/catch que ocultaba el error.
+//    · Censo de hoy: colapsar no re-renderizaba (_renderCensoHoy) → expuesta.
+//  GUARD PERMANENTE: prueba node:test que extrae todos los handlers y FALLA si alguno no está en
+//  window (previene regresiones de esta clase para siempre).
+//  Pasada D (async/UI) — P1 corregido: el GATE de sepsis (Urgencias + amplio espectro) dejaba
+//  window._guardarBusy=true al CANCELAR → el botón Guardar quedaba bloqueado hasta recargar. FIX:
+//  liberar el flag ANTES de abrir el gate (cualquier cierre ya no bloquea). Otros 5 flags Busy
+//  (_perfil/_lab/_mol/_histo/_reco/_sol) verificados: usan release()/finally → OK.
+//  Verificado: modelo IA = claude-sonnet-4-6 (regla #10 OK); window.open en handlers/funciones sync
+//  (no post-await). 161 pruebas en verde + node --check.
+//  PENDIENTE de auditoría (próxima ronda): pasadas B (rutas Firestore), C (flujos end-to-end),
+//  E (cálculos vs estándar), F (paridad de roles vs firestore.rules), G (Service Worker).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v292 (FIX micro/cama + nueva capacidad: PROA captura preliminares)
 //  BUG (reporte de usuarios): al agregar un preliminar a un paciente YA hospitalizado salía
 //  "cama ocupada" y no se enlazaba sobre el mismo paciente. CAUSA: el preliminar se registraba
@@ -270,7 +289,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v292';
+const CACHE = 'stewardmx-v293';
 const SHELL = [
   '/',
   '/index.html',

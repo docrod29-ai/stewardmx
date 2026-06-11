@@ -873,3 +873,39 @@ test('PRELIM: PROA puede capturar desde la ficha (botón)', () => {
 test('PRELIM: UI muestra el origen (Micro/PROA)', () => {
   assert.match(_idx, /_pf==='micro'\?' · 🔬Micro':_pf==='proa'\?' · ⭐PROA'/);
 });
+
+/* ═══════════ PARIDAD handler↔window — guard PERMANENTE de botones muertos (v293) ═══════════ */
+/* Riesgo sistémico: en un <script type="module">, todo handler inline (onclick/oninput/…) corre
+   en alcance GLOBAL → la función debe estar en window. Esta prueba extrae todos los handlers y
+   todos los nombres expuestos, y FALLA si algún handler referencia algo no expuesto. */
+test('NO hay botones muertos (handlers inline sin función en window)', () => {
+  const EXCL = new Set([
+    // keywords / control
+    'if','for','while','return','typeof','function','new','switch','catch','else','do','delete','void','await','yield','in','of','instanceof','throw',
+    // globals seguros
+    'event','window','document','this','true','false','null','undefined','console',
+    'Math','JSON','Number','String','Array','Object','Boolean','Date','RegExp','Map','Set','Promise','parseInt','parseFloat','isNaN','setTimeout','setInterval','clearTimeout','alert','confirm','prompt','encodeURIComponent','decodeURIComponent','escape','unescape','fetch','requestAnimationFrame',
+    // funciones CSS que aparecen dentro de strings de estilo en los handlers
+    'rgba','rgb','var','calc','url','translate','translateX','translateY','translateZ','translate3d','scale','scaleX','scaleY','rotate','rotateX','rotateY','skew','linear','radial','hsl','hsla','blur','brightness','cubic','matrix','perspective','repeat','minmax','clamp','attr','counter','env','min','max',
+  ]);
+  const called = new Map();
+  const hRe = /\bon[a-z]+\s*=\s*"([^"]*)"/g; let m;
+  while ((m = hRe.exec(_idx))) {
+    const body = m[1];
+    const cRe = /(?:^|[^.\w$])([A-Za-z_$][\w$]*)\s*\(/g; let c;
+    while ((c = cRe.exec(body))) { const fn = c[1]; if (!EXCL.has(fn)) called.set(fn, (called.get(fn)||0)+1); }
+  }
+  const exposed = new Set();
+  let e; const wRe = /window\.([A-Za-z_$][\w$]*)\s*=/g;
+  while ((e = wRe.exec(_idx))) exposed.add(e[1]);
+  const wRe2 = /window\[\s*["']([A-Za-z_$][\w$]*)["']\s*\]\s*=/g;
+  while ((e = wRe2.exec(_idx))) exposed.add(e[1]);
+  const dead = [...called.keys()].filter(fn => !exposed.has(fn));
+  assert.deepEqual(dead, [], 'BOTONES MUERTOS (handler inline sin window.fn): ' + dead.map(f=>f+'×'+called.get(f)).join(', '));
+});
+
+/* ═══════════ v293: gate de sepsis no bloquea el guardado al cancelar ═══════════ */
+test('GATE sepsis: libera _guardarBusy ANTES de abrir el gate (cancelar no bloquea)', () => {
+  // el reset debe ocurrir antes de _mostrarGateSepsis, no solo dentro del callback
+  assert.match(_idx, /window\._guardarBusy=false;\s*\n\s*if\(btnGuardar\)\{btnGuardar\.disabled=false;btnGuardar\.style\.opacity='';\}\s*\n\s*_mostrarGateSepsis\(\(\)=>\{ guardar\(\); \}\)/);
+});
