@@ -375,8 +375,13 @@ service cloud.firestore {
       // ── Catch-all para colecciones futuras del hospital ──
       // Solo lectura/escritura para miembros del MISMO hospital.
       // Subcollections de 2 niveles están cubiertas aquí.
+      // v301 SEGURIDAD: 'users' QUEDA FUERA de la escritura del catch-all. Si no, como Firestore
+      // hace OR de TODAS las reglas que matchean, cualquier miembro podría sobrescribir el doc de
+      // users/{quien sea} (incluido el propio) y auto-promoverse — anulando la regla específica de
+      // users de arriba. La escritura de users SOLO la gobierna esa regla específica (y joinWithCode).
       match /{anyCol}/{anyDoc} {
-        allow read, write: if isSuperAdmin() || isHospMember(hospId);
+        allow read:  if isSuperAdmin() || isHospMember(hospId);
+        allow write: if (isSuperAdmin() || isHospMember(hospId)) && anyCol != 'users';
       }
       // Subcollections de 3 niveles (safety net)
       match /{anyCol}/{anyDoc}/{subCol}/{subDocId} {
