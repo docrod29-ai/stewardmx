@@ -193,6 +193,12 @@ service cloud.firestore {
                           && userId != uid()
                           && resource.data.status != 'admin'
                           && request.resource.data.status != 'admin')
+                      // NOTA DE SEGURIDAD (hallazgo CI v294): hoy un usuario puede escribir su
+                      // propio 'rol'/'status' — la app lo NECESITA para el alta por código
+                      // (_unirseConCodigo). Esto es un vector de escalada porque el código se
+                      // valida en cliente. FIX CORRECTO PENDIENTE: validar el código en una Cloud
+                      // Function (servidor) que asigne el rol, y entonces bloquear aquí el cambio
+                      // de rol/status con diff().affectedKeys(). NO bloquear antes de eso (rompe el alta).
                       || (isAuth() && uid() == userId
                           && request.resource.data.status == resource.data.status
                           && request.resource.data.rol == resource.data.rol);
