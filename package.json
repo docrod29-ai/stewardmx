@@ -7,13 +7,14 @@
   "scripts": {
     "test": "node --test tests/critical-flows.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore \"node --test tests/firestore-rules.test.mjs\"",
-    "check": "node -e \"const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const m=h.match(/<script type=\\\"module\\\">([\\\\s\\\\S]*?)<\\\\/script>/);let c=m[1].replace(/^\\\\s*import[^;]*;/gm,'').replace(/import\\\\.meta/g,'({})');fs.writeFileSync('/tmp/_mod_check.mjs',c);\" && node --check /tmp/_mod_check.mjs && node --check sw.js",
+    "check": "node tests/check-syntax.mjs",
     "predeploy": "npm run check && npm test",
     "deploy:staging": "firebase hosting:channel:deploy staging --expires 30d",
     "deploy:prod": "firebase deploy --only hosting"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",
-    "firebase": "^10.12.0"
+    "firebase": "^10.12.0",
+    "firebase-tools": "^13.0.0"
   }
 }

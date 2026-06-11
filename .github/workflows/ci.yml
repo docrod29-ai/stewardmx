@@ -1,0 +1,42 @@
+name: CI
+
+# Gate de calidad: cada push/PR valida sintaxis + pruebas críticas + seguridad de reglas.
+# Objetivo: que ningún bug llegue a producción (los runners de GitHub SÍ tienen Java, así que
+# aquí SÍ corren las pruebas del emulador de Firestore que no pueden correr en cualquier máquina).
+
+on:
+  push:
+    branches: [ main, 'respaldo/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Java 17 (para el emulador de Firestore)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Verificar sintaxis (módulo de index.html + sw.js)
+        run: npm run check
+
+      - name: Pruebas críticas (161 — node:test)
+        run: npm test
+
+      - name: Pruebas de SEGURIDAD de firestore.rules (emulador)
+        run: npm run test:rules
