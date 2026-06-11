@@ -114,3 +114,37 @@ export function cockcroftGault(edad, peso, creat, sexo){
   const female=(String(sexo||'').toUpperCase()==='F');
   return ((140-edad)*peso*(female?0.85:1))/(72*creat);
 }
+
+// ── IC95% de proporciones (Wilson) y de tasas (Poisson/Byar) — Epidemiología (v221) ─────────
+// Extraído a stats.js en v298. Nivel publicación: Wilson es correcto para % en n pequeñas y p
+// extremos (ref. Brown-Cai-DasGupta 2001); Byar es la aproximación estándar del IC95% de Poisson.
+
+// IC95% de una proporción por método de Wilson. Devuelve {p, lo, hi, pct, loPct, hiPct, n}.
+export function ci95_wilson(x,n){
+  if(!n||n<=0)return{p:null,lo:null,hi:null,pct:null,loPct:null,hiPct:null,n:0};
+  const z=1.959964, p=x/n, z2=z*z;
+  const denom=1+z2/n;
+  const centro=(p+z2/(2*n))/denom;
+  const margen=(z*Math.sqrt((p*(1-p)+z2/(4*n))/n))/denom;
+  const lo=Math.max(0,centro-margen), hi=Math.min(1,centro+margen);
+  return{p:+p.toFixed(4),lo:+lo.toFixed(4),hi:+hi.toFixed(4),
+    pct:+(p*100).toFixed(1),loPct:+(lo*100).toFixed(1),hiPct:+(hi*100).toFixed(1),n};
+}
+
+// IC95% de una tasa de incidencia (eventos/persona-tiempo) — aproximación de Poisson (Byar).
+export function ci95_poisson_rate(eventos,personaTiempo,mult=1000){
+  if(!personaTiempo||personaTiempo<=0)return{tasa:null,lo:null,hi:null};
+  const x=eventos;
+  const loCount=x===0?0:x*Math.pow(1-1/(9*x)-1.959964/(3*Math.sqrt(x)),3);
+  const hiCount=(x+1)*Math.pow(1-1/(9*(x+1))+1.959964/(3*Math.sqrt(x+1)),3);
+  return{
+    tasa:+(x/personaTiempo*mult).toFixed(2),
+    lo:+(loCount/personaTiempo*mult).toFixed(2),
+    hi:+(hiCount/personaTiempo*mult).toFixed(2),
+    mult
+  };
+}
+
+// Formato compacto "12.3% (IC95% 8.1–17.9)" para celdas de la hoja de Bioestadística.
+export function fmtPropIC(x,n){const c=ci95_wilson(x,n);if(c.pct==null)return '—';return c.pct+'% (IC95% '+c.loPct+'–'+c.hiPct+')';}
+export function fmtRateIC(ev,pt,mult=1000,unidad='1000 pac-día'){const r=ci95_poisson_rate(ev,pt,mult);if(r.tasa==null)return '—';return r.tasa+' (IC95% '+r.lo+'–'+r.hi+') /'+unidad;}

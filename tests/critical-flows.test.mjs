@@ -11,7 +11,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 // Módulo extraído del monolito (v295): se prueba la función REAL, no un espejo regex de index.html.
-import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault } from '../js/core/stats.js';
+import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault,
+         ci95_wilson, ci95_poisson_rate, fmtPropIC, fmtRateIC } from '../js/core/stats.js';
 import { calcDiaATB, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPer1000 } from '../js/core/clinical-days.js';
 
 /* ─────────────── ESPEJOS de funciones puras (index.html v217) ─────────────── */
@@ -253,16 +254,7 @@ test('calcDiaATB: fin antes que inicio (dato malo) → mínimo 1 día', () => {
   assert.equal(r.dias, 1);
 });
 
-// 10) IC95% de proporción por Wilson (v221) — base de la hoja de Bioestadística.
-function ci95_wilson(x,n){
-  if(!n||n<=0)return{pct:null,loPct:null,hiPct:null,n:0};
-  const z=1.959964, p=x/n, z2=z*z, denom=1+z2/n;
-  const centro=(p+z2/(2*n))/denom;
-  const margen=(z*Math.sqrt((p*(1-p)+z2/(4*n))/n))/denom;
-  const lo=Math.max(0,centro-margen), hi=Math.min(1,centro+margen);
-  return{pct:+(p*100).toFixed(1),loPct:+(lo*100).toFixed(1),hiPct:+(hi*100).toFixed(1),n};
-}
-
+// 10) IC95% de proporción por Wilson (v221) — ahora función REAL importada de js/core/stats.js.
 test('Wilson: 50/100 ≈ 50% con IC simétrico ~40–60', () => {
   const c=ci95_wilson(50,100);
   assert.equal(c.pct, 50);
@@ -621,6 +613,27 @@ test('FISHER: selector testAuto2x2 → Fisher para n<30, χ² para n grande', ()
 test('χ²: independiente → p alto; asociación fuerte → p bajo', () => {
   assert.ok(chiSquareTest([[10,10],[10,10]]).pValue > 0.9, 'indep');     // chi²=0 → p=1
   assert.ok(chiSquareTest([[40,10],[10,40]]).pValue < 0.001, 'asociada'); // chi²=36,df=1
+});
+
+/* ═══════════ IC95% Wilson (proporciones) y Poisson/Byar (tasas) — v298 ═══════════ */
+/* Función REAL importada de js/core/stats.js; valores vs literatura publicada. */
+test('Wilson: 5/10 → 50% (IC95% 23.7–76.3) [valor publicado]', () => {
+  const c=ci95_wilson(5,10);   // ancla un valor exacto de literatura (los demás casos: tests v221)
+  assert.equal(c.pct, 50); assert.equal(c.loPct, 23.7); assert.equal(c.hiPct, 76.3);
+});
+test('Poisson/Byar: 5 eventos /1000 → tasa 5 (IC95% ~1.6–11.7)', () => {
+  const r=ci95_poisson_rate(5,1000);
+  assert.equal(r.tasa, 5); assert.ok(Math.abs(r.lo-1.61)<0.05); assert.ok(Math.abs(r.hi-11.67)<0.05);
+});
+test('Poisson: 0 eventos → tasa 0, lo 0 (límite inferior válido)', () => {
+  const r=ci95_poisson_rate(0,500);
+  assert.equal(r.tasa, 0); assert.equal(r.lo, 0); assert.ok(r.hi>0);
+});
+test('Poisson: persona-tiempo 0 → null (sin dividir por cero)', () => { assert.equal(ci95_poisson_rate(5,0).tasa, null); });
+test('Formato: fmtPropIC/fmtRateIC arman la celda legible', () => {
+  assert.equal(fmtPropIC(5,10), '50% (IC95% 23.7–76.3)');
+  assert.equal(fmtRateIC(5,1000), '5 (IC95% 1.61–11.67) /1000 pac-día');
+  assert.equal(fmtPropIC(0,0), '—');  // sin datos → guion, no '0%'
 });
 
 /* ═══════════ MIC50 / MIC90 (Fase 0.4) ═══════════ */

@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v298 (3er módulo: IC95% Wilson/Poisson → js/core/stats.js)
+//  Sigue la des-monolitización. Los IC95% de proporciones (Wilson) y tasas (Poisson/Byar) — la base
+//  de la hoja "Bioestadística" nivel publicación — salen de index.html a js/core/stats.js (junto al
+//  resto del núcleo estadístico): ci95_wilson, ci95_poisson_rate, fmtPropIC, fmtRateIC. index.html
+//  los importa y reexpone en window.*. ANTES no tenían prueba; ahora se verifican contra valores
+//  PUBLICADOS (Wilson 5/10 = 23.7–76.3%; Byar 5 eventos/1000 = 1.61–11.67). 169 pruebas en verde.
+//  Sin archivo nuevo (stats.js ya estaba en SHELL); invalidación automática al subir CACHE.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v297 (FIX científico: DOT no sub-cuenta por zona horaria)
 //  HALLAZGO durante la extracción v296: calcDiaATB parseaba el corte `hoy` (string 'YYYY-MM-DD',
 //  como lo pasan calcDOT/dotPer1000 desde el <input type=date>) con new Date(str) = medianoche UTC,
@@ -333,7 +341,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v297';
+const CACHE = 'stewardmx-v298';
 const SHELL = [
   '/',
   '/index.html',

@@ -1153,9 +1153,11 @@ function _grupoEdad(edad){
 // chiSquareTest · fisherExact2x2 · testAuto2x2 · parseMICnum · micStats · cockcroftGault
 // Ahora viven en un módulo PURO y testeable (las pruebas importan la función REAL, no un espejo).
 // Se importan aquí (los import se elevan/hoisted) y se reexponen en window.* para los onclick.
-import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault } from './js/core/stats.js';
+import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault,
+         ci95_wilson, ci95_poisson_rate, fmtPropIC, fmtRateIC } from './js/core/stats.js';
 window.chiSquareTest=chiSquareTest; window.fisherExact2x2=fisherExact2x2; window.testAuto2x2=testAuto2x2;
 window.parseMICnum=parseMICnum; window.micStats=micStats; window.cockcroftGault=cockcroftGault;
+window.ci95_wilson=ci95_wilson; window.ci95_poisson_rate=ci95_poisson_rate; window.fmtPropIC=fmtPropIC; window.fmtRateIC=fmtRateIC;
 
 // ── CLSI M39 Deduplication ──────────────────────────────────────────────
 // Mantiene SOLO el primer aislamiento por (paciente + especie + tipo de espécimen + período).
@@ -20217,36 +20219,8 @@ function stat_desc(arr){
   return{n,mean:+mean.toFixed(2),median:+med.toFixed(2),sd:+sd.toFixed(2),iqr:+(q3-q1).toFixed(2),q1,q3,min:a[0],max:a[n-1],ci95:+ci95.toFixed(2)};
 }
 function stat_rate(n,denom,mult=100){return denom>0?+(n/denom*mult).toFixed(1):0;}
-/* ═══ Epidemiología v221: IC95% de proporciones (Wilson) y tasas (Poisson) ═══ */
-// IC95% de una proporción por método de Wilson (correcto para %, robusto en n pequeñas y p extremos).
-function ci95_wilson(x,n){
-  if(!n||n<=0)return{p:null,lo:null,hi:null,pct:null,loPct:null,hiPct:null,n:0};
-  const z=1.959964, p=x/n, z2=z*z;
-  const denom=1+z2/n;
-  const centro=(p+z2/(2*n))/denom;
-  const margen=(z*Math.sqrt((p*(1-p)+z2/(4*n))/n))/denom;
-  const lo=Math.max(0,centro-margen), hi=Math.min(1,centro+margen);
-  return{p:+p.toFixed(4),lo:+lo.toFixed(4),hi:+hi.toFixed(4),
-    pct:+(p*100).toFixed(1),loPct:+(lo*100).toFixed(1),hiPct:+(hi*100).toFixed(1),n};
-}
-// IC95% de una tasa de incidencia (eventos/persona-tiempo) — aproximación de Poisson (Byar).
-function ci95_poisson_rate(eventos,personaTiempo,mult=1000){
-  if(!personaTiempo||personaTiempo<=0)return{tasa:null,lo:null,hi:null};
-  const x=eventos;
-  // Byar: límites del IC95% del conteo
-  const loCount=x===0?0:x*Math.pow(1-1/(9*x)-1.959964/(3*Math.sqrt(x)),3);
-  const hiCount=(x+1)*Math.pow(1-1/(9*(x+1))+1.959964/(3*Math.sqrt(x+1)),3);
-  return{
-    tasa:+(x/personaTiempo*mult).toFixed(2),
-    lo:+(loCount/personaTiempo*mult).toFixed(2),
-    hi:+(hiCount/personaTiempo*mult).toFixed(2),
-    mult
-  };
-}
-// Formato compacto "12.3% (IC95% 8.1–17.9)" para celdas de la hoja.
-function fmtPropIC(x,n){const c=ci95_wilson(x,n);if(c.pct==null)return '—';return c.pct+'% (IC95% '+c.loPct+'–'+c.hiPct+')';}
-function fmtRateIC(ev,pt,mult=1000,unidad='1000 pac-día'){const r=ci95_poisson_rate(ev,pt,mult);if(r.tasa==null)return '—';return r.tasa+' (IC95% '+r.lo+'–'+r.hi+') /'+unidad;}
-window.ci95_wilson=ci95_wilson; window.ci95_poisson_rate=ci95_poisson_rate; window.fmtPropIC=fmtPropIC; window.fmtRateIC=fmtRateIC;
+/* IC95% Wilson/Poisson (ci95_wilson, ci95_poisson_rate, fmtPropIC, fmtRateIC) → js/core/stats.js
+   (extraído v298). Se importan arriba (junto al resto del núcleo estadístico) y se exponen en window.*. */
 function stat_chi2_2x2(a,b,c,d){
   // a=expuesto+desenlace, b=expuesto+sin_desenlace, c=no_exp+desenlace, d=no_exp+sin_desenlace
   const N=a+b+c+d;
@@ -21601,7 +21575,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v297'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v298'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
