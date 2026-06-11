@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v299 (4º módulo: Magiorakos MDR/XDR/PDR → js/core/magiorakos.js)
+//  Sigue la des-monolitización con el clúster de SEGURIDAD CLÍNICA más sensible: la clasificación
+//  de multirresistencia. Salen de index.html a js/core/magiorakos.js (módulo PURO): CLSI_CATEGORIES
+//  (panel por especie, CLSI M100), _organismToSpeciesKey, _intrinsicResistanceKeys (intrínsecos
+//  EUCAST, se EXCLUYEN del cómputo), clasificarMagiorakos (algoritmo Magiorakos 2012). index.html
+//  los importa y reexpone en window.* (CLSI_CATEGORIES se usa también bare en la verificación de
+//  Pseudomonas). ANTES se probaban vía espejo regex (_mMag); AHORA como función REAL: Klebsiella
+//  amp-R sola NO es MDR (intrínseco), E. coli 3 categorías R SÍ. 167 pruebas en verde.
+//  /js/core/magiorakos.js precacheado en SHELL; invalidación automática al subir CACHE.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v298 (3er módulo: IC95% Wilson/Poisson → js/core/stats.js)
 //  Sigue la des-monolitización. Los IC95% de proporciones (Wilson) y tasas (Poisson/Byar) — la base
 //  de la hoja "Bioestadística" nivel publicación — salen de index.html a js/core/stats.js (junto al
@@ -341,7 +351,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v298';
+const CACHE = 'stewardmx-v299';
 const SHELL = [
   '/',
   '/index.html',
@@ -349,6 +359,7 @@ const SHELL = [
   '/manifest.json',
   '/js/core/stats.js',
   '/js/core/clinical-days.js',
+  '/js/core/magiorakos.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',
   '/icons/icon-maskable.svg'

@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault,
          ci95_wilson, ci95_poisson_rate, fmtPropIC, fmtRateIC } from '../js/core/stats.js';
 import { calcDiaATB, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPer1000 } from '../js/core/clinical-days.js';
+import { clasificarMagiorakos, _intrinsicResistanceKeys } from '../js/core/magiorakos.js';
 
 /* ─────────────── ESPEJOS de funciones puras (index.html v217) ─────────────── */
 
@@ -692,14 +693,8 @@ test('DOT NHSN: corte string LOCAL (FIX v297) → conteo determinista + cada age
 });
 
 /* ═══════════ Magiorakos + intrínsecos (Fase 0.3) ═══════════ */
-const _mMag = _idx.match(/const CLSI_CATEGORIES=\{[\s\S]*?\n\}\nwindow\._intrinsicResistanceKeys=_intrinsicResistanceKeys;[\s\S]*?\n\}\n\n\/\/ ── Estandarización NHSN/);
-let _clasif = () => ({mdr:false}), _intrin = () => new Set();
-if (_mMag) {
-  const blk = _mMag[0].replace(/\n\/\/ ── Estandarización NHSN/, '');
-  _clasif = new Function('const window={};' + blk + ' return clasificarMagiorakos;')();
-  _intrin = new Function('const window={};' + blk + ' return _intrinsicResistanceKeys;')();
-}
-test('MAG: bloque Magiorakos extraíble', () => { assert.ok(_mMag); });
+const _clasif = clasificarMagiorakos, _intrin = _intrinsicResistanceKeys; // función REAL de js/core/magiorakos.js
+test('MAG: funciones Magiorakos importables', () => { assert.equal(typeof clasificarMagiorakos,'function'); assert.equal(typeof _intrinsicResistanceKeys,'function'); });
 test('MAG: intrínseco Klebsiella incluye ampicilina', () => { assert.ok(_intrin('Klebsiella pneumoniae').has('amp')); });
 test('MAG: E. coli NO tiene ampicilina intrínseca', () => { assert.ok(!_intrin('Escherichia coli').has('amp')); });
 test('MAG: Klebsiella solo ampicilina-R → NO MDR (intrínseco excluido)', () => {
