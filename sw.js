@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v300 (5º módulo: Dx/CIE-10 → js/core/dx-cie10.js)
+//  La taxonomía de diagnósticos infecciosos (DX_CATEGORIES, 40+ categorías regex) + el mapeo a
+//  CIE-10 (DX_CIE10, cie10DeDx, interoperabilidad OMS/GLASS) salen de index.html a un módulo PURO.
+//  categorizarDx se usa bare en los cálculos EI/BACT/UTI del Excel (por eso se exporta+importa).
+//  ANTES se probaba un espejo simplificado; AHORA la función REAL con la taxonomía completa:
+//  pielonefritis→N39.0, sepsis→A41.9, CLABSI>bacteriemia→T80.2, no-infeccioso→B99.9. 167 verde.
+//  /js/core/dx-cie10.js precacheado en SHELL.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v299 (4º módulo: Magiorakos MDR/XDR/PDR → js/core/magiorakos.js)
 //  Sigue la des-monolitización con el clúster de SEGURIDAD CLÍNICA más sensible: la clasificación
 //  de multirresistencia. Salen de index.html a js/core/magiorakos.js (módulo PURO): CLSI_CATEGORIES
@@ -351,7 +359,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v299';
+const CACHE = 'stewardmx-v300';
 const SHELL = [
   '/',
   '/index.html',
@@ -360,6 +368,7 @@ const SHELL = [
   '/js/core/stats.js',
   '/js/core/clinical-days.js',
   '/js/core/magiorakos.js',
+  '/js/core/dx-cie10.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',
   '/icons/icon-maskable.svg'

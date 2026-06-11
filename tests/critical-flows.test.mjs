@@ -15,6 +15,7 @@ import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cock
          ci95_wilson, ci95_poisson_rate, fmtPropIC, fmtRateIC } from '../js/core/stats.js';
 import { calcDiaATB, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPer1000 } from '../js/core/clinical-days.js';
 import { clasificarMagiorakos, _intrinsicResistanceKeys } from '../js/core/magiorakos.js';
+import { cie10DeDx, categorizarDx } from '../js/core/dx-cie10.js';
 
 /* ─────────────── ESPEJOS de funciones puras (index.html v217) ─────────────── */
 
@@ -285,45 +286,29 @@ test('Wilson: IC más ancho con n pequeña que con n grande', () => {
   assert.ok(anchoChico>anchoGrande, 'IC de n chica debe ser más ancho');
 });
 
-// 11) CIE-10 v222 — mapeo categoría → código, con prioridad de especificidad.
-const DX_CATEGORIES_T={
-  UTI:{patterns:[/\bITU\b/i,/cistit/i,/pielonefr/i,/uros|urin/i,/\bCAUTI\b/i]},
-  BACT:{patterns:[/bacteriemia/i,/sepsis/i,/choque séptico/i,/candidemia/i]},
-  CDI:{patterns:[/C\.\s*difficile/i,/CDI/i,/clostridioides difficile/i]},
-  CLABSI:{patterns:[/CLABSI/i,/bacteriemia asociada a CVC/i]},
-  EI:{patterns:[/endocarditis/i]},
-  NAC:{patterns:[/\bNAC\b/i,/neumonía adquirida en comunidad/i]},
-};
-function categorizarDxT(dx){if(!dx)return[];const s=String(dx);const c=[];for(const[k,d] of Object.entries(DX_CATEGORIES_T)){if(d.patterns.some(re=>re.test(s)))c.push(k);}return c;}
-const DX_CIE10_T={UTI:{cie:'N39.0'},BACT:{cie:'A41.9'},CDI:{cie:'A04.7'},CLABSI:{cie:'T80.2'},EI:{cie:'I33.0'},NAC:{cie:'J18.9'}};
-const _PRIOR_T=['CDI','CLABSI','EI','NEUTRO','BACT','UTI','NAC'];
-function cie10DeDxT(dx){
-  const cats=categorizarDxT(dx);
-  if(!cats.length)return{cie:'B99.9',cat:'OTRO'};
-  for(const code of _PRIOR_T){if(cats.includes(code)&&DX_CIE10_T[code])return{...DX_CIE10_T[code],cat:code};}
-  return DX_CIE10_T[cats[0]]?{...DX_CIE10_T[cats[0]],cat:cats[0]}:{cie:'B99.9',cat:cats[0]};
-}
+// 11) CIE-10 v222 — ahora función REAL importada de js/core/dx-cie10.js (con la taxonomía COMPLETA),
+//     no un espejo simplificado. Los mismos casos siguen verdes contra la lógica que de verdad corre.
 
 test('CIE-10: pielonefritis → N39.0 (UTI)', () => {
-  assert.equal(cie10DeDxT('Pielonefritis aguda complicada').cie, 'N39.0');
+  assert.equal(cie10DeDx('Pielonefritis aguda complicada').cie, 'N39.0');
 });
 test('CIE-10: sepsis → A41.9', () => {
-  assert.equal(cie10DeDxT('Sepsis (Sepsis-3) — foco en estudio').cie, 'A41.9');
+  assert.equal(cie10DeDx('Sepsis (Sepsis-3) — foco en estudio').cie, 'A41.9');
 });
 test('CIE-10: C. difficile → A04.7', () => {
-  assert.equal(cie10DeDxT('Colitis por C. difficile').cie, 'A04.7');
+  assert.equal(cie10DeDx('Colitis por C. difficile').cie, 'A04.7');
 });
 test('CIE-10: PRIORIDAD — CLABSI gana sobre bacteriemia genérica', () => {
   // "bacteriemia asociada a CVC" matchea BACT y CLABSI → debe ganar CLABSI (más específico)
-  const r=cie10DeDxT('Bacteriemia asociada a CVC');
+  const r=cie10DeDx('Bacteriemia asociada a CVC');
   assert.equal(r.cat, 'CLABSI');
   assert.equal(r.cie, 'T80.2');
 });
 test('CIE-10: dx no infeccioso/desconocido → B99.9 (no inventa)', () => {
-  assert.equal(cie10DeDxT('Dolor torácico inespecífico').cie, 'B99.9');
+  assert.equal(cie10DeDx('Dolor torácico inespecífico').cie, 'B99.9');
 });
 test('CIE-10: dx vacío → B99.9', () => {
-  assert.equal(cie10DeDxT('').cie, 'B99.9');
+  assert.equal(cie10DeDx('').cie, 'B99.9');
 });
 
 /* ═══════════ VOZ — Validaciones clínicas de seguridad (v270) ═══════════ */
