@@ -1,4 +1,18 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v301 (SEGURIDAD: cierre de la escalada de rol/status)
+//  Cierra al 100% el hallazgo del CI v294. Antes el cliente podía auto-asignarse rol/status
+//  privilegiado en su propio doc de usuario. AHORA:
+//   · firestore.rules — los helpers isHospPROA/Farmacia/FarmaceuticoTitular/Medico exigen
+//     status aprobado/admin (antes solo el rol → un doc auto-creado 'pendiente' con rol:'PROA'
+//     daba acceso). El CREATE de users solo permite auto-crearse PENDIENTE, o ADMIN si el
+//     registro central te nombra adminUid (fundador), o super-admin. UPDATE no deja cambiar el
+//     propio rol/status. La auto-aprobación por código la hace SOLO joinWithCode (Admin SDK).
+//   · index.html — el fallback de _unirseConCodigo ya NO escribe status:'aprobado'; deja
+//     PENDIENTE y un admin aprueba (degradación segura si la función falla).
+//   · tests/firestore-rules.test.mjs — 7 pruebas nuevas de escalada (pendiente OK, aprobado/
+//     admin-ajeno DENEGADO, fundador OK, auto-update de rol DENEGADO, rol-sin-status sin acceso).
+//  Verificado en el emulador del CI. Reglas desplegadas con firebase deploy --only firestore:rules.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v300 (5º módulo: Dx/CIE-10 → js/core/dx-cie10.js)
 //  La taxonomía de diagnósticos infecciosos (DX_CATEGORIES, 40+ categorías regex) + el mapeo a
 //  CIE-10 (DX_CIE10, cie10DeDx, interoperabilidad OMS/GLASS) salen de index.html a un módulo PURO.
@@ -359,7 +373,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v300';
+const CACHE = 'stewardmx-v301';
 const SHELL = [
   '/',
   '/index.html',

@@ -32,7 +32,11 @@ before(async () => {
     await setDoc(doc(db, `hospitals/${HOSP_A}/users/userA`), { status: 'aprobado', rol: 'Enfermería' });
     await setDoc(doc(db, `hospitals/${HOSP_A}/users/userDel`), { status: 'aprobado', rol: 'Enfermería' });
     await setDoc(doc(db, `hospitals/${HOSP_A}/users/adminA`), { status: 'admin', rol: 'Líder PROA' });
+    // v301: usuario PENDIENTE con rol privilegiado — NO debe tener acceso (status manda).
+    await setDoc(doc(db, `hospitals/${HOSP_A}/users/pendProa`), { status: 'pendiente', rol: 'PROA' });
     await setDoc(doc(db, `hospitals/${HOSP_B}/users/userB`), { status: 'aprobado', rol: 'Enfermería' });
+    // v301: registro central que nombra a 'founderC' como admin de hospC (para la prueba de fundador).
+    await setDoc(doc(db, `hospitals_registry/hospC`), { adminUid: 'founderC', nombre: 'Hospital C' });
     await setDoc(doc(db, `hospitals/${HOSP_A}/months/${MES}/patients/p1`), { nombre: 'Paciente A', atbList: [] });
     await setDoc(doc(db, `hospitals/${HOSP_A}/months/${MES}/patients/p2`), { nombre: 'Paciente borrado', atbList: [] });
   });
@@ -43,6 +47,9 @@ const dbA = () => env.authenticatedContext('userA', { email: 'a@hospA.mx' }).fir
 const dbDel = () => env.authenticatedContext('userDel', { email: 'del@hospA.mx' }).firestore();
 const dbB = () => env.authenticatedContext('userB', { email: 'b@hospB.mx' }).firestore();
 const dbAdmin = () => env.authenticatedContext('adminA', { email: 'admin@hospA.mx' }).firestore();
+const dbPendProa = () => env.authenticatedContext('pendProa', { email: 'pp@hospA.mx' }).firestore();
+const dbFounderC = () => env.authenticatedContext('founderC', { email: 'f@hospC.mx' }).firestore();
+const dbNew = (uid) => env.authenticatedContext(uid, { email: uid + '@x.mx' }).firestore();
 const dbAnon = () => env.unauthenticatedContext().firestore();
 
 test('default-deny: no autenticado NO puede leer un paciente', async () => {
@@ -61,16 +68,29 @@ test('AISLAMIENTO: miembro del hospital B NO puede escribir paciente del hospita
   await assertFails(setDoc(doc(dbB(), `hospitals/${HOSP_A}/months/${MES}/patients/p1`), { nombre: 'hackeado' }, { merge: true }));
 });
 
-// HALLAZGO DE SEGURIDAD (CI v294) — NO es una aserción de "pasa", es documentación honesta:
-// Hoy un miembro SÍ puede escribir su propio 'rol' (lo verificó el emulador). La app lo necesita
-// para el alta por código (_unirseConCodigo escribe el rol en el doc del propio usuario). Como el
-// código se valida en CLIENTE, esto es un vector de escalada (un usuario podría auto-asignarse
-// 'Líder PROA' desde la consola sin código). FIX CORRECTO PENDIENTE: Cloud Function que valide el
-// código en servidor y asigne el rol; luego bloquear el cambio de rol/status en las reglas.
-// Lo que SÍ está blindado y se prueba abajo: aislamiento entre hospitales, default-deny,
-// borrado de paciente solo admin/PROA, y audit_log inmutable.
-test('un miembro NO puede escribir roles de OTRO hospital (aislamiento de escalada)', async () => {
+// ── ESCALADA DE ROL/STATUS — CERRADA en v301 ───────────────────────────────────
+// El rol auto-aprobado por código lo asigna la Cloud Function joinWithCode (Admin SDK, ignora
+// reglas). El cliente ya NO puede auto-asignarse rol/status privilegiado. Se verifica aquí:
+test('un miembro NO puede escribir roles de OTRO hospital (aislamiento)', async () => {
   await assertFails(setDoc(doc(dbB(), `hospitals/${HOSP_A}/users/userA`), { rol: 'Líder PROA' }, { merge: true }));
+});
+test('ESCALADA: auto-crearse PENDIENTE sí se permite (alta normal → admin aprueba)', async () => {
+  await assertSucceeds(setDoc(doc(dbNew('newPend'), `hospitals/${HOSP_A}/users/newPend`), { uid: 'newPend', status: 'pendiente', rol: 'PROA' }));
+});
+test('ESCALADA: auto-crearse APROBADO → DENEGADO (solo joinWithCode en servidor)', async () => {
+  await assertFails(setDoc(doc(dbNew('newApr'), `hospitals/${HOSP_A}/users/newApr`), { uid: 'newApr', status: 'aprobado', rol: 'PROA' }));
+});
+test('ESCALADA: auto-crearse ADMIN de un hospital ajeno → DENEGADO', async () => {
+  await assertFails(setDoc(doc(dbNew('newAdm'), `hospitals/${HOSP_A}/users/newAdm`), { uid: 'newAdm', status: 'admin', rol: 'Líder PROA' }));
+});
+test('FUNDADOR: auto-crearse ADMIN si el registro central me nombra adminUid → OK', async () => {
+  await assertSucceeds(setDoc(doc(dbFounderC(), `hospitals/hospC/users/founderC`), { uid: 'founderC', status: 'admin', rol: 'Admin' }));
+});
+test('ESCALADA: auto-UPDATE cambiando el propio rol → DENEGADO', async () => {
+  await assertFails(updateDoc(doc(dbA(), `hospitals/${HOSP_A}/users/userA`), { rol: 'Líder PROA' }));
+});
+test('ROL sin status aprobado NO da acceso: pendiente con rol PROA NO borra paciente', async () => {
+  await assertFails(deleteDoc(doc(dbPendProa(), `hospitals/${HOSP_A}/months/${MES}/patients/p1`)));
 });
 
 test('borrado de paciente: enfermería NO puede borrar', async () => {

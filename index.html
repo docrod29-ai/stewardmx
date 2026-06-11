@@ -1688,19 +1688,22 @@ async function _unirseConCodigo(u,codigo){
     const rol=autoRol||window._pendingRol||'Pendiente';
     const nombre=u.displayName||window._pendingName||u.email;
     const autoAprobado=!!autoRol;
+    // v301 SEGURIDAD: el cliente NO se auto-aprueba. La auto-aprobación por código la hace SOLO
+    // la Cloud Function joinWithCode (Admin SDK, ignora reglas). Este es el FALLBACK (si la función
+    // falla): deja al usuario PENDIENTE → un admin lo aprueba. Las reglas bloquean auto-crear
+    // 'aprobado', así que un setDoc con status:'aprobado' aquí sería rechazado de todos modos.
     await setDoc(doc(db,'hospitals',hospId,'users',u.uid),{
       uid:u.uid,email:u.email,nombre,rol,
       especialidad:window._pendingEspecialidad||'',
-      status:autoAprobado?'aprobado':'pendiente',
-      active:autoAprobado,
-      createdAt:new Date().toISOString(),
-      ...(autoAprobado?{approvedAt:new Date().toISOString(),approvedBy:'role_code'}:{})
+      status:'pendiente',
+      active:false,
+      createdAt:new Date().toISOString()
     });
     await setDoc(doc(db,'users',u.uid),{hospitalId:hospId,email:u.email});
     HOSP=hospId;
     window._joinedHospNombre=hospNombre;
     window._joinedRol=rol;
-    window._joinedAutoAprobado=autoAprobado;
+    window._joinedAutoAprobado=false; // v301: el fallback siempre deja PENDIENTE (un admin aprueba)
     return true;
   }catch(e){console.warn('[_unirseConCodigo]',e);return false;}
 }
@@ -21236,7 +21239,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v300'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v301'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){

@@ -54,9 +54,13 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol == 'Líder PROA';
     }
     // Rol PROA/Infectología (acceso clínico total)
+    // v301 SEGURIDAD: ahora exige status aprobado/admin (antes solo el rol → un doc
+    // auto-creado con rol:'PROA' status:'pendiente' otorgaba acceso sin aprobación).
     function isHospPROA(hospId) {
       return isAuth()
         && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
+        && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.status
+           in ['aprobado', 'admin']
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
            in ['PROA', 'Infectología', 'Infectólogo', 'Líder PROA', 'Médico PROA'];
     }
@@ -64,6 +68,8 @@ service cloud.firestore {
     function isHospFarmacia(hospId) {
       return isAuth()
         && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
+        && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.status
+           in ['aprobado', 'admin']
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
            in ['Farmacéutico', 'Auxiliar Farmacia'];
     }
@@ -71,6 +77,8 @@ service cloud.firestore {
     function isHospFarmaceuticoTitular(hospId) {
       return isAuth()
         && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
+        && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.status
+           in ['aprobado', 'admin']
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
            == 'Farmacéutico';
     }
@@ -78,6 +86,8 @@ service cloud.firestore {
     function isHospMedico(hospId) {
       return isAuth()
         && exists(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid()))
+        && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.status
+           in ['aprobado', 'admin']
         && get(/databases/$(database)/documents/hospitals/$(hospId)/users/$(uid())).data.rol
            in ['Medico', 'medico', 'Residente', 'Interno', 'Especialista',
                'Médico adscrito', 'Médico PROA', 'Médico interconsultante',
@@ -183,7 +193,23 @@ service cloud.firestore {
       // ── Gestión de usuarios del hospital ────────────────
       match /users/{userId} {
         allow read:   if isAuth() && (uid() == userId || isHospAdmin(hospId) || isHospLider(hospId) || isSuperAdmin());
-        allow create: if isAuth() && uid() == userId;
+        // CREATE (v301 SEGURIDAD — cierre de escalada de rol/status):
+        //  · un usuario solo puede auto-crearse PENDIENTE (alta normal → admin aprueba), o
+        //  · ADMIN solo si es el FUNDADOR (el registro central dice adminUid == él), o
+        //  · super-admin (siembra/migración).
+        //  El alta AUTO-APROBADA por código YA NO la hace el cliente: la hace la Cloud Function
+        //  joinWithCode (Admin SDK, ignora reglas). Así el cliente nunca se auto-asigna 'aprobado'
+        //  ni un 'admin' de un hospital ajeno.
+        allow create: if isAuth() && uid() == userId
+                      && (
+                        isSuperAdmin()
+                        || request.resource.data.status == 'pendiente'
+                        || (request.resource.data.status == 'admin'
+                            && exists(/databases/$(database)/documents/hospitals_registry/$(hospId))
+                            && get(/databases/$(database)/documents/hospitals_registry/$(hospId)).data.adminUid == uid())
+                      );
+        // UPDATE: admin/líder gestionan a OTROS (no a sí mismos, no tocan 'admin'); super-admin todo.
+        //  Auto-update SOLO si NO cambia rol ni status (cierra la escalada por edición).
         allow update: if isSuperAdmin()
                       || (isHospAdmin(hospId)
                           && userId != uid()
@@ -193,12 +219,6 @@ service cloud.firestore {
                           && userId != uid()
                           && resource.data.status != 'admin'
                           && request.resource.data.status != 'admin')
-                      // NOTA DE SEGURIDAD (hallazgo CI v294): hoy un usuario puede escribir su
-                      // propio 'rol'/'status' — la app lo NECESITA para el alta por código
-                      // (_unirseConCodigo). Esto es un vector de escalada porque el código se
-                      // valida en cliente. FIX CORRECTO PENDIENTE: validar el código en una Cloud
-                      // Function (servidor) que asigne el rol, y entonces bloquear aquí el cambio
-                      // de rol/status con diff().affectedKeys(). NO bloquear antes de eso (rompe el alta).
                       || (isAuth() && uid() == userId
                           && request.resource.data.status == resource.data.status
                           && request.resource.data.rol == resource.data.rol);
