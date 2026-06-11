@@ -893,3 +893,57 @@ test('GATE sepsis: libera _guardarBusy ANTES de abrir el gate (cancelar no bloqu
   // el reset debe ocurrir antes de _mostrarGateSepsis, no solo dentro del callback
   assert.match(_idx, /window\._guardarBusy=false;\s*\n\s*if\(btnGuardar\)\{btnGuardar\.disabled=false;btnGuardar\.style\.opacity='';\}\s*\n\s*_mostrarGateSepsis\(\(\)=>\{ guardar\(\); \}\)/);
 });
+
+/* ═══════════ Trasplante Pre-TX (v302): TODO campo de serología EJECUTA en _pretxRecs (AST IDCOP 2019) ═══════════ */
+/* Bug reportado: se seleccionaban anticuerpos (p.ej. Coccidioides) y la recomendación no los ejecutaba.
+   Causa raíz: el formulario ofrecía campos que el motor _pretxRecs NUNCA leía → selecciones muertas.
+   Esta prueba extrae el motor REAL de index.html y lo EJECUTA en un DOM simulado: cada campo antes
+   muerto debe producir recomendación, y ningún campo de serología puede quedar sin consumir. */
+const _pretxBlock = (() => {
+  const s = _idx.indexOf('function g(id){return document.getElementById');
+  const e = _idx.indexOf('window._pretxWordExport=function');
+  return (s >= 0 && e > s) ? _idx.slice(s, e) : '';
+})();
+function _runPretx(fields) {
+  const recsEl = { innerHTML: '' };
+  const document = { getElementById: id => id === 'pretx-recs' ? recsEl : { value: (fields[id] || '') } };
+  const win = {};
+  new Function('window', 'document', _pretxBlock)(win, document);
+  win._pretxRecs();
+  return recsEl.innerHTML;
+}
+test('PRETX: el motor _pretxRecs es extraíble y ejecuta sin error (vacío → fallback)', () => {
+  assert.ok(_pretxBlock.length > 500, 'no se extrajo el bloque _pretxRecs');
+  assert.doesNotThrow(() => _runPretx({}));
+  assert.ok(_runPretx({}).includes('Complete los campos'));
+});
+const _PRETX_CASES = [
+  ['pt_coccidio', 'Positivo (+)', 'Coccidioides serología POSITIVA'],
+  ['pt_vzv', 'Negativo (-)', 'VZV IgG NEGATIVO'],
+  ['pt_hsv', 'Positivo (+)', 'HSV IgG positivo'],
+  ['pt_hbvdna', 'Detectable', 'HBV DNA DETECTABLE'],
+  ['pt_htlv', 'Positivo (+)', 'HTLV-1/2 POSITIVO'],
+  ['pd_htlv', 'Positivo (+)', 'HTLV-1/2 POSITIVO (DONANTE)'],
+  ['pd_wnv', 'Positivo (+)', 'West Nile Virus POSITIVO'],
+  ['pd_hemocult', 'Positivos', 'Hemocultivo del DONANTE'],
+  ['pd_bal', 'Positivo', 'Cultivo de BAL del DONANTE'],
+  ['pd_urocult', 'Positivo', 'Urocultivo del DONANTE'],
+  ['pd_lcr', 'Positivo', 'Cultivo de LCR del DONANTE'],
+  ['pt_rxtx', 'Anormal', 'Rx de tórax ANORMAL'],
+  ['pt_bcg', 'Sí', 'BCG aplicada'],
+  ['pt_tbanterior', 'Sí', 'Historia de TB previa'],
+  ['pt_cmv', 'Positivo (+)', 'CMV'],   // regresión: lo que ya funcionaba sigue funcionando
+];
+for (const [id, val, must] of _PRETX_CASES) {
+  test('PRETX ejecuta: ' + id + '=' + val + ' → recomendación', () => {
+    assert.ok(_runPretx({ [id]: val }).includes(must), 'no apareció la recomendación: ' + must);
+  });
+}
+test('PRETX ejecuta: EBV D+/R- (dos campos) → riesgo de PTLD', () => {
+  assert.ok(_runPretx({ pt_ebv: 'Negativo (-)', pd_ebv: 'Positivo (+)' }).includes('PTLD'));
+});
+test('PRETX anti-selección-muerta: cada serología ofrecida es consumida por _pretxRecs', () => {
+  const requeridos = ['pt_coccidio','pt_vzv','pt_hsv','pt_hbvdna','pt_ebv','pt_htlv','pd_ebv','pd_hsv','pd_htlv','pd_wnv','pd_hemocult','pd_bal','pd_urocult','pd_lcr','pt_rxtx','pt_ppd','pt_tbanterior','pt_bcg','pt_cmv','pd_cmv','pt_hbsag','pt_qft','pt_chagas','pt_toxo','pt_strongy','pt_histo','pt_hiv'];
+  const muertos = requeridos.filter(id => !_pretxBlock.includes("'" + id + "'"));
+  assert.deepEqual(muertos, [], 'CAMPOS MUERTOS (no consumidos por _pretxRecs): ' + muertos.join(', '));
+});

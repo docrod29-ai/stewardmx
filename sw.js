@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v302 (FIX trasplante: serologías Pre-TX que no ejecutaban)
+//  BUG (Dr. Rodríguez): en el apartado Trasplante > Pre-Trasplante se seleccionaban anticuerpos
+//  (Coccidioides, HTLV, VZV, HSV, HBV-DNA, WNV, cultivos del donante, Rx/PPD/BCG/TB previa) y la
+//  recomendación NO los ejecutaba. CAUSA: el formulario ofrecía 17 campos que el motor _pretxRecs
+//  nunca leía → selecciones muertas. FIX: cada campo ahora ejecuta con recomendación CITADA a la
+//  guía rectora (AST IDCOP — Malinis & Boucher, Clin Transplant 2019;33:e13548). Prueba nueva que
+//  EJECUTA _pretxRecs en DOM simulado (15 casos) + guard anti-selección-muerta (FALLA si algún
+//  campo de serología queda sin consumir). Fase 1 del plan de inmunodeprimidos (prompt maestro en
+//  docs/PROMPT_MAESTRO_INMUNODEPRIMIDOS.md). Sin archivo nuevo.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v301 (SEGURIDAD: cierre de la escalada de rol/status)
 //  Cierra al 100% el hallazgo del CI v294. Antes el cliente podía auto-asignarse rol/status
 //  privilegiado en su propio doc de usuario. AHORA:
@@ -373,7 +383,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v301';
+const CACHE = 'stewardmx-v302';
 const SHELL = [
   '/',
   '/index.html',

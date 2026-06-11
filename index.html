@@ -21239,7 +21239,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v301'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v302'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
@@ -26213,6 +26213,30 @@ function _renderTxPreTx(p){
     if(histo.includes('+')){h+=rec('🔴','Histoplasma Ag urinario +','Descartar histoplasmosis activa antes del TX. TC tórax/abdomen. Itraconazol × ≥12 meses si activo.','var(--red)');}
     // HIV
     if(hiv.includes('+')){h+=rec('🟡','VIH+','CD4 actual: '+(isNaN(cd4)?'no registrado':cd4+' cells/μL')+'. Mantener TAR. CD4 >200 ideal pre-TX. Cotrimoxazol diario. Discutir con Infectología.','var(--amber)');}
+    // ── Screening adicional v302 — TODO campo seleccionable ejecuta (AST IDCOP — Malinis & Boucher, Clin Transplant 2019;33:e13548) ──
+    var _P=function(v){return v.includes('+')||v.includes('Positivo');};
+    var _N=function(v){return v.includes('-')&&!v.includes('+');};
+    if(_P(g('pt_coccidio'))){h+=rec('🔴','Coccidioides serología POSITIVA (receptor)','Zona endémica: la <b>reactivación</b> en el receptor previamente infectado es más frecuente que la transmisión donante-derivada. Descartar enfermedad activa (Rx/TC tórax, títulos de fijación de complemento). <b>Profilaxis azólica prolongada — fluconazol 400 mg VO QD</b> (alternativa itraconazol/posaconazol); valoración por Infectología. [AST IDCOP 2019, §3.3]','var(--red)');}
+    var _vzv=g('pt_vzv');
+    if(_N(_vzv)){h+=rec('🟡','VZV IgG NEGATIVO (receptor)','Susceptible a varicela. <b>Vacunar (vacuna viva atenuada) ANTES del trasplante</b> si hay tiempo — contraindicada post-TX bajo inmunosupresión. Ante exposición post-TX: inmunoglobulina VZV (VariZIG) + aciclovir. [AST IDCOP 2019, §3.5.1]','var(--amber)');}
+    else if(_vzv.includes('+')){h+=rec('💊','VZV IgG positivo (receptor)','Riesgo de reactivación (herpes zóster). Profilaxis con aciclovir/valaciclovir durante el período inmunosupresor relevante (en especial bortezomib, inhibidores JAK, TCMH). [AST IDCOP 2019, §3.5]','var(--blue)');}
+    if(g('pt_hsv').includes('+')){h+=rec('💊','HSV IgG positivo (receptor)','Profilaxis antiviral (aciclovir 400 mg VO BID o valaciclovir 500 mg VO QD) al menos el primer mes post-TX. [AST IDCOP 2019, §3.5]','var(--blue)');}
+    if(g('pd_hsv').includes('+')){h+=rec('💊','HSV IgG positivo (donante)','Reforzar la profilaxis antiviral del receptor el primer mes post-TX.','var(--blue)');}
+    if(g('pt_hbvdna').includes('Detectable')){h+=rec('🔴','HBV DNA DETECTABLE (receptor)','Replicación viral activa de hepatitis B. <b>Entecavir 0.5–1 mg o tenofovir (TAF/TDF) VO QD</b> durante toda la inmunosupresión; co-manejo con Hepatología; documentar carga viral basal. [AASLD 2023; AST IDCOP 2019 §2.4.3]','var(--red)');}
+    var _ebvR=g('pt_ebv'),_ebvD=g('pd_ebv');
+    if(_N(_ebvR)&&_ebvD.includes('+')){h+=rec('🔴','EBV D+/R- — Riesgo MÁXIMO de PTLD','El receptor EBV-seronegativo de un injerto EBV-seropositivo tiene el mayor riesgo de enfermedad linfoproliferativa post-trasplante (PTLD). <b>Vigilancia con EBV-PCR</b> (semanal/quincenal el primer año) + minimizar inmunosupresión. Belatacept CONTRAINDICADO en EBV-seronegativos. [AST IDCOP 2019, §2.4.2]','var(--red)');}
+    else if(_N(_ebvR)){h+=rec('🟡','EBV IgG NEGATIVO (receptor)','Receptor susceptible: si el donante es EBV+, se configura D+/R- (riesgo de PTLD). Definir serología del donante y vigilar con EBV-PCR. Belatacept contraindicado en EBV-seronegativos. [AST IDCOP 2019, §2.4.2]','var(--amber)');}
+    if(g('pt_htlv').includes('+')){h+=rec('🟡','HTLV-1/2 POSITIVO (receptor)','Confirmar (los tamizajes tienen bajo valor predictivo positivo). HTLV-1 se asocia a leucemia/linfoma de células T del adulto (ATL, 2–5%) y a mielopatía/paraparesia espástica tropical (HAM/TSP); HTLV-2 sin asociación clara a enfermedad. Vigilancia hematológica/neurológica. [AST IDCOP 2019, §2.4.6]','var(--amber)');}
+    if(g('pd_htlv').includes('+')){h+=rec('🔴','HTLV-1/2 POSITIVO (DONANTE)','Confirmar (alta tasa de falsos positivos). El uso de un donante HTLV+ exige consentimiento informado y decisión multidisciplinaria por el riesgo de ATL/HAM-TSP. [AST IDCOP 2019, §2.4.6]','var(--red)');}
+    if(_P(g('pd_wnv'))){h+=rec('🔴','West Nile Virus POSITIVO (donante)','Riesgo de transmisión por trasplante (meningoencefalitis). <b>Evitar</b> donantes con encefalitis por WNV no explicada o confirmada; confirmar con NAT y vigilar clínicamente al receptor. [AST IDCOP 2019, §2.4.8]','var(--red)');}
+    if(g('pd_hemocult').includes('Positivo')){h+=rec('🟡','Hemocultivo del DONANTE positivo','Si hay organismos virulentos (S. aureus, P. aeruginosa): tratar al receptor por lo menos 14 días dirigidos para prevenir sepsis temprana o aneurisma micótico en la anastomosis vascular. [AST IDCOP 2019, §2.1]','var(--amber)');}
+    if(g('pd_bal').includes('Positivo')){h+=rec('🟡','Cultivo de BAL del DONANTE positivo','Donante pulmonar: iniciar antibióticos en el receptor dirigidos a los organismos recuperados de la vía aérea del donante. [AST IDCOP 2019, §2.1]','var(--amber)');}
+    if(g('pd_urocult').includes('Positivo')){h+=rec('🟡','Urocultivo del DONANTE positivo','Tratar al receptor según el organismo aislado; especialmente relevante en trasplante renal. [AST IDCOP 2019, §2.1]','var(--amber)');}
+    if(g('pd_lcr').includes('Positivo')){h+=rec('🔴','Cultivo de LCR del DONANTE positivo','Infección del SNC del donante: definir patógeno; profilaxis/tratamiento dirigido del receptor (meningococo o H. influenzae requieren profilaxis; neumococo, tratar). [AST IDCOP 2019, §2.1]','var(--red)');}
+    if(g('pt_rxtx').includes('Anormal')){h+=rec('🟡','Rx de tórax ANORMAL','Descartar TB activa (TC de tórax, BAAR en esputo) y otras infecciones pulmonares antes de inmunosuprimir. [AST IDCOP 2019, §3.2]','var(--amber)');}
+    if(_P(g('pt_ppd'))){h+=rec('🟡','PPD POSITIVO','Sugiere TB latente. En vacunados con BCG <b>preferir IGRA</b> (distingue BCG de LTBI en mayores de 5 años). Descartar TB activa y dar isoniazida 300 mg + B6 × 9 meses (o 3HP). [AST IDCOP 2019, §3.2]','var(--amber)');}
+    if(g('pt_tbanterior')==='Sí'){h+=rec('🟡','Historia de TB previa','Confirmar tratamiento completo y documentado; si no consta, valorar LTBI vs enfermedad activa antes de inmunosuprimir. [AST IDCOP 2019, §3.2]','var(--amber)');}
+    if(g('pt_bcg')==='Sí'){h+=rec('💊','BCG aplicada','Para el tamizaje de TB latente usar <b>IGRA</b> en lugar de PPD (la BCG produce PPD falsamente positivo). [AST IDCOP 2019, §3.2]','var(--blue)');}
     if(!h.includes('border-left:4px solid')){h+='<div style="font-size:11px;color:var(--t3);text-align:center;padding:14px;">Complete los campos de laboratorio para ver las recomendaciones.</div>';}
     el.innerHTML=h;
   };
