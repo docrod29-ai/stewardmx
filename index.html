@@ -21239,7 +21239,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v305'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v306'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
@@ -26157,6 +26157,7 @@ function _renderTxPreTx(p){
   const DET=['Indetectable','Detectable'];
   let html=`<div style="background:var(--s1);border:1px solid var(--brd2);border-radius:8px;padding:14px 16px;margin-bottom:14px;">
     <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:12px;">Evaluación Pre-Trasplante — RECEPTOR</div>
+    <div style="margin-bottom:12px;max-width:460px;">${selField('pt_tipotx','Tipo de trasplante (autólogo/alogénico u órgano sólido)',['Renal','Hepático','Cardíaco','Pulmonar','Páncreas','Intestino/Multivisceral','TCMH autólogo','TCMH alogénico relacionado','TCMH alogénico no relacionado','TCMH haploidéntico','TCMH cordón umbilical'],'window._pretxRecs&&window._pretxRecs()')}</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
       <div>
         <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Virología</div>
@@ -26172,6 +26173,7 @@ function _renderTxPreTx(p){
         ${selField('pt_hcvrna','HCV RNA',DET,'window._pretxRecs&&window._pretxRecs()')}
         ${selField('pt_hiv','HIV Ag/Ab 4ta gen',PNND,'window._pretxRecs&&window._pretxRecs()')}
         ${selField('pt_htlv','HTLV-1/2',POS,'window._pretxRecs&&window._pretxRecs()')}
+        ${selField('pt_sifilis','VDRL/RPR (sífilis)',['No reactivo','Reactivo'],'window._pretxRecs&&window._pretxRecs()')}
       </div>
       <div>
         <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Parásitos y TB</div>
@@ -26260,62 +26262,113 @@ function _renderTxPreTx(p){
     const el=document.getElementById('pretx-recs');
     if(!el)return;
     let h='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:10px;">Recomendaciones automáticas</div>';
-    const cmvR=g('pt_cmv'),cmvD=g('pd_cmv');
-    const hbsag=g('pt_hbsag'),hbc=g('pt_hbc');
-    const pdHbsag=g('pd_hbsag'),pdHbc=g('pd_hbc');
-    const qft=g('pt_qft'),chagas=g('pt_chagas'),toxo=g('pt_toxo'),strongy=g('pt_strongy'),histo=g('pt_histo');
-    const hiv=g('pt_hiv'),cd4=gn('pt_cd4');
-    // CMV D+/R-
-    if(cmvD.includes('+')&&cmvR.includes('-')){
-      h+=rec('🔴','CMV D+/R- — Riesgo MUY ALTO','Iniciar profilaxis CMV: Letermovir (TCMH) o Valganciclovir 900 mg QD (SOT) desde el día 0. Ver tab CMV para dosis y duración completas.','var(--red)');
-    } else if(cmvD&&cmvR&&!cmvD.includes('+')&&!cmvR.includes('+')){
-      h+=rec('✅','CMV D-/R- — Riesgo bajo','Sin profilaxis CMV. Solo aciclovir estándar para VZV/HSV.','var(--teal)');
-    } else if(cmvD||cmvR){
-      h+=rec('🟡','CMV — Revisar estrategia','D+/R+ o D-/R+: Profilaxis o pre-emptiva según protocolo del centro y órgano trasplantado.','var(--amber)');
-    }
-    // HBV receptor
-    if(hbsag.includes('+')){h+=rec('🔴','HBsAg+ RECEPTOR','Entecavir 0.5–1 mg VO QD durante toda la inmunosupresión + 12–18 meses post-TX. Hepatología co-manejo.','var(--red)');}
-    else if(hbc.includes('+')){h+=rec('🟡','Anti-HBc+ RECEPTOR','Monitoreo HBV DNA mensual. Si anti-CD20 o ATG: entecavir profiláctico durante inmunosupresión.','var(--amber)');}
-    // HBV donor
-    if(pdHbsag.includes('+')){h+=rec('🔴','HBsAg+ DONADOR','Evaluar riesgo de transmisión HBV. Entecavir en receptor. Discutir con Hepatología y Trasplante.','var(--red)');}
-    else if(pdHbc.includes('+')){h+=rec('🟡','Anti-HBc+ DONADOR','Riesgo de transmisión HBV. Monitoreo HBV DNA mensual en receptor. Considerar entecavir profiláctico.','var(--amber)');}
-    // TB
-    if(qft.includes('+')){h+=rec('🔴','QFT/IGRA+ — LTBI','Descartar TB activa. Tratamiento: Isoniazida 300 mg + Piridoxina × 9 meses ANTES del TX si posible. Rifampicina EVITAR por interacciones con calcineurina inhibidores.','var(--red)');}
-    // Chagas
-    if(chagas.includes('+')){h+=rec('🟡','Chagas+ — T. cruzi','Benznidazol 5 mg/kg/d × 60 días antes del TX. Post-TX: PCR T. cruzi cada 3 meses × 2 años.','var(--amber)');}
-    // Strongyloides
-    if(strongy.includes('+')){h+=rec('🔴','Strongyloides+','Ivermectina 200 μg/kg × 2 dosis (D1 y D15) ANTES del TX. Riesgo de hiperinfección fatal con ATG/esteroides.','var(--red)');}
-    // Toxoplasma
-    if(toxo.includes('-')){h+=rec('🟡','Toxoplasma IgG negativo (receptor)','Si donador seropositivo en TX cardíaco: pirimetamina + ácido folínico × 6 semanas post-TX.','var(--amber)');}
-    // Histoplasma
-    if(histo.includes('+')){h+=rec('🔴','Histoplasma Ag urinario +','Descartar histoplasmosis activa antes del TX. TC tórax/abdomen. Itraconazol × ≥12 meses si activo.','var(--red)');}
+    var P=function(v){return !!v&&(v.indexOf('+')>=0||v.indexOf('Positivo')>=0||v.indexOf('Reactivo')===0||v.indexOf('Detectable')>=0||v==='Anormal'||v==='Sí');};
+    var N=function(v){return !!v&&v.indexOf('+')<0&&(v.indexOf('-')>=0||/negativo|no reactivo|indetectable|^normal$/i.test(v));};
+    var ND=function(v){return /no realizado/i.test(v||'');};
+    var tt=g('pt_tipotx');
+    var isHeart=/card/i.test(tt),isLung=/pulmon/i.test(tt),isTCMH=/TCMH/i.test(tt),isAllo=/alog|haplo|cord/i.test(tt);
+    var cmvDur=isTCMH?'Letermovir hasta el día 100 (extender al 200 si alto riesgo: alogénico no relacionado/haplo/cordón, GVHD o esteroides)':((isHeart||isLung)?'Valganciclovir 900 mg VO QD durante 6–12 meses':'Valganciclovir 900 mg VO QD durante 3–6 meses');
+    // Tipo de trasplante (contexto)
+    if(tt){h+=rec('🫀','Tipo de trasplante: '+tt,'Las recomendaciones se ajustan a este tipo. '+(isTCMH?(isAllo?'TCMH alogénico: mayor riesgo de CMV, EBV/PTLD, hongos invasivos y GVHD que el autólogo; profilaxis más intensa.':'TCMH autólogo: riesgo menor; PCP y VZV son los principales.'):'SOT: la ventana de mayor riesgo de oportunistas es 1–6 meses post-TX; corazón/pulmón requieren profilaxis más prolongada.'),'var(--purple)');}
+    else {h+=rec('⏳','Seleccione el tipo de trasplante','Elija arriba el tipo (autólogo/alogénico u órgano sólido) para ajustar la duración de profilaxis y los riesgos específicos.','var(--t3)');}
+    // CMV (modulado por órgano)
+    var cmvR=g('pt_cmv'),cmvD=g('pd_cmv');
+    if(P(cmvD)&&N(cmvR)){h+=rec('🔴','CMV D+/R- — Riesgo MUY ALTO','Profilaxis CMV obligatoria. '+cmvDur+'. Monitoreo con PCR-CMV (ver tab CMV). [AST 2019; IDSA 2024]','var(--red)');}
+    else if(N(cmvD)&&N(cmvR)){h+=rec('✅','CMV D-/R- — Riesgo BAJO','Sin profilaxis CMV específica. Usar hemoderivados CMV-negativos o leucorreducidos. Aciclovir estándar para VZV/HSV.','var(--teal)');}
+    else if(P(cmvR)){h+=rec('🟡','CMV R+ — Riesgo intermedio','Profilaxis o estrategia pre-emptiva (PCR-CMV semanal × 3–6 meses) según el protocolo del centro. '+cmvDur+'. [AST 2019]','var(--amber)');}
+    else if(cmvR||cmvD){h+=rec('🟡','CMV — completar D/R','Capture CMV de donante y receptor para estratificar (D+/R- es el de mayor riesgo).','var(--amber)');}
+    // EBV (PTLD) — TODO valor emite
+    var ebvR=g('pt_ebv'),ebvD=g('pd_ebv');
+    if(P(ebvR)){h+=rec('✅','EBV IgG POSITIVO (receptor)','Seropositivo (la mayoría de adultos): menor riesgo de PTLD que el seronegativo. Sin profilaxis específica; vigilar EBV-PCR solo si inmunosupresión intensa (ATG/belatacept) o síntomas. [AST IDCOP 2019, §2.4.2]','var(--teal)');}
+    else if(N(ebvR)&&P(ebvD)){h+=rec('🔴','EBV D+/R- — Riesgo MÁXIMO de PTLD','Receptor seronegativo + injerto seropositivo: el mayor riesgo de PTLD. Vigilancia EBV-PCR (semanal/quincenal el 1er año) + minimizar inmunosupresión. Belatacept CONTRAINDICADO. [AST IDCOP 2019, §2.4.2]','var(--red)');}
+    else if(N(ebvR)){h+=rec('🟡','EBV IgG NEGATIVO (receptor)','Susceptible: si el donante es EBV+, se configura D+/R- (riesgo de PTLD). Definir serología del donante + vigilar EBV-PCR. Belatacept contraindicado. [AST IDCOP 2019, §2.4.2]','var(--amber)');}
+    else if(ND(ebvR)){h+=rec('⏳','EBV — pendiente','Solicitar EBV VCA IgG (define el riesgo de PTLD). [AST IDCOP 2019]','var(--t3)');}
+    // HSV
+    var hsvR=g('pt_hsv');
+    if(P(hsvR)){h+=rec('💊','HSV IgG POSITIVO (receptor)','Profilaxis antiviral (aciclovir 400 mg VO BID o valaciclovir 500 mg VO QD) al menos el 1er mes post-TX (toda la fase de mayor IS en TCMH). [AST IDCOP 2019, §3.5]','var(--blue)');}
+    else if(N(hsvR)){h+=rec('✅','HSV IgG NEGATIVO (receptor)','Sin riesgo de reactivación de HSV. Muchos centros igual dan aciclovir universal el 1er mes (también cubre VZV). [AST IDCOP 2019, §3.5]','var(--teal)');}
+    else if(ND(hsvR)){h+=rec('⏳','HSV — pendiente','Solicitar HSV-1/2 IgG o iniciar profilaxis antiviral universal el 1er mes.','var(--t3)');}
+    // VZV
+    var vzv=g('pt_vzv');
+    if(N(vzv)){h+=rec('🟡','VZV IgG NEGATIVO (receptor)','Susceptible a varicela. Vacunar (vacuna VIVA) ANTES del trasplante si hay tiempo — contraindicada post-TX. Ante exposición post-TX: inmunoglobulina VZV (VariZIG) + aciclovir. [AST IDCOP 2019, §3.5.1]','var(--amber)');}
+    else if(P(vzv)){h+=rec('💊','VZV IgG POSITIVO (receptor)','Riesgo de reactivación (herpes zóster). Profilaxis con aciclovir/valaciclovir durante la IS relevante (en especial bortezomib, JAK, TCMH). Vacuna recombinante (Shingrix) tras la recuperación inmune. [AST IDCOP 2019, §3.5]','var(--blue)');}
+    else if(ND(vzv)){h+=rec('⏳','VZV — pendiente','Solicitar VZV IgG (define la necesidad de vacuna pre-TX).','var(--t3)');}
+    // HBV (HBsAg / Anti-HBc / Anti-HBs título / HBV DNA)
+    var hbsag=g('pt_hbsag'),hbc=g('pt_hbc'),hbsTit=gn('pt_hbs_t'),hbvdna=g('pt_hbvdna');
+    if(P(hbsag)){h+=rec('🔴','HBsAg POSITIVO (receptor) — Hepatitis B activa','Entecavir 0.5–1 mg o tenofovir (TAF/TDF) VO QD durante TODA la inmunosupresión + 12–18 meses después. Hepatología; evaluar fibrosis. [AASLD 2023]','var(--red)');}
+    else if(P(hbc)){h+=rec('🟡','Anti-HBc+ / HBsAg- (receptor) — riesgo de reactivación','Monitoreo HBV DNA mensual. Si anti-CD20 (rituximab), ATG o IS intensa: entecavir profiláctico durante la IS + 12 meses. [AASLD 2023; AST 2019]','var(--amber)');}
+    else if(N(hbsag)&&N(hbc)){h+=rec('✅','HBV: HBsAg- / Anti-HBc- (receptor)','Sin evidencia de HBV. Verificar inmunidad (Anti-HBs); si <10 UI/L, vacunar (idealmente pre-TX, doble dosis). [AST 2019]','var(--teal)');}
+    if(P(hbvdna)){h+=rec('🔴','HBV DNA DETECTABLE (receptor)','Replicación viral activa: entecavir o tenofovir + Hepatología; documentar carga viral basal. [AASLD 2023; AST 2019 §2.4.3]','var(--red)');}
+    if(!isNaN(hbsTit)&&hbsTit<10){h+=rec('🟡','Anti-HBs <10 UI/L — inmunidad HBV insuficiente','Refuerzo de vacuna HBV (doble dosis) si hay tiempo pre-TX; la respuesta post-TX es subóptima. [AST 2019]','var(--amber)');}
+    else if(!isNaN(hbsTit)&&hbsTit>=10){h+=rec('✅','Anti-HBs ≥10 UI/L — inmune a HBV','Protección adecuada. Monitorear el título periódicamente bajo IS.','var(--teal)');}
+    // HCV
+    var hcv=g('pt_hcv'),hcvrna=g('pt_hcvrna');
+    if(P(hcvrna)){h+=rec('🔴','HCV RNA DETECTABLE — Hepatitis C activa','AAD pangenotípicos (sofosbuvir/velpatasvir × 12 semanas; SVR >98%). Diferir el TX hasta SVR si es posible; Hepatología. [AASLD 2023]','var(--red)');}
+    else if(P(hcv)){h+=rec('🟡','Anti-HCV+ (RNA indetectable o no medido)','Confirmar con HCV RNA: si es negativo, infección curada o tratada; vigilar bajo IS intensa. [AASLD 2023]','var(--amber)');}
+    else if(N(hcv)){h+=rec('✅','Anti-HCV NEGATIVO','Sin evidencia de hepatitis C.','var(--teal)');}
     // HIV
-    if(hiv.includes('+')){h+=rec('🟡','VIH+','CD4 actual: '+(isNaN(cd4)?'no registrado':cd4+' cells/μL')+'. Mantener TAR. CD4 >200 ideal pre-TX. Cotrimoxazol diario. Discutir con Infectología.','var(--amber)');}
-    // ── Screening adicional v302 — TODO campo seleccionable ejecuta (AST IDCOP — Malinis & Boucher, Clin Transplant 2019;33:e13548) ──
-    var _P=function(v){return v.includes('+')||v.includes('Positivo');};
-    var _N=function(v){return v.includes('-')&&!v.includes('+');};
-    if(_P(g('pt_coccidio'))){h+=rec('🔴','Coccidioides serología POSITIVA (receptor)','Zona endémica: la <b>reactivación</b> en el receptor previamente infectado es más frecuente que la transmisión donante-derivada. Descartar enfermedad activa (Rx/TC tórax, títulos de fijación de complemento). <b>Profilaxis azólica prolongada — fluconazol 400 mg VO QD</b> (alternativa itraconazol/posaconazol); valoración por Infectología. [AST IDCOP 2019, §3.3]','var(--red)');}
-    var _vzv=g('pt_vzv');
-    if(_N(_vzv)){h+=rec('🟡','VZV IgG NEGATIVO (receptor)','Susceptible a varicela. <b>Vacunar (vacuna viva atenuada) ANTES del trasplante</b> si hay tiempo — contraindicada post-TX bajo inmunosupresión. Ante exposición post-TX: inmunoglobulina VZV (VariZIG) + aciclovir. [AST IDCOP 2019, §3.5.1]','var(--amber)');}
-    else if(_vzv.includes('+')){h+=rec('💊','VZV IgG positivo (receptor)','Riesgo de reactivación (herpes zóster). Profilaxis con aciclovir/valaciclovir durante el período inmunosupresor relevante (en especial bortezomib, inhibidores JAK, TCMH). [AST IDCOP 2019, §3.5]','var(--blue)');}
-    if(g('pt_hsv').includes('+')){h+=rec('💊','HSV IgG positivo (receptor)','Profilaxis antiviral (aciclovir 400 mg VO BID o valaciclovir 500 mg VO QD) al menos el primer mes post-TX. [AST IDCOP 2019, §3.5]','var(--blue)');}
-    if(g('pd_hsv').includes('+')){h+=rec('💊','HSV IgG positivo (donante)','Reforzar la profilaxis antiviral del receptor el primer mes post-TX.','var(--blue)');}
-    if(g('pt_hbvdna').includes('Detectable')){h+=rec('🔴','HBV DNA DETECTABLE (receptor)','Replicación viral activa de hepatitis B. <b>Entecavir 0.5–1 mg o tenofovir (TAF/TDF) VO QD</b> durante toda la inmunosupresión; co-manejo con Hepatología; documentar carga viral basal. [AASLD 2023; AST IDCOP 2019 §2.4.3]','var(--red)');}
-    var _ebvR=g('pt_ebv'),_ebvD=g('pd_ebv');
-    if(_N(_ebvR)&&_ebvD.includes('+')){h+=rec('🔴','EBV D+/R- — Riesgo MÁXIMO de PTLD','El receptor EBV-seronegativo de un injerto EBV-seropositivo tiene el mayor riesgo de enfermedad linfoproliferativa post-trasplante (PTLD). <b>Vigilancia con EBV-PCR</b> (semanal/quincenal el primer año) + minimizar inmunosupresión. Belatacept CONTRAINDICADO en EBV-seronegativos. [AST IDCOP 2019, §2.4.2]','var(--red)');}
-    else if(_N(_ebvR)){h+=rec('🟡','EBV IgG NEGATIVO (receptor)','Receptor susceptible: si el donante es EBV+, se configura D+/R- (riesgo de PTLD). Definir serología del donante y vigilar con EBV-PCR. Belatacept contraindicado en EBV-seronegativos. [AST IDCOP 2019, §2.4.2]','var(--amber)');}
-    if(g('pt_htlv').includes('+')){h+=rec('🟡','HTLV-1/2 POSITIVO (receptor)','Confirmar (los tamizajes tienen bajo valor predictivo positivo). HTLV-1 se asocia a leucemia/linfoma de células T del adulto (ATL, 2–5%) y a mielopatía/paraparesia espástica tropical (HAM/TSP); HTLV-2 sin asociación clara a enfermedad. Vigilancia hematológica/neurológica. [AST IDCOP 2019, §2.4.6]','var(--amber)');}
-    if(g('pd_htlv').includes('+')){h+=rec('🔴','HTLV-1/2 POSITIVO (DONANTE)','Confirmar (alta tasa de falsos positivos). El uso de un donante HTLV+ exige consentimiento informado y decisión multidisciplinaria por el riesgo de ATL/HAM-TSP. [AST IDCOP 2019, §2.4.6]','var(--red)');}
-    if(_P(g('pd_wnv'))){h+=rec('🔴','West Nile Virus POSITIVO (donante)','Riesgo de transmisión por trasplante (meningoencefalitis). <b>Evitar</b> donantes con encefalitis por WNV no explicada o confirmada; confirmar con NAT y vigilar clínicamente al receptor. [AST IDCOP 2019, §2.4.8]','var(--red)');}
-    if(g('pd_hemocult').includes('Positivo')){h+=rec('🟡','Hemocultivo del DONANTE positivo','Si hay organismos virulentos (S. aureus, P. aeruginosa): tratar al receptor por lo menos 14 días dirigidos para prevenir sepsis temprana o aneurisma micótico en la anastomosis vascular. [AST IDCOP 2019, §2.1]','var(--amber)');}
-    if(g('pd_bal').includes('Positivo')){h+=rec('🟡','Cultivo de BAL del DONANTE positivo','Donante pulmonar: iniciar antibióticos en el receptor dirigidos a los organismos recuperados de la vía aérea del donante. [AST IDCOP 2019, §2.1]','var(--amber)');}
-    if(g('pd_urocult').includes('Positivo')){h+=rec('🟡','Urocultivo del DONANTE positivo','Tratar al receptor según el organismo aislado; especialmente relevante en trasplante renal. [AST IDCOP 2019, §2.1]','var(--amber)');}
-    if(g('pd_lcr').includes('Positivo')){h+=rec('🔴','Cultivo de LCR del DONANTE positivo','Infección del SNC del donante: definir patógeno; profilaxis/tratamiento dirigido del receptor (meningococo o H. influenzae requieren profilaxis; neumococo, tratar). [AST IDCOP 2019, §2.1]','var(--red)');}
-    if(g('pt_rxtx').includes('Anormal')){h+=rec('🟡','Rx de tórax ANORMAL','Descartar TB activa (TC de tórax, BAAR en esputo) y otras infecciones pulmonares antes de inmunosuprimir. [AST IDCOP 2019, §3.2]','var(--amber)');}
-    if(_P(g('pt_ppd'))){h+=rec('🟡','PPD POSITIVO','Sugiere TB latente. En vacunados con BCG <b>preferir IGRA</b> (distingue BCG de LTBI en mayores de 5 años). Descartar TB activa y dar isoniazida 300 mg + B6 × 9 meses (o 3HP). [AST IDCOP 2019, §3.2]','var(--amber)');}
+    var hiv=g('pt_hiv'),cd4=gn('pt_cd4');
+    if(P(hiv)){h+=rec('🟡','VIH POSITIVO (receptor)','CD4 actual: '+(isNaN(cd4)?'no registrado':cd4+' cells/μL')+'. Mantener TAR sin interrupción; CD4 >200 y carga viral indetectable ideales pre-TX. Cotrimoxazol. Vigilar interacciones TAR–calcineurínicos (ritonavir/cobicistat). Infectología VIH.'+((cd4<200&&!isNaN(cd4))?' CD4 <200: optimizar antes del TX.':''),'var(--amber)');}
+    else if(N(hiv)){h+=rec('✅','VIH NEGATIVO','Sin VIH.','var(--teal)');}
+    // HTLV receptor
+    var htlvR=g('pt_htlv');
+    if(P(htlvR)){h+=rec('🟡','HTLV-1/2 POSITIVO (receptor)','Confirmar (bajo valor predictivo positivo de los tamizajes). HTLV-1 → ATL (2–5%) y HAM/TSP; HTLV-2 sin asociación clara. Vigilancia hematológica/neurológica. [AST IDCOP 2019, §2.4.6]','var(--amber)');}
+    else if(N(htlvR)){h+=rec('✅','HTLV-1/2 NEGATIVO','Sin HTLV.','var(--teal)');}
+    // VDRL / sífilis (receptor) — NUEVO
+    var sif=g('pt_sifilis');
+    if(P(sif)){h+=rec('🟡','VDRL/RPR REACTIVO (receptor)','Confirmar con prueba treponémica (FTA-ABS/TPHA). Si hay sífilis: penicilina G benzatínica según estadio ANTES del TX; seguimiento de títulos. [CDC STI 2021]','var(--amber)');}
+    else if(N(sif)){h+=rec('✅','VDRL/RPR no reactivo','Sin evidencia de sífilis.','var(--teal)');}
+    // Toxoplasma (modulado por órgano: corazón)
+    var toxo=g('pt_toxo');
+    if(N(toxo)){h+=rec(isHeart?'🔴':'🟡','Toxoplasma IgG NEGATIVO (receptor)',(isHeart?'TRASPLANTE CARDÍACO con receptor seronegativo: si el donante es seropositivo (D+/R-) hay alto riesgo de toxoplasmosis primaria → pirimetamina + ácido folínico × 6 semanas post-TX. ':'Receptor susceptible. ')+'El cotrimoxazol profiláctico (PCP) también protege contra Toxoplasma. [AST IDCOP 2019, §3.4]','var(--amber)');}
+    else if(P(toxo)){h+=rec('🟡','Toxoplasma IgG POSITIVO (receptor)','Infección latente: riesgo de reactivación con IS intensa (en especial TCMH alogénico y corazón). El cotrimoxazol PCP cubre Toxoplasma; en TCMH alogénico seropositivo vigilar PCR. [AST IDCOP 2019]','var(--amber)');}
+    // Chagas
+    var chagas=g('pt_chagas');
+    if(P(chagas)){h+=rec('🟡','Chagas POSITIVO (T. cruzi IgG)','Benznidazol 5 mg/kg/d × 60 días ANTES del TX si es posible. Post-TX: PCR T. cruzi cada 3 meses × 2 años; tratar si reactivación. Evaluar cardiopatía chagásica. [AST 2019]','var(--amber)');}
+    else if(N(chagas)){h+=rec('✅','Chagas NEGATIVO','Sin enfermedad de Chagas.','var(--teal)');}
+    // Strongyloides
+    var strongy=g('pt_strongy');
+    if(P(strongy)){h+=rec('🔴','Strongyloides POSITIVO','Ivermectina 200 μg/kg × 2 dosis (D1 y D15) ANTES del TX. Riesgo de hiperinfección fatal con ATG/esteroides. [IDSA 2024]','var(--red)');}
+    else if(N(strongy)){h+=rec('✅','Strongyloides NEGATIVO','Sin evidencia. Si hay exposición epidemiológica fuerte y la serología es poco sensible, considerar ivermectina empírica. [AST 2019]','var(--teal)');}
+    else if(ND(strongy)){h+=rec('⏳','Strongyloides — pendiente (zona endémica)','Solicitar serología (preferida sobre el coproparasitoscópico) en pacientes de zona endémica. [AST 2019]','var(--t3)');}
+    // TB: QFT/IGRA
+    var qft=g('pt_qft');
+    if(P(qft)){h+=rec('🔴','QFT/IGRA POSITIVO — TB latente','Descartar TB activa (Rx/TC tórax, BAAR). Isoniazida 300 mg + B6 × 9 meses (o 3HP) iniciando ANTES del TX. La rifampicina interactúa con los calcineurínicos. [OMS 2023; IDSA 2024]','var(--red)');}
+    else if(N(qft)){h+=rec('✅','QFT/IGRA NEGATIVO','Sin evidencia de TB latente (correlacionar con Rx y factores de riesgo).','var(--teal)');}
+    else if(/indeterminado/i.test(qft)){h+=rec('🟡','QFT/IGRA INDETERMINADO','Repetir; considerar anergia por inmunosupresión. Valorar Rx tórax + factores de riesgo epidemiológicos. [IDSA 2024]','var(--amber)');}
+    // PPD (mm), Rx, TB previa, BCG
+    var ppdN=gn('pt_ppd');
+    if(!isNaN(ppdN)){ if(ppdN>=5){h+=rec('🟡','PPD '+ppdN+' mm — positivo en inmunocomprometido (≥5 mm)','LTBI probable. En vacunados con BCG preferir IGRA. Descartar TB activa → isoniazida × 9 meses. [AST IDCOP 2019, §3.2]','var(--amber)');} else {h+=rec('✅','PPD '+ppdN+' mm — negativo','En inmunocomprometidos el umbral de positividad es ≥5 mm.','var(--teal)');} }
+    var rxtx=g('pt_rxtx');
+    if(rxtx==='Anormal'){h+=rec('🟡','Rx de tórax ANORMAL','Descartar TB activa (TC, BAAR en esputo) y otras infecciones pulmonares antes de inmunosuprimir. [AST IDCOP 2019, §3.2]','var(--amber)');}
+    else if(rxtx==='Normal'){h+=rec('✅','Rx de tórax normal','Sin hallazgos radiográficos de infección pulmonar.','var(--teal)');}
     if(g('pt_tbanterior')==='Sí'){h+=rec('🟡','Historia de TB previa','Confirmar tratamiento completo y documentado; si no consta, valorar LTBI vs enfermedad activa antes de inmunosuprimir. [AST IDCOP 2019, §3.2]','var(--amber)');}
-    if(g('pt_bcg')==='Sí'){h+=rec('💊','BCG aplicada','Para el tamizaje de TB latente usar <b>IGRA</b> en lugar de PPD (la BCG produce PPD falsamente positivo). [AST IDCOP 2019, §3.2]','var(--blue)');}
-    if(!h.includes('border-left:4px solid')){h+='<div style="font-size:11px;color:var(--t3);text-align:center;padding:14px;">Complete los campos de laboratorio para ver las recomendaciones.</div>';}
+    if(g('pt_bcg')==='Sí'){h+=rec('💊','BCG aplicada','Para el tamizaje de TB latente usar IGRA (la BCG produce PPD falsamente positivo). [AST IDCOP 2019, §3.2]','var(--blue)');}
+    // Histoplasma
+    var histo=g('pt_histo');
+    if(P(histo)){h+=rec('🔴','Histoplasma Ag urinario POSITIVO','Descartar histoplasmosis activa (TC tórax/abdomen, cultivos). Si activa: anfotericina B liposomal → itraconazol ≥12 meses; diferir el TX. [IDSA 2024]','var(--red)');}
+    else if(N(histo)){h+=rec('✅','Histoplasma Ag NEGATIVO','Sin antigenuria. En zona endémica, mantener la sospecha ante fiebre post-TX. [AST IDCOP 2019]','var(--teal)');}
+    // Coccidioides
+    var cocci=g('pt_coccidio');
+    if(P(cocci)){h+=rec('🔴','Coccidioides serología POSITIVA (receptor)','Zona endémica: la reactivación es más frecuente que la transmisión. Descartar enfermedad activa; profilaxis azólica prolongada (fluconazol 400 mg VO QD). Infectología. [AST IDCOP 2019, §3.3]','var(--red)');}
+    else if(N(cocci)){h+=rec('✅','Coccidioides serología NEGATIVA','Sin evidencia. En zona endémica, vigilar post-TX. [AST IDCOP 2019]','var(--teal)');}
+    // G6PD
+    var g6pd=g('pt_g6pd');
+    if(/deficiente/i.test(g6pd)){h+=rec('🟡','G6PD DEFICIENTE','Evitar cotrimoxazol y dapsona (riesgo de hemólisis). Para PCP: atovacuona 1500 mg VO QD (o pentamidina inhalada).','var(--amber)');}
+    else if(/normal/i.test(g6pd)){h+=rec('✅','G6PD normal','Cotrimoxazol seguro para la profilaxis de PCP.','var(--teal)');}
+    // ── DONANTE (positivos) ──
+    if(g('pd_hsv').includes('+')){h+=rec('💊','HSV IgG positivo (donante)','Reforzar la profilaxis antiviral del receptor el primer mes post-TX.','var(--blue)');}
+    if(g('pd_htlv').includes('+')){h+=rec('🔴','HTLV-1/2 POSITIVO (DONANTE)','Confirmar (falsos positivos). El uso de un donante HTLV+ exige consentimiento informado por el riesgo de ATL/HAM-TSP. [AST IDCOP 2019, §2.4.6]','var(--red)');}
+    if(P(g('pd_wnv'))){h+=rec('🔴','West Nile Virus POSITIVO (donante)','Riesgo de meningoencefalitis transmitida. Evitar donantes con encefalitis WNV; confirmar con NAT y vigilar al receptor. [AST IDCOP 2019, §2.4.8]','var(--red)');}
+    if(g('pd_hemocult').includes('Positivo')){h+=rec('🟡','Hemocultivo del DONANTE positivo','Si hay organismos virulentos (S. aureus, P. aeruginosa): tratar al receptor por lo menos 14 días dirigidos (sepsis temprana / aneurisma micótico). [AST IDCOP 2019, §2.1]','var(--amber)');}
+    if(g('pd_bal').includes('Positivo')){h+=rec('🟡','Cultivo de BAL del DONANTE positivo','Donante pulmonar: antibióticos al receptor dirigidos a los organismos recuperados de la vía aérea del donante. [AST IDCOP 2019, §2.1]','var(--amber)');}
+    if(g('pd_urocult').includes('Positivo')){h+=rec('🟡','Urocultivo del DONANTE positivo','Tratar al receptor según el organismo aislado (relevante en trasplante renal). [AST IDCOP 2019, §2.1]','var(--amber)');}
+    if(g('pd_lcr').includes('Positivo')){h+=rec('🔴','Cultivo de LCR del DONANTE positivo','Infección del SNC del donante: profilaxis/tratamiento dirigido del receptor. [AST IDCOP 2019, §2.1]','var(--red)');}
+    if(g('pd_hbsag').includes('+')){h+=rec('🔴','HBsAg+ DONANTE','Riesgo de transmisión HBV: entecavir en el receptor (+ HBIG en SOT); Hepatología. [AST IDCOP 2019]','var(--red)');}
+    else if(g('pd_hbc').includes('+')){h+=rec('🟡','Anti-HBc+ DONANTE','Riesgo de transmisión HBV oculta: entecavir profiláctico + monitoreo HBV DNA en el receptor. [AST IDCOP 2019]','var(--amber)');}
+    if(g('pd_chagas').includes('+')){h+=rec('🔴','Chagas+ DONANTE','Evitar el corazón de un donante Chagas+; hígado/riñón con consentimiento + monitoreo PCR. [AST 2019]','var(--red)');}
+    if(P(g('pd_sifilis'))){h+=rec('🟡','VDRL/RPR reactivo DONANTE','No contraindica la donación; tratar al receptor con penicilina post-TX. [AST IDCOP 2019]','var(--amber)');}
+    if(!h.includes('border-left:4px solid')){h+='<div style="font-size:11px;color:var(--t3);text-align:center;padding:14px;">Seleccione el tipo de trasplante y complete las serologías para ver las recomendaciones.</div>';}
     el.innerHTML=h;
   };
   window._pretxWordExport=function(){

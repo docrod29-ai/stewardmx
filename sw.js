@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v306 (Trasplante Pre-TX: TODO valor da recomendación + tipo de TX + VDRL)
+//  Reporte del Dr. Rodríguez (3 cosas): (1) serologías en POSITIVO que no daban recomendación
+//  (EBV, etc.); (2) faltaba elegir el TIPO de trasplante y que module; (3) faltaba VDRL.
+//  FIX — _pretxRecs reescrito: cada serología emite para CUALQUIER valor (positivo, negativo/inmune,
+//  no realizado → pendiente), no solo la polaridad accionable. Nuevo campo pt_tipotx (renal/hepático/
+//  cardíaco/pulmonar/páncreas/intestino/TCMH autólogo/alogénico/haplo/cordón) que MODULA: duración
+//  CMV por órgano (riñón/hígado 3-6m, corazón/pulmón 6-12m, TCMH letermovir d100/200), Toxo D+/R-
+//  en corazón → pirimetamina, riesgo alogénico vs autólogo. Nuevo campo pt_sifilis (VDRL/RPR).
+//  Todo citado (AST IDCOP 2019, AASLD 2023, CDC STI 2021, IDSA). +8 pruebas (202): el motor se
+//  ejecuta en DOM simulado (EBV+/Toxo+/VDRL/negativos) y se verifica que el tipo de TX modula.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v305 (Trasplante Fase 2b: nuevo subtab Vacunación)
 //  Nuevo subtab "💉 Vacunación" en el módulo de trasplante (_renderTxVacunas): la regla de oro
 //  (vivas contraindicadas post-TX → dar ≥4 sem antes; inactivadas/recombinantes seguras, completar
@@ -413,7 +424,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v305';
+const CACHE = 'stewardmx-v306';
 const SHELL = [
   '/',
   '/index.html',

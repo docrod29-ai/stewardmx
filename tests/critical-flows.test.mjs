@@ -912,15 +912,15 @@ function _runPretx(fields) {
   win._pretxRecs();
   return recsEl.innerHTML;
 }
-test('PRETX: el motor _pretxRecs es extraíble y ejecuta sin error (vacío → fallback)', () => {
+test('PRETX: el motor _pretxRecs es extraíble y ejecuta sin error (vacío → pide tipo de TX)', () => {
   assert.ok(_pretxBlock.length > 500, 'no se extrajo el bloque _pretxRecs');
   assert.doesNotThrow(() => _runPretx({}));
-  assert.ok(_runPretx({}).includes('Complete los campos'));
+  assert.ok(_runPretx({}).includes('Seleccione el tipo de trasplante'));
 });
 const _PRETX_CASES = [
   ['pt_coccidio', 'Positivo (+)', 'Coccidioides serología POSITIVA'],
   ['pt_vzv', 'Negativo (-)', 'VZV IgG NEGATIVO'],
-  ['pt_hsv', 'Positivo (+)', 'HSV IgG positivo'],
+  ['pt_hsv', 'Positivo (+)', 'HSV IgG POSITIVO'],
   ['pt_hbvdna', 'Detectable', 'HBV DNA DETECTABLE'],
   ['pt_htlv', 'Positivo (+)', 'HTLV-1/2 POSITIVO'],
   ['pd_htlv', 'Positivo (+)', 'HTLV-1/2 POSITIVO (DONANTE)'],
@@ -933,6 +933,14 @@ const _PRETX_CASES = [
   ['pt_bcg', 'Sí', 'BCG aplicada'],
   ['pt_tbanterior', 'Sí', 'Historia de TB previa'],
   ['pt_cmv', 'Positivo (+)', 'CMV'],   // regresión: lo que ya funcionaba sigue funcionando
+  // v306 — TODO valor emite (no solo la polaridad accionable):
+  ['pt_ebv', 'Positivo (+)', 'EBV IgG POSITIVO'],   // la queja: EBV+ ya da recomendación
+  ['pt_toxo', 'Positivo (+)', 'Toxoplasma IgG POSITIVO'],
+  ['pt_sifilis', 'Reactivo', 'VDRL/RPR REACTIVO'],  // VDRL nuevo
+  ['pt_sifilis', 'No reactivo', 'VDRL/RPR no reactivo'],
+  ['pt_hsv', 'Negativo (-)', 'HSV IgG NEGATIVO'],
+  ['pt_hiv', 'Negativo (-)', 'VIH NEGATIVO'],
+  ['pt_chagas', 'Negativo (-)', 'Chagas NEGATIVO'],
 ];
 for (const [id, val, must] of _PRETX_CASES) {
   test('PRETX ejecuta: ' + id + '=' + val + ' → recomendación', () => {
@@ -943,9 +951,17 @@ test('PRETX ejecuta: EBV D+/R- (dos campos) → riesgo de PTLD', () => {
   assert.ok(_runPretx({ pt_ebv: 'Negativo (-)', pd_ebv: 'Positivo (+)' }).includes('PTLD'));
 });
 test('PRETX anti-selección-muerta: cada serología ofrecida es consumida por _pretxRecs', () => {
-  const requeridos = ['pt_coccidio','pt_vzv','pt_hsv','pt_hbvdna','pt_ebv','pt_htlv','pd_ebv','pd_hsv','pd_htlv','pd_wnv','pd_hemocult','pd_bal','pd_urocult','pd_lcr','pt_rxtx','pt_ppd','pt_tbanterior','pt_bcg','pt_cmv','pd_cmv','pt_hbsag','pt_qft','pt_chagas','pt_toxo','pt_strongy','pt_histo','pt_hiv'];
+  const requeridos = ['pt_coccidio','pt_vzv','pt_hsv','pt_hbvdna','pt_ebv','pt_htlv','pd_ebv','pd_hsv','pd_htlv','pd_wnv','pd_hemocult','pd_bal','pd_urocult','pd_lcr','pt_rxtx','pt_ppd','pt_tbanterior','pt_bcg','pt_cmv','pd_cmv','pt_hbsag','pt_hbc','pt_hbs_t','pt_qft','pt_chagas','pt_toxo','pt_strongy','pt_histo','pt_hiv','pt_hcv','pt_hcvrna','pt_sifilis','pt_g6pd','pt_tipotx'];
   const muertos = requeridos.filter(id => !_pretxBlock.includes("'" + id + "'"));
   assert.deepEqual(muertos, [], 'CAMPOS MUERTOS (no consumidos por _pretxRecs): ' + muertos.join(', '));
+});
+test('PRETX: el tipo de trasplante MODULA las recomendaciones (v306)', () => {
+  // Corazón seronegativo a Toxo → riesgo de toxoplasmosis primaria (pirimetamina)
+  assert.ok(_runPretx({ pt_tipotx: 'Cardíaco', pt_toxo: 'Negativo (-)' }).includes('pirimetamina'));
+  // TCMH alogénico no relacionado, CMV D+/R- → letermovir hasta día 100
+  assert.ok(_runPretx({ pt_tipotx: 'TCMH alogénico no relacionado', pd_cmv: 'Positivo (+)', pt_cmv: 'Negativo (-)' }).includes('Letermovir hasta el día 100'));
+  // Pulmón, CMV D+/R- → profilaxis 6–12 meses
+  assert.ok(_runPretx({ pt_tipotx: 'Pulmonar', pd_cmv: 'Positivo (+)', pt_cmv: 'Negativo (-)' }).includes('6–12 meses'));
 });
 
 /* ═══════════ Trasplante Profilaxis (v303): pf_ebv/pf_hcv/pf_hbv_dna ahora EJECUTAN ═══════════ */
