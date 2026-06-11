@@ -1,4 +1,17 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v294 (CI en GitHub Actions + cierre de escalada de rol por servidor)
+//  · CI: .github/workflows/ci.yml corre en cada push — sintaxis + 161 pruebas + 8 pruebas de
+//    SEGURIDAD de firestore.rules en el emulador de Firestore (con Java del runner). package.json
+//    con scripts (check/test/test:rules/predeploy/deploy). Canal de STAGING para probar antes de prod.
+//  · HALLAZGO del CI: un usuario podía escribir su propio 'rol' (escalada) porque el código de alta
+//    se validaba en CLIENTE. FIX: nueva Cloud Function joinWithCode valida el código EN SERVIDOR y
+//    asigna el rol con privilegios de servidor. _unirseConCodigo ahora la usa (con fallback al flujo
+//    cliente durante la transición, para no romper el alta de nadie).
+//  · PENDIENTE (tras migrar clientes): endurecer firestore.rules para BLOQUEAR el cambio de
+//    rol/status directo del cliente (diff().affectedKeys) — cierra el hueco al 100%. Documentado
+//    en firestore.rules y tests/firestore-rules.test.mjs.
+//  Verificación: CI en VERDE (8/8 reglas + 161) + node --check de functions/index.js.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v293 (AUDITORÍA: botones muertos + flag de guardado atascado)
 //  Pasada A (handler↔window): 385 handlers vs 676 expuestos. 4 BOTONES MUERTOS corregidos
 //  (ReferenceError silencioso porque la función no estaba en window):
@@ -289,7 +302,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v293';
+const CACHE = 'stewardmx-v294';
 const SHELL = [
   '/',
   '/index.html',

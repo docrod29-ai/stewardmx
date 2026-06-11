@@ -2263,3 +2263,53 @@ exports.exportSheetSA = onCall(
     return { ok: true, ssId, url };
   }
 );
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  joinWithCode — onCall: valida el código de alta EN SERVIDOR y asigna el rol con
+//  privilegios de servidor (Admin SDK omite reglas). Cierra el vector de escalada
+//  encontrado por el CI: el cliente ya NO decide su propio rol — solo manda el código.
+// ═══════════════════════════════════════════════════════════════════════════════
+exports.joinWithCode = onCall(
+  { region: 'us-central1', cors: true, timeoutSeconds: 30 },
+  async (req) => {
+    if (!req.auth) throw new HttpsError('unauthenticated', 'Login requerido');
+    const uid = req.auth.uid;
+    const email = (req.auth.token.email || '').toString();
+    const code = ((req.data && req.data.code) || '').toString().trim().toLowerCase();
+    const nombre = ((req.data && req.data.nombre) || req.auth.token.name || email).toString().slice(0, 120);
+    const especialidad = ((req.data && req.data.especialidad) || '').toString().slice(0, 80);
+    if (!code) throw new HttpsError('invalid-argument', 'Código requerido');
+
+    // 1) Validar el código SERVER-SIDE (no se confía en el cliente)
+    let hospitalId, rol, autoAprobado;
+    const codeSnap = await db.doc(`hospital_role_codes/${code}`).get();
+    if (codeSnap.exists) {
+      hospitalId = codeSnap.data().hospitalId;
+      rol = codeSnap.data().rol;
+      autoAprobado = true;
+    } else {
+      // ¿El código es el ID del hospital directo (código de Líder/hospital)?
+      let hospOk = false;
+      const reg = await db.doc(`hospitals_registry/${code}`).get();
+      if (reg.exists) hospOk = true;
+      else { const info = await db.doc(`hospitals/${code}/info/main`).get(); if (info.exists) hospOk = true; }
+      if (!hospOk) throw new HttpsError('not-found', 'Código no válido');
+      hospitalId = code;
+      rol = 'Pendiente';
+      autoAprobado = false;
+    }
+
+    // 2) Escribir el doc del usuario con el rol CONFIABLE (resuelto en servidor)
+    const FieldValue = admin.firestore.FieldValue;
+    await db.doc(`hospitals/${hospitalId}/users/${uid}`).set({
+      uid, email, nombre, rol, especialidad,
+      status: autoAprobado ? 'aprobado' : 'pendiente',
+      active: autoAprobado,
+      createdAt: FieldValue.serverTimestamp(),
+      ...(autoAprobado ? { approvedAt: FieldValue.serverTimestamp(), approvedBy: 'role_code_server' } : {})
+    }, { merge: true });
+    await db.doc(`users/${uid}`).set({ hospitalId, email }, { merge: true });
+
+    return { ok: true, hospitalId, rol, autoAprobado };
+  }
+);

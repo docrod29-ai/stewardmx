@@ -2084,6 +2084,25 @@ window.crearHospital=async()=>{
 // no se necesita verificar hospitals_registry.
 async function _unirseConCodigo(u,codigo){
   if(!codigo||!u)return false;
+  // v294 SEGURIDAD: validar el código en SERVIDOR (joinWithCode) — el cliente ya no decide su rol
+  // (cierra el vector de escalada). Si la función falla por red/transición, cae al flujo cliente.
+  try{
+    const {getFunctions,httpsCallable}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js');
+    const _join=httpsCallable(getFunctions(app,'us-central1'),'joinWithCode');
+    const _r=await _join({code:codigo,nombre:(u.displayName||window._pendingName||u.email),especialidad:window._pendingEspecialidad||''});
+    if(_r&&_r.data&&_r.data.ok){
+      HOSP=_r.data.hospitalId;
+      window._joinedRol=_r.data.rol;
+      window._joinedAutoAprobado=_r.data.autoAprobado;
+      window._joinedHospNombre=_r.data.hospitalId;
+      try{const rs=await getDoc(doc(db,'hospitals',_r.data.hospitalId,'info','main'));if(rs.exists())window._joinedHospNombre=rs.data().nombre||_r.data.hospitalId;}catch(_){}
+      return true;
+    }
+  }catch(_jf){
+    // 'not-found' = código inválido (lo re-valida el flujo de abajo y devuelve false). Otros
+    // errores (red/función fría) → resiliencia: el flujo cliente reintenta el alta.
+    console.warn('[joinWithCode] usando flujo cliente:',(_jf&&_jf.code)||_jf);
+  }
   try{
     let hospId=codigo,autoRol=null,hospNombre=hospId;
     // 1. ¿Es un código de rol?
@@ -21805,7 +21824,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v293'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v294'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
