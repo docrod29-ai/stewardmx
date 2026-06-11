@@ -29,8 +29,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Instalar dependencias
+      - name: Instalar dependencias (raíz)
         run: npm install
+
+      - name: Instalar dependencias (functions, para el emulador)
+        run: npm --prefix functions install
 
       - name: Verificar sintaxis (módulo de index.html + sw.js)
         run: npm run check
@@ -38,5 +41,5 @@ jobs:
       - name: Pruebas críticas (161 — node:test)
         run: npm test
 
-      - name: Pruebas de SEGURIDAD de firestore.rules (emulador)
-        run: npm run test:rules
+      - name: Pruebas de SEGURIDAD de reglas + Cloud Function (emulador)
+        run: npm run test:emu

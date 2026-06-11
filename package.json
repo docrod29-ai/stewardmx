@@ -7,6 +7,7 @@
   "scripts": {
     "test": "node --test tests/critical-flows.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore \"node --test tests/firestore-rules.test.mjs\"",
+    "test:emu": "firebase emulators:exec --only firestore,functions,auth \"node --test tests/firestore-rules.test.mjs && node --test tests/functions.test.mjs\"",
     "check": "node tests/check-syntax.mjs",
     "predeploy": "npm run check && npm test",
     "deploy:staging": "firebase hosting:channel:deploy staging --expires 30d",
