@@ -21239,7 +21239,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v303'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v304'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
@@ -25610,6 +25610,20 @@ function _renderTxTipo(p){
       {nom:'Polatuzumab vedotin',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'PCP, neutropenia, infecciones bacterianas',screening:'HBsAg/Anti-HBc; CMV IgG',profilaxis:'Cotrimoxazol PCP; entecavir si HBc+',monitoreo:'BHC, CMV PCR'},
       {nom:'Mogamulizumab',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'Infecciones virales, dermatitis infecciosa (CCR4)',screening:'HBsAg/Anti-HBc; CMV IgG; HTLV si aplica',profilaxis:'Cotrimoxazol si bajo CD4; aciclovir VZV',monitoreo:'BHC, CMV PCR, vigilancia dermatológica'},
       {nom:'Daratumumab',riesgo:'MODERADO',riesgoColor:'var(--amber)',riesgos:'HBV reactivación, virus respiratorios, hipogammaglobulinemia',screening:'HBsAg, Anti-HBc total, HBV DNA; CMV IgG',profilaxis:'Entecavir si Anti-HBc+; IVIG si hipogammaglobulinemia sintomática',monitoreo:'HBV DNA mensual, IgG niveles'},
+    ]},
+    {clase:'Anti-Complemento (anti-C5)',color:'var(--red)',items:[
+      {nom:'Eculizumab',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Enfermedad MENINGOCÓCICA invasiva (Neisseria meningitidis) — advertencia de caja negra; también N. gonorrhoeae diseminada y encapsulados',screening:'Vacunación antimeningocócica documentada (MenACWY + MenB)',profilaxis:'Vacunar MenACWY + MenB ≥2 semanas ANTES de iniciar; si no se cumple la ventana, profilaxis antibiótica (penicilina V o macrólido) durante la terapia hasta completar inmunización. [FDA caja negra; ACIP/CDC]',monitoreo:'Tarjeta de alerta al paciente; alta sospecha de meningococo ante fiebre → evaluación urgente'},
+      {nom:'Ravulizumab',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Enfermedad meningocócica invasiva (anti-C5 de acción prolongada; igual que eculizumab)',screening:'Vacunación antimeningocócica documentada (MenACWY + MenB)',profilaxis:'MenACWY + MenB ≥2 semanas antes; profilaxis antibiótica si la ventana vacunal no se cumplió. [FDA caja negra; ACIP/CDC]',monitoreo:'Tarjeta de alerta; evaluación urgente ante fiebre'},
+    ]},
+    {clase:'Anti-CD52',color:'var(--red)',items:[
+      {nom:'Alemtuzumab',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'Reactivación CMV (~31%) y HSV (~32%); PCP; hongos (Candida, Aspergillus, Cryptococcus, zigomicetos); Listeria; defecto de inmunidad celular que persiste >9 meses',screening:'CMV/EBV/VZV/HSV IgG; HBsAg/Anti-HBc; recuento de linfocitos',profilaxis:'Antiviral (aciclovir/valaciclovir) + antifúngica + cotrimoxazol PCP; profilaxis o preemptiva de CMV con valganciclovir',monitoreo:'PCR-CMV cuantitativa semanal/quincenal durante la terapia; BHC. [Morrison VA, CID 2014;59(S5):S360-4]'},
+    ]},
+    {clase:'Inhibidores de TNF-α',color:'var(--red)',items:[
+      {nom:'Infliximab',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'Reactivación de TB latente (riesgo 4–10×; mayor con infliximab/adalimumab); hongos endémicos (histoplasma, coccidioides); Listeria, Nocardia, Legionella; PCP; reactivación HBV/HCV',screening:'IGRA o PPD + Rx tórax; HBsAg/Anti-HBc/HBV DNA; Anti-HCV — ANTES de iniciar',profilaxis:'Tratar LTBI (isoniazida × 9 meses) iniciando ≥1–2 semanas antes de la terapia; entecavir si HBc+',monitoreo:'Vigilancia de TB/infección fúngica; HBV DNA si HBc+. [Morrison VA, CID 2014;59(S5):S360-4]'},
+      {nom:'Adalimumab / Etanercept / Golimumab / Certolizumab',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'TB latente (menor con etanercept); HBV/HCV; hongos endémicos; intracelulares (Listeria, Salmonella, Legionella); herpes zóster',screening:'IGRA/PPD + Rx tórax; HBsAg/Anti-HBc; Anti-HCV',profilaxis:'Tratar LTBI antes de iniciar; entecavir si HBc+',monitoreo:'Vigilancia de TB/infección; HBV DNA. [Morrison VA, CID 2014;59(S5):S360-4]'},
+    ]},
+    {clase:'Anti-integrina (riesgo LMP)',color:'var(--amber)',items:[
+      {nom:'Natalizumab',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'Leucoencefalopatía multifocal progresiva (LMP) por virus JC — principal agente asociado a LMP en enfermedad desmielinizante',screening:'Índice de anticuerpos anti-virus JC (estratifica el riesgo de LMP)',profilaxis:'Sin profilaxis específica; estratificar riesgo por serología JC, duración del tratamiento y uso previo de inmunosupresores',monitoreo:'RM cerebral periódica + vigilancia de síntomas neurológicos; índice anti-JC seriado. [Morrison VA, CID 2014;59(S5):S360-4]'},
     ]},
   ];
   // Risk badge helper

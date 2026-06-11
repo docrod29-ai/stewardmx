@@ -980,3 +980,21 @@ for (const [id, val, must] of _PROF_CASES) {
     assert.ok(out.includes(must), 'no apareció: ' + must);
   });
 }
+
+/* ═══════════ Trasplante (v304): mapa de inmunosupresores/biológicos — agentes críticos + campos completos ═══════════ */
+/* inmunoClases alimenta los checkboxes y _txShowInmuno (cada agente ejecuta su tarjeta). Esta prueba
+   evalúa el array REAL, exige los agentes de mayor impacto (incl. el hueco de seguridad anti-complemento
+   → meningococo) y que NINGÚN agente quede sin los 4 campos que rinde la tarjeta. */
+test('TXMAP: inmunoClases parsea, cubre agentes críticos y todos tienen los 4 campos', () => {
+  const s = _idx.indexOf('const inmunoClases=[');
+  const e = _idx.indexOf('];', s) + 2;
+  assert.ok(s >= 0 && e > s, 'no se ubicó inmunoClases');
+  const arr = eval('(' + _idx.slice(s + 'const inmunoClases='.length, e - 1) + ')');
+  const noms = arr.flatMap(c => c.items.map(i => i.nom)).join(' | ');
+  for (const must of ['Eculizumab', 'Ravulizumab', 'Alemtuzumab', 'Infliximab', 'Natalizumab', 'Rituximab', 'Ibrutinib', 'Tacrolimus', 'Timoglobulina (ATG)']) {
+    assert.ok(noms.includes(must), 'falta agente crítico en el mapa: ' + must);
+  }
+  assert.ok(JSON.stringify(arr).includes('MENINGOC'), 'eculizumab/anti-C5 sin la recomendación meningocócica');
+  const incompletos = arr.flatMap(c => c.items).filter(i => !i.nom || !i.riesgos || !i.screening || !i.profilaxis || !i.monitoreo).map(i => i.nom || '???');
+  assert.deepEqual(incompletos, [], 'agentes sin los 4 campos (no rinden tarjeta completa): ' + incompletos.join(', '));
+});

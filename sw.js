@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v304 (Trasplante Fase 3: mapa de inmunosupresores — huecos críticos)
+//  El mapa de fármacos ya era extenso (~54 agentes). Se cubren 4 huecos de seguridad reales con cita:
+//   · Anti-complemento (Eculizumab, Ravulizumab) → enfermedad MENINGOCÓCICA (caja negra FDA/ACIP):
+//     vacuna MenACWY+MenB ≥2 sem antes + profilaxis penicilina si ventana no cumplida.
+//   · Anti-CD52 (Alemtuzumab) → CMV/HSV/PCP/hongos/Listeria; profilaxis + PCR-CMV semanal.
+//   · TNF-α (Infliximab/Adalimumab/Etanercept…) → TB latente 4-10×, HBV/HCV, hongos endémicos.
+//   · Anti-integrina (Natalizumab) → LMP por virus JC. [Morrison VA, CID 2014;59(S5):S360-4]
+//  Las clases se agregan a inmunoClases → checkbox + tarjeta que ejecuta automáticamente (_txShowInmuno).
+//  Prueba nueva: evalúa el array real (59 agentes), exige los críticos + 4 campos completos por agente.
+//  192 pruebas verde. Doc rector: docs/PROMPT_MAESTRO_INMUNODEPRIMIDOS.md.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v303 (Trasplante Fase 2: cero selecciones muertas en TODO el módulo)
 //  Continúa la Fase 1 (v302). Ahora también ejecutan:
 //   · Profilaxis (_txProfRec): pf_ebv (PTLD), pf_hcv (AAD si RNA+), pf_hbv_dna (entecavir) — antes
@@ -393,7 +404,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v303';
+const CACHE = 'stewardmx-v304';
 const SHELL = [
   '/',
   '/index.html',
