@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v303 (Trasplante Fase 2: cero selecciones muertas en TODO el módulo)
+//  Continúa la Fase 1 (v302). Ahora también ejecutan:
+//   · Profilaxis (_txProfRec): pf_ebv (PTLD), pf_hcv (AAD si RNA+), pf_hbv_dna (entecavir) — antes
+//     se leían sin usarse. · Word export (_pretxWordExport): Coccidioides, VZV, HSV, HTLV, WNV,
+//     HBV-DNA, EBV D+/R-, cultivos del donante (BAL/LCR/hemo/orina) y TB (Rx/PPD/BCG/TB previa)
+//     ahora aparecen en el resumen del documento. Todo citado a AST IDCOP 2019 / AASLD 2023.
+//   · +6 pruebas: _txProfRec se extrae, se des-escapan sus template-literals y se ejecuta en DOM
+//     simulado; el IIFE de pre-TX se compila para validar _pretxWordExport. 191 pruebas verde.
+//  Sin archivo nuevo. Doc rector: docs/PROMPT_MAESTRO_INMUNODEPRIMIDOS.md.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v302 (FIX trasplante: serologías Pre-TX que no ejecutaban)
 //  BUG (Dr. Rodríguez): en el apartado Trasplante > Pre-Trasplante se seleccionaban anticuerpos
 //  (Coccidioides, HTLV, VZV, HSV, HBV-DNA, WNV, cultivos del donante, Rx/PPD/BCG/TB previa) y la
@@ -383,7 +393,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v302';
+const CACHE = 'stewardmx-v303';
 const SHELL = [
   '/',
   '/index.html',

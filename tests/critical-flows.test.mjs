@@ -947,3 +947,36 @@ test('PRETX anti-selección-muerta: cada serología ofrecida es consumida por _p
   const muertos = requeridos.filter(id => !_pretxBlock.includes("'" + id + "'"));
   assert.deepEqual(muertos, [], 'CAMPOS MUERTOS (no consumidos por _pretxRecs): ' + muertos.join(', '));
 });
+
+/* ═══════════ Trasplante Profilaxis (v303): pf_ebv/pf_hcv/pf_hbv_dna ahora EJECUTAN ═══════════ */
+/* Estaban leídos pero sin usar (selección muerta). _txProfRec se extrae, se des-escapan los
+   template-literals internos (rec usa backticks) y se ejecuta en DOM simulado. */
+const _profBlock = (() => {
+  const s = _idx.indexOf('window._txProfRec=function(){');
+  const e = _idx.indexOf('window._txProfRec();', s);
+  return (s >= 0 && e > s) ? _idx.slice(s, e).split('\\`').join('`').split('\\${').join('${') : '';
+})();
+function _runProf(fields) {
+  const recsEl = { innerHTML: '' };
+  const document = { getElementById: id => id === 'pf-recs' ? recsEl : { value: (fields[id] || '') } };
+  const win = {};
+  new Function('window', 'document', _profBlock + '\n window._txProfRec();')(win, document);
+  return recsEl.innerHTML;
+}
+test('PROF: el motor _txProfRec es extraíble y ejecuta sin error', () => {
+  assert.ok(_profBlock.length > 500, 'no se extrajo el bloque _txProfRec');
+  assert.doesNotThrow(() => _runProf({}));
+});
+const _PROF_CASES = [
+  ['pf_ebv', 'Negativo (-)', 'EBV IgG NEGATIVO'],
+  ['pf_hcv', 'HCV RNA detectable', 'HCV RNA DETECTABLE'],
+  ['pf_hcv', 'Anti-HCV+ / RNA indetectable', 'Anti-HCV+ con RNA indetectable'],
+  ['pf_hbv_dna', 'Detectable', 'HBV DNA DETECTABLE'],
+  ['pf_cmv_d', 'Positivo (+)', 'CMV'],   // regresión
+];
+for (const [id, val, must] of _PROF_CASES) {
+  test('PROF ejecuta: ' + id + '=' + val + ' → recomendación', () => {
+    const out = id === 'pf_cmv_d' ? _runProf({ pf_cmv_d: 'Positivo (+)', pf_cmv_r: 'Negativo (-)' }) : _runProf({ [id]: val });
+    assert.ok(out.includes(must), 'no apareció: ' + must);
+  });
+}
