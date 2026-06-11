@@ -2299,14 +2299,16 @@ exports.joinWithCode = onCall(
       autoAprobado = false;
     }
 
-    // 2) Escribir el doc del usuario con el rol CONFIABLE (resuelto en servidor)
-    const FieldValue = admin.firestore.FieldValue;
+    // 2) Escribir el doc del usuario con el rol CONFIABLE (resuelto en servidor).
+    //    Fechas en ISO string (consistente con lo que ya escribía el cliente; evita el gotcha de
+    //    admin.firestore.FieldValue undefined en algunos runtimes).
+    const nowISO = new Date().toISOString();
     await db.doc(`hospitals/${hospitalId}/users/${uid}`).set({
       uid, email, nombre, rol, especialidad,
       status: autoAprobado ? 'aprobado' : 'pendiente',
       active: autoAprobado,
-      createdAt: FieldValue.serverTimestamp(),
-      ...(autoAprobado ? { approvedAt: FieldValue.serverTimestamp(), approvedBy: 'role_code_server' } : {})
+      createdAt: nowISO,
+      ...(autoAprobado ? { approvedAt: nowISO, approvedBy: 'role_code_server' } : {})
     }, { merge: true });
     await db.doc(`users/${uid}`).set({ hospitalId, email }, { merge: true });
 
