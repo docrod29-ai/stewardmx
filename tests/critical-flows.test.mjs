@@ -12,6 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // Módulo extraído del monolito (v295): se prueba la función REAL, no un espejo regex de index.html.
 import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault } from '../js/core/stats.js';
+import { calcDiaATB, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPer1000 } from '../js/core/clinical-days.js';
 
 /* ─────────────── ESPEJOS de funciones puras (index.html v217) ─────────────── */
 
@@ -221,19 +222,7 @@ test('fase: status desconocido → fase 0 (no se pierde)', () => {
 });
 
 // 9) calcDiaATB v220 — días EXACTOS de cada antibiótico individual.
-function _parseFecha(f){if(!f||typeof f!=='string')return null;const d=new Date(f.slice(0,10)+'T00:00:00');return isNaN(d.getTime())?null:d;}
-function calcDiaATB(a, hoy){
-  const hoyLocal=hoy?new Date(hoy):new Date(); hoyLocal.setHours(0,0,0,0);
-  const ini=_parseFecha(a&&(a.fechaInicioIV||a.inicio));
-  if(!ini)return {dias:null, activo:!(a&&a.fechaFinIV), inicio:null, fin:null};
-  const finRaw=a&&a.fechaFinIV?_parseFecha(a.fechaFinIV):null;
-  const activo=!finRaw;
-  let corte=finRaw||hoyLocal;
-  if(corte<ini)corte=ini;
-  const dias=Math.floor((corte.getTime()-ini.getTime())/86400000)+1;
-  return {dias:Math.max(1,dias), activo, inicio:ini, fin:finRaw};
-}
-
+//     Se prueba la función REAL importada de js/core/clinical-days.js (arriba), no un espejo.
 test('calcDiaATB: ATB activo, inicio hoy = día 1 (inclusivo)', () => {
   const r=calcDiaATB({fechaInicioIV:'2026-05-29'}, new Date('2026-05-29T12:00:00'));
   assert.equal(r.dias, 1); assert.equal(r.activo, true);
@@ -657,13 +646,8 @@ test('MIC50/90: sin datos → null', () => {
 });
 
 /* ═══════════ Días-paciente reales / DOT NHSN (Fase 0.2) ═══════════ */
-const _mDP = _idx.match(/function _fechaADate\(v\)\{[\s\S]*?window\.calcDiasPaciente=function[\s\S]*?\n\};/);
-let _diasEst = () => 0, _diasPac = () => 0;
-if (_mDP) {
-  _diasEst = new Function('const window={};' + _mDP[0] + ' return window.calcDiasEstancia;')();
-  _diasPac = new Function('const window={};' + _mDP[0] + ' return window.calcDiasPaciente;')();
-}
-test('DIASPAC: existe calcDiasEstancia/calcDiasPaciente', () => { assert.ok(_mDP); });
+const _diasEst = calcDiasEstancia, _diasPac = calcDiasPaciente;   // función REAL importada de js/core/clinical-days.js
+test('DIASPAC: existe calcDiasEstancia/calcDiasPaciente', () => { assert.equal(typeof calcDiasEstancia,'function'); assert.equal(typeof calcDiasPaciente,'function'); });
 test('DIASPAC: ingreso→corte = días inclusivos', () => {
   assert.equal(_diasEst({ingreso:'2026-06-01'}, '2026-06-10'), 10);
 });
@@ -682,10 +666,20 @@ test('DIASPAC: suma del censo', () => {
   const pacs = [{ingreso:'2026-06-01'},{ingreso:'2026-06-06'},{}];
   assert.equal(_diasPac(pacs, '2026-06-10'), 10 + 5 + 0);
 });
-test('DIASPAC: DOT NHSN y dotPer1000 existen en el código', () => {
-  assert.match(_idx, /window\.calcDOT=function/);
-  assert.match(_idx, /window\.dotPer1000=function/);
-  assert.match(_idx, /DOT\/1000 días-paciente \(NHSN-AUR\)/);
+test('DOT NHSN: cada agente cuenta por separado; dotPer1000 = dot/díasPac×1000', () => {
+  // Aserción RELACIONAL (independiente de zona horaria): combinada = suma de agentes.
+  const dosATB=[{ingreso:'2026-06-01', atbList:[
+    {nombre:'Meropenem',   fechaInicioIV:'2026-06-01'},
+    {nombre:'Vancomicina', fechaInicioIV:'2026-06-01'}]}];
+  const unATB =[{ingreso:'2026-06-01', atbList:[
+    {nombre:'Meropenem',   fechaInicioIV:'2026-06-01'}]}];
+  const dot2=calcDOT(dosATB,'2026-06-05'), dot1=calcDOT(unATB,'2026-06-05');
+  assert.ok(dot1>0, 'dot1='+dot1);
+  assert.equal(dot2, dot1*2);                 // 2 ATB simultáneos = 2× DOT (semántica NHSN)
+  const r=dotPer1000(dosATB,'2026-06-05');
+  assert.equal(r.dot, dot2);
+  assert.ok(r.diasPaciente>0);
+  assert.equal(r.por1000, +(r.dot/r.diasPaciente*1000).toFixed(1)); // normalización NHSN-AUR
 });
 
 /* ═══════════ Magiorakos + intrínsecos (Fase 0.3) ═══════════ */

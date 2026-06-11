@@ -4783,29 +4783,8 @@ async function _generarFolio(pacientId){
   return folio;
 }
 
-/* ═══════════ DÍAS POR ATB v220 — conteo exacto por antimicrobiano individual ═══════════ */
-/* calcDia(p) da el día de terapia GLOBAL del paciente (ATB más antiguo activo). Pero PROA
-   necesita los días EXACTOS de CADA ATB: desde su inicio hasta su fin (si suspendido) o hasta
-   hoy (si activo). Inclusivo (día 1 = día de inicio), estándar DOT. */
-function _parseFecha(f){
-  if(!f||typeof f!=='string')return null;
-  const d=new Date(f.slice(0,10)+'T00:00:00');
-  return isNaN(d.getTime())?null:d;
-}
-// Días de terapia de UN antibiótico. Devuelve {dias, activo, inicio, fin}.
-function calcDiaATB(a, hoy){
-  const hoyLocal=hoy?new Date(hoy):new Date(); hoyLocal.setHours(0,0,0,0);
-  const ini=_parseFecha(a&&(a.fechaInicioIV||a.inicio));
-  if(!ini)return {dias:null, activo:!(a&&a.fechaFinIV), inicio:null, fin:null};
-  const finRaw=a&&a.fechaFinIV?_parseFecha(a.fechaFinIV):null;
-  const activo=!finRaw;
-  // Día de corte: fin (si suspendido) o hoy (si activo). Nunca antes del inicio.
-  let corte=finRaw||hoyLocal;
-  if(corte<ini)corte=ini;
-  // Inclusivo: del 1 al 1 = 1 día.
-  const dias=Math.floor((corte.getTime()-ini.getTime())/86400000)+1;
-  return {dias:Math.max(1,dias), activo, inicio:ini, fin:finRaw};
-}
+/* DÍAS POR ATB / días-paciente / DOT → js/core/clinical-days.js (extraído v296). calcDiaATB y
+   _parseFecha viven ahí; se importan más abajo y se reexponen en window.*. */
 // v279: detecta TERAPIA COMBINADA — cuántos ATB están activos simultáneamente HOY.
 // Activo = sin fechaFinIV, o fechaFinIV en el futuro. Devuelve {n, combinada, nombres}.
 // Expuesta en window para reutilizar en resumen, censo y Excel, y para pruebas.
@@ -4855,102 +4834,12 @@ window._blindarCamposClinicos=function(data, prev){
   });
   return conservados;
 };
-// Resumen legible "Día N" o "N días (suspendido)" para mostrar junto a cada ATB.
-function diaATBLabel(a, hoy){
-  const r=calcDiaATB(a, hoy);
-  if(r.dias==null)return r.activo?'sin fecha de inicio':'suspendido';
-  return r.activo?('Día '+r.dias):(r.dias+' día'+(r.dias!==1?'s':'')+' · suspendido');
-}
-window.calcDiaATB=calcDiaATB; window.diaATBLabel=diaATBLabel;
-
-function calcDia(p){
-  const hoyLocal=new Date();hoyLocal.setHours(0,0,0,0);
-  // Prioridad: fecha más temprana entre todos los ATBs activos en atbList
-  let fechaRef=null;
-  let fechaFin=hoyLocal; // por defecto: hasta hoy
-  // ── FIX v201 MAESTRO (Samuel bug): paciente con accion='suspender' → contar
-  // hasta la fecha de la última modificación que marcó esa acción. ──
-  if(p.accion==='suspender'){
-    // Buscar la fechaFinIV más reciente entre los ATBs (cualquiera)
-    if(p.atbList&&p.atbList.length){
-      const fines=p.atbList.map(a=>a.fechaFinIV).filter(Boolean);
-      if(fines.length){
-        const ultimaFin=fines.reduce((max,f)=>f>max?f:max);
-        const dFin=new Date(ultimaFin+'T00:00:00');
-        if(!isNaN(dFin.getTime())&&dFin<=hoyLocal)fechaFin=dFin;
-      }
-    }
-  }
-  if(p.atbList&&p.atbList.length){
-    const fechasInicio=p.atbList.map(a=>a.fechaInicioIV).filter(Boolean);
-    if(fechasInicio.length)fechaRef=fechasInicio.reduce((min,f)=>f<min?f:min);
-    // ── FIX BUG 5: Si TODOS los ATBs tienen fechaFinIV (todos suspendidos),
-    // detener el contador en la fechaFinIV más reciente en vez de hoy.
-    // (TODOS los ATBs con nombre + fechaInicio, sin contar entradas vacías) ──
-    const conNombre=p.atbList.filter(a=>a.nombre&&a.nombre.trim());
-    const activos=conNombre.filter(a=>!a.fechaFinIV||a.fechaFinIV.trim()==='');
-    if(conNombre.length>0&&activos.length===0){
-      const fines=p.atbList.map(a=>a.fechaFinIV).filter(Boolean);
-      if(fines.length){
-        const ultimaFin=fines.reduce((max,f)=>f>max?f:max);
-        const dFin=new Date(ultimaFin+'T00:00:00');
-        if(!isNaN(dFin.getTime())&&dFin<=hoyLocal)fechaFin=dFin;
-      }
-    }
-  }
-  // Fallback al campo clásico p.inicio
-  if(!fechaRef)fechaRef=p.inicio;
-  if(fechaRef){
-    const inicio=new Date(fechaRef+'T00:00:00');
-    const d=Math.floor((fechaFin.getTime()-inicio.getTime())/86400000)+1;
-    if(d>0)return d;
-  }
-  return p.dia||1;
-}
-
-// ── DÍAS-PACIENTE reales + DOT NHSN-AUR (Fase 0.2) ──────────────────────────────────────
-// Reemplaza el denominador artificial "camas×30" por DÍAS-PACIENTE reales = Σ por paciente de
-// (egreso | fecha de corte) − ingreso. Es el estándar NHSN-AUR para tasas de uso por densidad.
-// DOT/1000 días-paciente (NHSN) y DDD/100 días-cama (ESAC/OMS) son métricas distintas y ambas válidas.
-function _fechaADate(v){
-  if(!v)return null;
-  if(typeof v==='string'){const d=new Date(v.length<=10?v+'T00:00:00':v);return isNaN(d.getTime())?null:d;}
-  if(v.toDate)try{return v.toDate();}catch(_){}
-  if(v.toMillis)try{return new Date(v.toMillis());}catch(_){}
-  if(v.seconds!=null)return new Date(v.seconds*1000);
-  if(v instanceof Date)return v;
-  return null;
-}
-// Días de estancia de UN paciente: ingreso → (alta | corte), inclusivo, mín 1, sin pasar del corte.
-window.calcDiasEstancia=function(p, hasta){
-  const ini=_fechaADate(p&&p.ingreso); if(!ini)return 0;
-  const corte=_fechaADate(hasta)||new Date();
-  let fin=(p&&p.alta&&p.fechaAlta)?_fechaADate(p.fechaAlta):corte;
-  if(!fin)fin=corte;
-  if(fin>corte)fin=corte;
-  const dias=Math.floor((fin.getTime()-ini.getTime())/86400000)+1;
-  return dias>0?dias:(fin>=ini?1:0);
-};
-// Días-paciente del censo completo (denominador NHSN).
-window.calcDiasPaciente=function(pacs, hasta){
-  return (pacs||[]).reduce((s,p)=>s+window.calcDiasEstancia(p,hasta),0);
-};
-// DOT correcto (NHSN): Σ paciente, Σ antibiótico, de los días activos de ESE agente.
-// Terapia combinada de 2 ATB × 5 días = 10 DOT (cada agente cuenta por separado).
-window.calcDOT=function(pacs, hasta){
-  const hoyISO=(typeof hasta==='string'?hasta:new Date().toISOString().slice(0,10));
-  return (pacs||[]).reduce((s,p)=>{
-    const items=(p&&Array.isArray(p.atbList)&&p.atbList.length)?p.atbList
-      :(p&&p.atb?[{nombre:p.atb,fechaInicioIV:p.inicio,fechaFinIV:p.fechaFinIV}]:[]);
-    return s+items.filter(a=>a&&a.nombre).reduce((ss,a)=>{const r=calcDiaATB(a,hoyISO);return ss+((r&&r.dias)?r.dias:0);},0);
-  },0);
-};
-// DOT por 1000 días-paciente (NHSN-AUR). Devuelve {dot, diasPaciente, por1000}.
-window.dotPer1000=function(pacs, hasta){
-  const dot=window.calcDOT(pacs,hasta);
-  const dp=window.calcDiasPaciente(pacs,hasta);
-  return {dot, diasPaciente:dp, por1000: dp>0?+(dot/dp*1000).toFixed(1):0};
-};
+// ── Días de terapia / estancia / DOT → js/core/clinical-days.js (extraído v296, 2º módulo) ──
+// calcDiaATB · diaATBLabel · calcDia · _fechaADate · calcDiasEstancia · calcDiasPaciente · calcDOT · dotPer1000
+// Módulo PURO y testeable; las pruebas importan la función REAL. Reexpuesto en window.* (onclick + IAAS).
+import { calcDiaATB, diaATBLabel, calcDia, _fechaADate, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPer1000 } from './js/core/clinical-days.js';
+window.calcDiaATB=calcDiaATB; window.diaATBLabel=diaATBLabel; window.calcDia=calcDia; window._fechaADate=_fechaADate;
+window.calcDiasEstancia=calcDiasEstancia; window.calcDiasPaciente=calcDiasPaciente; window.calcDOT=calcDOT; window.dotPer1000=dotPer1000;
 
 const ABG_ATBS=[
   {g:'Penicilinas',a:[{k:'amp',n:'Ampicilina'},{k:'amsul',n:'Amp-Sulbactam'},{k:'amcl',n:'Amox-Clav'},{k:'oxa',n:'Oxacilina'},{k:'pitaz',n:'Pip-Tazobactam'}]},
@@ -21712,7 +21601,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v295'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v296'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){

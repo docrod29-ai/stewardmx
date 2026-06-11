@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v296 (2º módulo extraído: js/core/clinical-days.js)
+//  Sigue la des-monolitización: el cálculo de DÍAS (terapia/estancia/DOT) sale de index.html a un
+//  módulo ESM PURO — calcDiaATB, diaATBLabel, calcDia, _fechaADate, calcDiasEstancia,
+//  calcDiasPaciente, calcDOT, dotPer1000. index.html lo importa y reexpone en window.* (lo usan
+//  onclick y el cálculo de días-dispositivo de IAAS). calcTerapiaCombinada y _blindarCamposClinicos
+//  estaban INTERCALADOS y NO se movieron (siguen en index.html, verificado por la salvaguarda).
+//  GANANCIA: calcDiaATB, calcDOT y dotPer1000 (DOT NHSN) ahora se prueban como función REAL, no
+//  como espejo regex. Las internas calcDiasPaciente/dotPer1000 referencian directo (no vía window)
+//  → módulo autocontenido y testeable en Node. Mismo resultado clínico. 163 pruebas en verde.
+//  CACHÉ: /js/core/clinical-days.js precacheado en SHELL; invalidación automática al subir CACHE.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v295 (1er módulo extraído del monolito: js/core/stats.js)
 //  Primer paso REAL de des-monolitización (deuda de arquitectura): el núcleo estadístico/clínico
 //  PURO (chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault) salió
@@ -312,13 +323,14 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v295';
+const CACHE = 'stewardmx-v296';
 const SHELL = [
   '/',
   '/index.html',
   '/guia.html',
   '/manifest.json',
   '/js/core/stats.js',
+  '/js/core/clinical-days.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',
   '/icons/icon-maskable.svg'
