@@ -38,7 +38,7 @@ jobs:
       - name: Verificar sintaxis (módulo de index.html + sw.js)
         run: npm run check
 
-      - name: Pruebas críticas (161 — node:test)
+      - name: Pruebas críticas (node:test — flujos críticos + módulos js/core)
         run: npm test
 
       - name: Pruebas de SEGURIDAD de reglas + Cloud Function (emulador)
