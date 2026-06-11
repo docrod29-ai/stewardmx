@@ -16,8 +16,17 @@ function _parseFecha(f){
 }
 
 // Días de terapia de UN antibiótico. Devuelve {dias, activo, inicio, fin}. Inclusivo, mín 1.
+// FIX v297 (zona horaria): el corte `hoy` como string solo-fecha se parsea a medianoche LOCAL
+// (igual que _parseFecha de las fechas de inicio). Antes `new Date('YYYY-MM-DD')` daba medianoche
+// UTC → en zonas detrás de UTC (México) el DOT de ATB activos sub-contaba 1 día. Entradas Date
+// no cambian (los tests usan Date con T12:00:00 → mismo resultado que antes).
 export function calcDiaATB(a, hoy){
-  const hoyLocal=hoy?new Date(hoy):new Date(); hoyLocal.setHours(0,0,0,0);
+  let hoyLocal;
+  if(hoy){
+    hoyLocal=(typeof hoy==='string')?new Date(hoy.slice(0,10)+'T00:00:00'):new Date(hoy);
+    if(isNaN(hoyLocal.getTime()))hoyLocal=new Date(); // guarda contra 'YYYY-MM' u otros inválidos
+  }else hoyLocal=new Date();
+  hoyLocal.setHours(0,0,0,0);
   const ini=_parseFecha(a&&(a.fechaInicioIV||a.inicio));
   if(!ini)return {dias:null, activo:!(a&&a.fechaFinIV), inicio:null, fin:null};
   const finRaw=a&&a.fechaFinIV?_parseFecha(a.fechaFinIV):null;

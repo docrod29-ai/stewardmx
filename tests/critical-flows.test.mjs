@@ -666,20 +666,16 @@ test('DIASPAC: suma del censo', () => {
   const pacs = [{ingreso:'2026-06-01'},{ingreso:'2026-06-06'},{}];
   assert.equal(_diasPac(pacs, '2026-06-10'), 10 + 5 + 0);
 });
-test('DOT NHSN: cada agente cuenta por separado; dotPer1000 = dot/díasPac×1000', () => {
-  // Aserción RELACIONAL (independiente de zona horaria): combinada = suma de agentes.
+test('DOT NHSN: corte string LOCAL (FIX v297) → conteo determinista + cada agente cuenta', () => {
+  // ATB activo 06-01, corte string '2026-06-05' → 5 días inclusive. Determinista en CUALQUIER
+  // zona horaria gracias al fix v297 (antes, en zonas detrás de UTC, daba 4 → DOT sub-contado).
+  assert.equal(calcDiaATB({fechaInicioIV:'2026-06-01'}, '2026-06-05').dias, 5);
   const dosATB=[{ingreso:'2026-06-01', atbList:[
     {nombre:'Meropenem',   fechaInicioIV:'2026-06-01'},
     {nombre:'Vancomicina', fechaInicioIV:'2026-06-01'}]}];
-  const unATB =[{ingreso:'2026-06-01', atbList:[
-    {nombre:'Meropenem',   fechaInicioIV:'2026-06-01'}]}];
-  const dot2=calcDOT(dosATB,'2026-06-05'), dot1=calcDOT(unATB,'2026-06-05');
-  assert.ok(dot1>0, 'dot1='+dot1);
-  assert.equal(dot2, dot1*2);                 // 2 ATB simultáneos = 2× DOT (semántica NHSN)
+  assert.equal(calcDOT(dosATB,'2026-06-05'), 10);   // 2 agentes × 5 días (cada agente cuenta: NHSN)
   const r=dotPer1000(dosATB,'2026-06-05');
-  assert.equal(r.dot, dot2);
-  assert.ok(r.diasPaciente>0);
-  assert.equal(r.por1000, +(r.dot/r.diasPaciente*1000).toFixed(1)); // normalización NHSN-AUR
+  assert.equal(r.dot, 10); assert.equal(r.diasPaciente, 5); assert.equal(r.por1000, 2000); // 10/5×1000
 });
 
 /* ═══════════ Magiorakos + intrínsecos (Fase 0.3) ═══════════ */

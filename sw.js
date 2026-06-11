@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v297 (FIX científico: DOT no sub-cuenta por zona horaria)
+//  HALLAZGO durante la extracción v296: calcDiaATB parseaba el corte `hoy` (string 'YYYY-MM-DD',
+//  como lo pasan calcDOT/dotPer1000 desde el <input type=date>) con new Date(str) = medianoche UTC,
+//  mientras las fechas de inicio usan medianoche LOCAL (_parseFecha). En zonas detrás de UTC
+//  (México, UTC−6) el DOT de antibióticos ACTIVOS sub-contaba 1 día → la métrica DOT/1000
+//  días-paciente del Excel salía sesgada hacia abajo. El "Día N" del paciente NO se afectaba
+//  (usa new Date() local). FIX: el corte string se parsea a medianoche LOCAL (consistente). Las
+//  entradas Date no cambian. Regresión cubierta: calcDOT(2 ATB × 5 días)=10 determinista en
+//  cualquier zona. 162 pruebas en verde. Sin archivos nuevos (solo lógica de js/core/clinical-days.js).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v296 (2º módulo extraído: js/core/clinical-days.js)
 //  Sigue la des-monolitización: el cálculo de DÍAS (terapia/estancia/DOT) sale de index.html a un
 //  módulo ESM PURO — calcDiaATB, diaATBLabel, calcDia, _fechaADate, calcDiasEstancia,
@@ -323,7 +333,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v296';
+const CACHE = 'stewardmx-v297';
 const SHELL = [
   '/',
   '/index.html',
