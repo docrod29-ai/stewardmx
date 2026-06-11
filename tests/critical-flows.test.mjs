@@ -998,3 +998,19 @@ test('TXMAP: inmunoClases parsea, cubre agentes críticos y todos tienen los 4 c
   const incompletos = arr.flatMap(c => c.items).filter(i => !i.nom || !i.riesgos || !i.screening || !i.profilaxis || !i.monitoreo).map(i => i.nom || '???');
   assert.deepEqual(incompletos, [], 'agentes sin los 4 campos (no rinden tarjeta completa): ' + incompletos.join(', '));
 });
+
+/* ═══════════ Trasplante Vacunación (v305, Fase 2b): subtab nuevo, conectado y renderiza ═══════════ */
+test('TXVAC: subtab Vacunación en _TX_SUBTABS y despachado', () => {
+  assert.ok(_idx.includes("{id:'tx-vacunas'"), 'no está en _TX_SUBTABS');
+  assert.ok(_idx.includes("sub==='tx-vacunas')cont.innerHTML=_renderTxVacunas(p)"), 'no despachado en renderTrasplantePac');
+});
+test('TXVAC: _renderTxVacunas ejecuta y produce el contenido clave citado', () => {
+  const s = _idx.indexOf('function _renderTxVacunas(p){');
+  const e = _idx.indexOf('\nfunction _txCard(', s);
+  assert.ok(s >= 0 && e > s, 'no se ubicó _renderTxVacunas');
+  const fn = new Function('_txCard', _idx.slice(s, e) + '\n return _renderTxVacunas;')((t, c) => t + '||' + c);
+  const out = fn({});
+  for (const must of ['VIVAS', 'Shingrix', 'Meningococo', 'MMR', '≥4 semanas', 'Danziger-Isakov']) {
+    assert.ok(out.includes(must), 'falta contenido en Vacunación: ' + must);
+  }
+});

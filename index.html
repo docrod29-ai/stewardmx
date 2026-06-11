@@ -21239,7 +21239,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v304'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v305'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
@@ -25468,6 +25468,7 @@ const _TX_SUBTABS=[
   {id:'tx-cmv',label:'🔬 CMV Monitor'},
   {id:'tx-neutropenia',label:'🩸 Neutropenia F.'},
   {id:'tx-pretx',label:'📋 Pre-Trasplante'},
+  {id:'tx-vacunas',label:'💉 Vacunación'},
   {id:'tx-24h',label:'🚨 Protocolo 24h'},
 ];
 window.renderTrasplante=function(){
@@ -25503,9 +25504,58 @@ window.renderTrasplantePac=function(pid){
   else if(sub==='tx-cmv')cont.innerHTML=_renderTxCMV(p);
   else if(sub==='tx-neutropenia')cont.innerHTML=_renderTxNeutropenia(p);
   else if(sub==='tx-pretx')cont.innerHTML=_renderTxPreTx(p);
+  else if(sub==='tx-vacunas')cont.innerHTML=_renderTxVacunas(p);
   else if(sub==='tx-24h')cont.innerHTML=_renderTxProtocolo24h(p);
   _execScripts(cont); // re-run scripts blocked by innerHTML assignment
 };
+
+// Subtab Vacunación (Fase 2b) — referencia citada. Vivas vs inactivadas + timing pre/post-TX.
+function _renderTxVacunas(p){
+  const li=(t)=>`<li style="margin-bottom:4px;">${t}</li>`;
+  const cite=(t)=>`<div style="color:var(--t3);font-size:9.5px;font-family:var(--mono);margin-top:8px;line-height:1.5;">${t}</div>`;
+  let html='';
+  html+=_txCard('💉 Regla de oro — Vacunación en el trasplante',`
+    <div style="font-size:11.5px;color:var(--t2);line-height:1.75;">
+      <b>1.</b> Vacunas <b style="color:var(--red);">VIVAS atenuadas → CONTRAINDICADAS después del trasplante</b> (y durante inmunosupresión significativa). Aplicarlas <b>≥4 semanas ANTES</b> del trasplante.<br>
+      <b>2.</b> Vacunas <b style="color:var(--teal);">INACTIVADAS / recombinantes → seguras en cualquier momento.</b> Idealmente <b>completar antes</b> del TX (mejor respuesta inmune); reanudar a los <b>3–6 meses post-TX</b>, cuando baja la inmunosupresión.<br>
+      <b>3.</b> Revisar serologías (VZV, sarampión/MMR, Anti-HBs) para definir qué vacunas vivas faltan ANTES del TX — después ya no se podrán administrar.
+      ${cite('[AST ID Community of Practice — Danziger-Isakov &amp; Kumar, Clin Transplant 2019] · [IDSA 2013 — Rubin et al., Clin Infect Dis 2014] · [AST IDCOP Screening — Malinis &amp; Boucher 2019]')}
+    </div>`,'var(--purple)');
+  html+=_txCard('🚫 Vacunas VIVAS — solo PRE-trasplante (≥4 semanas antes)',`
+    <ul style="font-size:11px;color:var(--t2);line-height:1.6;margin:0;padding-left:18px;">
+      ${li('<b>Triple viral (MMR: sarampión, parotiditis, rubéola)</b> — vacunar al candidato seronegativo antes del TX.')}
+      ${li('<b>Varicela</b> — si VZV IgG negativo (idealmente 2 dosis).')}
+      ${li('<b>Fiebre amarilla</b> — solo si viaje a zona endémica es inevitable; planear PRE-TX.')}
+      ${li('<b>BCG</b> · <b>Polio oral (OPV)</b> · <b>Tifoidea oral (Ty21a)</b> · <b>Influenza intranasal (LAIV)</b> · <b>Rotavirus</b> (lactantes).')}
+      ${li('<b>Zóster vivo (Zostavax)</b> — NO usar; sustituido por el recombinante (ver abajo).')}
+    </ul>
+    ${cite('Contraindicadas post-TX por riesgo de enfermedad por el virus/bacteria vacunal en el inmunocomprometido. [AST IDCOP Screening 2019; IDSA 2013]')}`,'var(--red)');
+  html+=_txCard('✅ Vacunas INACTIVADAS / recombinantes — seguras (completar pre-TX; reanudar 3–6 m post-TX)',`
+    <ul style="font-size:11px;color:var(--t2);line-height:1.6;margin:0;padding-left:18px;">
+      ${li('<b>Influenza inactivada</b> — anual, todos los candidatos y receptores (y convivientes).')}
+      ${li('<b>Neumococo</b> — PCV20 (o PCV15 seguido de PPSV23). Prioritario en asplenia.')}
+      ${li('<b>Hepatitis B</b> — verificar Anti-HBs &gt;10 UI/L; revacunar (doble dosis) si subprotector.')}
+      ${li('<b>Tdap / Td</b> · <b>VPH</b> (hasta 45 años) · <b>COVID-19</b> · <b>VRS</b> (≥60 años / candidatos).')}
+      ${li('<b>Zóster RECOMBINANTE (Shingrix)</b> — <b>NO es viva</b>: SÍ se puede usar en inmunocomprometidos (2 dosis). Preferida sobre la viva.')}
+      ${li('<b>Meningococo (MenACWY + MenB)</b> — obligatorio en asplenia, déficit de complemento y con <b>eculizumab/ravulizumab</b> (ver mapa de fármacos).')}
+      ${li('<b>Haemophilus influenzae b (Hib)</b> — en asplenia.')}
+    </ul>
+    ${cite('Mejor inmunogenicidad si se completan antes del TX. Post-TX: reiniciar a los 3–6 meses (influenza inactivada puede darse desde 1 mes si hay brote). [AST ID CoP 2019; IDSA 2013; ACIP/CDC]')}`,'var(--teal)');
+  html+=_txCard('🏠 Contactos del hogar (cocooning)',`
+    <div style="font-size:11px;color:var(--t2);line-height:1.65;">
+      Vacunar a los convivientes para proteger al receptor: <b>influenza inactivada anual</b>, <b>MMR y varicela</b> si son susceptibles, esquemas al día.<br>
+      <b>Evitar polio oral (OPV)</b> en convivientes. Rotavirus en lactantes del hogar está permitido (higiene de manos estricta). Tras vacuna de varicela, si el conviviente desarrolla exantema, evitar contacto hasta que resuelva.
+      ${cite('[IDSA 2013 — Rubin et al.; AST ID CoP 2019]')}
+    </div>`,'var(--blue)');
+  html+=_txCard('⭐ Situaciones especiales',`
+    <ul style="font-size:11px;color:var(--t2);line-height:1.6;margin:0;padding-left:18px;">
+      ${li('<b>Asplenia (anatómica o funcional):</b> neumococo + Hib + meningococo (ACWY y B).')}
+      ${li('<b>Eculizumab / ravulizumab:</b> meningococo ACWY + B obligatorio ≥2 semanas antes + profilaxis antibiótica si no se cumple la ventana (riesgo de enfermedad meningocócica — caja negra).')}
+      ${li('<b>Endémicas / viajero:</b> planear ANTES del TX (la fiebre amarilla es viva → solo pre-TX). Strongyloides/Chagas/TB latente: ver Pre-Trasplante.')}
+    </ul>
+    ${cite('[ACIP/CDC; AST ID CoP 2019]')}`,'var(--amber)');
+  return html;
+}
 
 function _txCard(titulo,contenido,color){
   color=color||'var(--teal)';

@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v305 (Trasplante Fase 2b: nuevo subtab Vacunación)
+//  Nuevo subtab "💉 Vacunación" en el módulo de trasplante (_renderTxVacunas): la regla de oro
+//  (vivas contraindicadas post-TX → dar ≥4 sem antes; inactivadas/recombinantes seguras, completar
+//  pre-TX y reanudar 3-6 m post-TX), lista de vacunas vivas vs inactivadas (incl. Shingrix NO viva,
+//  Meningococo para eculizumab/asplenia), contactos del hogar y situaciones especiales. Citado a
+//  AST ID CoP (Danziger-Isakov & Kumar 2019), IDSA 2013 (Rubin), AST IDCOP Screening 2019, ACIP/CDC.
+//  Contenido estático (sin motor); +2 pruebas que ejecutan _renderTxVacunas y verifican el contenido.
+//  194 pruebas verde. Doc rector: docs/PROMPT_MAESTRO_INMUNODEPRIMIDOS.md.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v304 (Trasplante Fase 3: mapa de inmunosupresores — huecos críticos)
 //  El mapa de fármacos ya era extenso (~54 agentes). Se cubren 4 huecos de seguridad reales con cita:
 //   · Anti-complemento (Eculizumab, Ravulizumab) → enfermedad MENINGOCÓCICA (caja negra FDA/ACIP):
@@ -404,7 +413,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v304';
+const CACHE = 'stewardmx-v305';
 const SHELL = [
   '/',
   '/index.html',
