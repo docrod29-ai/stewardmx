@@ -1030,3 +1030,14 @@ test('TXVAC: _renderTxVacunas ejecuta y produce el contenido clave citado', () =
     assert.ok(out.includes(must), 'falta contenido en Vacunación: ' + must);
   }
 });
+
+/* ═══════════ Trasplante v307: alta sin ATB + crear paciente desde el módulo ═══════════ */
+test('TXALTA: el paciente de trasplante queda EXENTO del requisito de ATB en guardar()', () => {
+  assert.ok(_idx.includes("const _esTx=(gv('f-inmuno')||'')==='trasplante'||_tipoVisita==='trasplante';"), 'falta la marca _esTx');
+  assert.ok(_idx.includes('!_esInterconsulta&&!_esTx&&!atb&&atbListData.length===0'), 'la condición de bloqueo no exime trasplante');
+});
+test('TXALTA: hay función + botón para crear paciente desde el módulo (preselecciona trasplante)', () => {
+  assert.ok(_idx.includes('window._txNuevoPaciente=function()'), 'falta _txNuevoPaciente');
+  assert.ok(_idx.includes("s.value='trasplante'"), 'no preselecciona Inmunosupresión=trasplante');
+  assert.ok(_idx.includes('window._txNuevoPaciente&&window._txNuevoPaciente()'), 'falta el botón en el módulo');
+});

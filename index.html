@@ -259,7 +259,7 @@ if (document.readyState === 'loading') {
 // ║  Cada ID tiene datos 100% separados en Firebase.        ║
 // ╚══════════════════════════════════════════════════════════╝
 let U=null,HOSP=null,HInfo={nombre:'Mi Hospital',camas:100};
-let unsubP=null,unsubS=null,unsubB=null,PACS=[],CONTS=[],CAMAS={},SOLICITUDES=[],BLOQUEOS=[],filtro='todos',editId=null,currentView='censo',currentMonth=new Date().toISOString().slice(0,7),_farmFiltro='todos',_farmTab='solicitudes';
+let unsubP=null,unsubS=null,unsubB=null,_cultUnsub=null,_icNotifUnsub=null,PACS=[],CONTS=[],CAMAS={},SOLICITUDES=[],BLOQUEOS=[],filtro='todos',editId=null,currentView='censo',currentMonth=new Date().toISOString().slice(0,7),_farmFiltro='todos',_farmTab='solicitudes';
 // ── Módulo Clínica / Expediente Electrónico ──
 let CLINICA_PACS=[],_clinicaSelPac=null,_clinicaSelVid=null,_clinicaTab='expediente',_clinicaSubTab='visitas',_clinicaAppts=[];
 const CLINICA_ESPECIALIDADES=['Medicina Interna','Infectología','Cardiología','Neumología','Gastroenterología','Hepatología','Nefrología','Endocrinología','Reumatología','Hematología','Oncología Médica','Neurología','Psiquiatría','Dermatología','Oftalmología','Otorrinolaringología','Ortopedia y Traumatología','Cirugía General','Cirugía Cardiovascular','Cirugía Plástica y Reconstructiva','Urología','Ginecología y Obstetricia','Pediatría','Neonatología','Geriatría','Medicina de Urgencias','Medicina Crítica / UCI','Anestesiología','Radiología e Imagen','Medicina Nuclear','Medicina del Deporte','Medicina Física y Rehabilitación','Alergología e Inmunología Clínica','Endoscopía Gastrointestinal','Coloproctología','Nutrición Clínica y Metabólica','Medicina Genómica','Cuidados Paliativos','Clínica del Dolor Crónico','Medicina Preventiva y Salud Pública','Psicología Clínica','Estomatología y Cirugía Oral','Medicina del Trabajo','Toxicología Clínica','Microbiología Clínica','Medicina Familiar','Medicina General','Otra especialidad'];
@@ -1091,7 +1091,7 @@ onAuthStateChanged(auth,async u=>{
     await cargarApp(u,isAdmin);
   }else{
     U=null;HOSP=null;
-    if(unsubP)unsubP();if(unsubS)unsubS();if(unsubB)unsubB();
+    if(unsubP)unsubP();if(unsubS)unsubS();if(unsubB)unsubB();if(_cultUnsub){try{_cultUnsub();}catch(_){}_cultUnsub=null;}if(_icNotifUnsub){try{_icNotifUnsub();}catch(_){}_icNotifUnsub=null;}
     _show('screen-login');
     const b=document.getElementById('li-btn');if(b){b.textContent='Ingresar';b.disabled=false;}
     const er=document.getElementById('li-err');if(er)er.style.display='none';
@@ -1222,7 +1222,8 @@ async function cargarApp(u,isAdmin){
   try{
     window._cultRequests=[];
     const _cq=query(collection(db,'hospitals',HOSP,'culture_requests'),orderBy('solicitadoAt','desc'));
-    onSnapshot(_cq,snap=>{
+    if(_cultUnsub){try{_cultUnsub();}catch(_){}_cultUnsub=null;} // libera el listener previo (evita fuga al re-invocar cargarApp)
+    _cultUnsub=onSnapshot(_cq,snap=>{
       window._cultRequests=snap.docs.map(d=>({id:d.id,...d.data()}));
       // Badge en tab Micro si hay solicitudes pendientes
       const _nPend=(window._cultRequests||[]).filter(r=>r.status==='pendiente').length;
@@ -1898,14 +1899,14 @@ window.cargarPlataforma=async()=>{
           const periodos=[{d:30,label:'1 mes',m:1},{d:90,label:'3 meses',m:3},{d:180,label:'6 meses',m:6},{d:365,label:'1 año',m:12}];
           const precioBtn=m=>{const base=PLAN_MONTOS[h.plan]||0;const desc={1:0,3:0.05,6:0.10,12:0.17}[m]||0;return base?'<br><span style="font-family:var(--mono);font-size:7px;opacity:.8;">$'+(Math.round(base*m*(1-desc))).toLocaleString('es-MX')+'</span>':''};
           btonesHTML+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:4px;">`+periodos.map(p=>`<button class="btn-sm" style="border-color:rgba(0,212,168,.3);color:var(--teal);font-size:9px;line-height:1.3;padding:3px 6px;" onclick="extenderSuscripcion('${h.id}',${p.d})">${p.label}${precioBtn(p.m)}</button>`).join('')+'</div>';
-          if(isSA)btonesHTML+=`<button class="btn-sm" style="border-color:rgba(167,139,250,.3);color:var(--purple);font-size:9px;width:100%;margin-bottom:3px;" onclick="darPaseLibre('${h.id}','${(h.nombre||h.id).replace(/'/g,"\\'")}')">🎁 Pase libre…</button>`;
+          if(isSA)btonesHTML+=`<button class="btn-sm" style="border-color:rgba(167,139,250,.3);color:var(--purple);font-size:9px;width:100%;margin-bottom:3px;" onclick="darPaseLibre('${h.id}','${escJs(h.nombre||h.id)}')">🎁 Pase libre…</button>`;
         }
         if(h.status!=='suspendido')btonesHTML+=`<button class="btn-sm" style="border-color:rgba(255,77,109,.3);color:var(--red);font-size:9px;width:100%;" onclick="suspenderHospitalPlat('${h.id}')">Suspender</button>`;
         else btonesHTML+=`<button class="btn-sm btn-sm-teal" style="font-size:9px;width:100%;" onclick="aprobarHospital('${h.id}')">Reactivar</button>`;
-        if(isSA)btonesHTML+=`<button class="btn-sm" style="border-color:rgba(255,77,109,.5);color:var(--red);font-size:9px;width:100%;margin-top:2px;" onclick="eliminarHospitalPlat('${h.id}','${(h.nombre||'').replace(/'/g,"\\'")}')">🗑 Eliminar</button>`;
+        if(isSA)btonesHTML+=`<button class="btn-sm" style="border-color:rgba(255,77,109,.5);color:var(--red);font-size:9px;width:100%;margin-top:2px;" onclick="eliminarHospitalPlat('${h.id}','${escJs(h.nombre||'')}')">🗑 Eliminar</button>`;
         // Datos: limpiar y demo — disponibles para super-admin
         if(isSA){
-          const _hn=(h.nombre||h.id).replace(/'/g,"\\'");
+          const _hn=escJs(h.nombre||h.id);
           btonesHTML+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;">`;
           btonesHTML+=`<button class="btn-sm" style="border-color:rgba(245,166,35,.3);color:var(--amber);font-size:9px;" onclick="cargarDemoHosp('${h.id}','${_hn}')">🎭 Demo</button>`;
           btonesHTML+=`<button class="btn-sm" style="border-color:rgba(255,77,109,.4);color:var(--red);font-size:9px;" onclick="limpiarPacientesHosp('${h.id}','${_hn}')">🗑 Limpiar pac.</button>`;
@@ -3911,7 +3912,11 @@ window.guardar=async()=>{
   const atbListData=getAtbList();
   const _tipoVisita=(gv('f-tipo-visita')||'seguimiento');
   const _esInterconsulta=_tipoVisita==='interconsulta';
-  if(!nom||(!_esInterconsulta&&!atb&&atbListData.length===0)){
+  // v307: el paciente de TRASPLANTE/inmunodeprimido en evaluación pre-TX todavía NO lleva
+  // antimicrobiano → exento del requisito de ATB (igual que la interconsulta). Así se puede dar
+  // de alta en el censo para trabajar su protocolo en el módulo de Trasplante.
+  const _esTx=(gv('f-inmuno')||'')==='trasplante'||_tipoVisita==='trasplante';
+  if(!nom||(!_esInterconsulta&&!_esTx&&!atb&&atbListData.length===0)){
     if(!nom){
       toast('⚠ El nombre del paciente es obligatorio','rd');
       const fNom=document.getElementById('f-nom');
@@ -3920,7 +3925,7 @@ window.guardar=async()=>{
       // Cambiar a la pestaña Antimicrobianos para que el médico vea qué falta
       const _atbTabBtn=document.querySelector('.ftab[onclick*="ft-atb"]');
       if(_atbTabBtn&&typeof swFTab==='function')swFTab(_atbTabBtn,'ft-atb');
-      toast('⚠ Agrega al menos un antimicrobiano antes de guardar','rd');
+      toast('⚠ Agrega al menos un antimicrobiano (o marca Inmunosupresión = Trasplante si aún no lleva ATB)','rd');
       // Flash visual en la sección de ATBs
       setTimeout(()=>{const _atbSec=document.getElementById('ft-atb');if(_atbSec){_atbSec.style.outline='2px solid var(--red)';setTimeout(()=>{_atbSec.style.outline='';},2000);}},100);
     }
@@ -9186,8 +9191,18 @@ window.enviarResumenPROAporWA=async function(pid){
   // WA tiene límite ~4096 caracteres por mensaje. Si excede, dividir.
   const _MAX=3800;
   if(txt.length<=_MAX){
-    window.open('https://wa.me?text='+encodeURIComponent(txt),'_blank');
-    toast('📱 Resumen enviado por WhatsApp ✓');
+    const _resUrl=('https://wa.me?text='+encodeURIComponent(txt)).replace(/'/g,'%27');
+    setTimeout(()=>{ // popup click-through (window.open en gesto fresco, no bloqueado tras await) — CLAUDE.md #5
+      const old=document.getElementById('_wa-res-popup');if(old)old.remove();
+      const div=document.createElement('div');
+      div.id='_wa-res-popup';
+      div.style.cssText='position:fixed;bottom:80px;right:20px;z-index:9999;background:var(--s1);border:1px solid var(--teal);border-radius:10px;padding:14px 18px;box-shadow:0 8px 32px rgba(0,0,0,.4);display:flex;gap:10px;align-items:center;max-width:340px;';
+      div.innerHTML='<span style="font-size:13px;color:var(--t1);">📱 Enviar resumen PROA por WhatsApp</span>'
+        +'<button onclick="window.open(\''+_resUrl+'\',\'_blank\');this.parentNode.remove();" style="background:var(--teal);color:#000;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Enviar</button>'
+        +'<button onclick="this.parentNode.remove();" style="background:none;border:1px solid var(--brd);color:var(--t3);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;">Omitir</button>';
+      document.body.appendChild(div);
+      setTimeout(()=>{if(div.parentNode)div.remove();},12000);
+    },400);
     return;
   }
   // Dividir en partes manteniendo secciones intactas en la medida posible
@@ -10561,7 +10576,7 @@ window.abrirNuevoLaboratorio=(pid,labId,prefill)=>{
   });
   html+=`<div class="fg"><label>📝 Notas / interpretación clínica</label>
     <textarea id="lab-notas" style="width:100%;height:60px;border:1px solid var(--brd);background:var(--s2);color:var(--t1);border-radius:4px;padding:8px;font-size:12px;resize:vertical;"
-      placeholder="ej. PCR en descenso tras 48h de carbapeném. Leucopenia en resolución.">${isEdit&&prefill.notas?prefill.notas:''}</textarea>
+      placeholder="ej. PCR en descenso tras 48h de carbapeném. Leucopenia en resolución.">${isEdit&&prefill.notas?escHtml(prefill.notas):''}</textarea>
   </div>
   <div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--brd2);">
     <button class="btn-main btn-teal" onclick="guardarLaboratorio('${pid}','${labId||''}')">💾 ${isEdit?'Actualizar':'Guardar'} laboratorios</button>
@@ -11681,6 +11696,7 @@ function escHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 function esc(s){return escHtml(s);}
 // Toast con stack: si llegan varios seguidos, no se sobreescriben
 function toast(msg,tipo){
+  if(tipo==='err'||tipo==='error')tipo='rd'; // alias de error → rojo (evita que un fallo se pinte verde-éxito)
   let stack=document.getElementById('toast-stack');
   if(!stack){
     stack=document.createElement('div');
@@ -13561,7 +13577,7 @@ const DOSIS_RENAL={
   'Ceftazidima':(cl)=>cl>=50?'2g IV c/8h':cl>=31?'1-2g IV c/12h':cl>=16?'1g IV c/24h':cl>=6?'500 mg IV c/24h':'500 mg IV c/48h',
   'Piperacilina-tazobactam':(cl)=>cl>=40?'4.5g IV c/6-8h':cl>=20?'3.375g IV c/6h':cl<20?'2.25g IV c/6h':'2.25g IV c/8h',
   'Meropenem':(cl)=>cl>=51?'1g IV c/8h':cl>=26?'1g IV c/12h':cl>=10?'500 mg IV c/12h':'500 mg IV c/24h',
-  'Imipenem':(cl)=>cl>=71?'500 mg IV c/6h':cl>=41?'500 mg IV c/8h':cl>=21?'500 mg IV c/12h':cl<21?'250 mg IV c/12h':'NO USAR si ClCr<5 (riesgo de convulsiones)',
+  'Imipenem':(cl)=>cl>=71?'500 mg IV c/6h':cl>=41?'500 mg IV c/8h':cl>=21?'500 mg IV c/12h':cl>=5?'250 mg IV c/12h':'250 mg IV c/12h ⚠ riesgo de convulsiones si ClCr<5',
   'Ertapenem':(cl)=>cl>=31?'1g IV c/24h':'500 mg IV c/24h',
   'Vancomicina':(cl,peso)=>{
     const dosis=peso?Math.round(15*parseFloat(peso)):'15 mg/kg';
@@ -15255,6 +15271,7 @@ function _waTransicion(s,nuevoStatus){
   // Cama actualizada desde PACS (no datos stale de solicitud)
   const _pacT=PACS.find(x=>x.id===s.patientId||x.id===s.pacienteId);
   const _camaT=_pacT?.cama||s.cama||'—';
+  const _svcT=_pacT?.servicio||s.servicio||'—'; // servicio ACTUAL desde PACS (evita stale tras traslado)
   // Nombre limpio del ATB (sin placeholder "OTRO (escribir...)")
   const _atbT=(()=>{
     const a=(s.antibiotico||'').trim();
@@ -15265,14 +15282,25 @@ function _waTransicion(s,nuevoStatus){
   })();
   const msgs={
     en_farmacia:`PROA aprobó *${_atbT}* para ${s.pacienteNombre||'paciente'}. Cama: ${_camaT}.`,
-    en_almacen:`Farmacia confirma stock de *${_atbT}*. Favor liberar a enfermería del servicio ${s.servicio||'—'}.`,
-    entregado:`*${_atbT}* liberado por almacén. Enfermería del servicio ${s.servicio||'—'}: favor recoger y administrar.`,
-    emergencia_fuera_horario:`⚠️ URGENCIA: Solicitud *${_atbT}* para paciente en ${s.servicio||'—'}. Cama: ${_camaT}. Infectólogo: favor revisar a la brevedad.`
+    en_almacen:`Farmacia confirma stock de *${_atbT}*. Favor liberar a enfermería del servicio ${_svcT}.`,
+    entregado:`*${_atbT}* liberado por almacén. Enfermería del servicio ${_svcT}: favor recoger y administrar.`,
+    emergencia_fuera_horario:`⚠️ URGENCIA: Solicitud *${_atbT}* para paciente en ${_svcT}. Cama: ${_camaT}. Infectólogo: favor revisar a la brevedad.`
   };
   const msg=msgs[nuevoStatus]||'';
   if(msg&&tel){
-    const url='https://wa.me/52'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent('*StewardMX PROA*\n'+msg);
-    window.open(url,'_blank');
+    const url=('https://wa.me/52'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent('*StewardMX PROA*\n'+msg)).replace(/'/g,'%27');
+    const _lbl=nuevoStatus==='en_almacen'?'Notificar Almacén':nuevoStatus==='entregado'?'Notificar Enfermería':'Notificar Farmacia';
+    setTimeout(()=>{ // popup click-through: el window.open va en un gesto fresco (no bloqueado tras await) — CLAUDE.md #5
+      const old=document.getElementById('_wa-trans-popup');if(old)old.remove();
+      const div=document.createElement('div');
+      div.id='_wa-trans-popup';
+      div.style.cssText='position:fixed;bottom:80px;right:20px;z-index:9999;background:var(--s1);border:1px solid var(--teal);border-radius:10px;padding:14px 18px;box-shadow:0 8px 32px rgba(0,0,0,.4);display:flex;gap:10px;align-items:center;max-width:340px;';
+      div.innerHTML='<span style="font-size:13px;color:var(--t1);">📱 '+_lbl+' por WhatsApp</span>'
+        +'<button onclick="window.open(\''+url+'\',\'_blank\');this.parentNode.remove();" style="background:var(--teal);color:#000;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Enviar</button>'
+        +'<button onclick="this.parentNode.remove();" style="background:none;border:1px solid var(--brd);color:var(--t3);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;">Omitir</button>';
+      document.body.appendChild(div);
+      setTimeout(()=>{if(div.parentNode)div.remove();},12000);
+    },400);
   }
 }
 
@@ -16023,11 +16051,12 @@ window.abrirRevision=(id,accion)=>{
 };
 
 window.confirmarRevision=async(id,accion)=>{
+  if(window._revBusy)return;window._revBusy=true; // anti-doble-click (libera en finally + salidas tempranas)
   const motivo=(document.getElementById('rev-motivo')?.value||'').trim();
   const duracion=(document.getElementById('rev-duracion')?.value||'').trim();
   const errEl=document.getElementById('rev-err');
-  if(accion!=='revision'&&!motivo){if(errEl){errEl.textContent='El motivo/condiciones son obligatorios.';errEl.style.display='';}return;}
-  if(accion==='liberar'&&!duracion){if(errEl){errEl.textContent='Selecciona la duración de la autorización.';errEl.style.display='';}return;}
+  if(accion!=='revision'&&!motivo){if(errEl){errEl.textContent='El motivo/condiciones son obligatorios.';errEl.style.display='';}window._revBusy=false;return;}
+  if(accion==='liberar'&&!duracion){if(errEl){errEl.textContent='Selecciona la duración de la autorización.';errEl.style.display='';}window._revBusy=false;return;}
   const s=SOLICITUDES.find(x=>x.id===id);
   // Mapa de acción → nuevo estado (estado extendido v75)
   const nuevoStatus=accion==='liberar'?'aprobado':accion==='revision'?'en_revision':'denegado';
@@ -16048,7 +16077,7 @@ window.confirmarRevision=async(id,accion)=>{
     toast(labels[nuevoStatus]||'Actualizado ✓',nuevoStatus==='denegado'?'am':'');
     // Después de aprobar: WA a farmacia + popup de compartir
     if(nuevoStatus==='aprobado'&&s){
-      _waTransicion({...s,...upd},'en_farmacia');
+      // _waTransicion('en_farmacia') se omite aquí: abajo se arma un popup WA propio más completo (evita duplicado)
       const lider=proaLider();
       // Cama y servicio actualizados desde PACS (no datos stale de la solicitud)
       const _pacWA=PACS.find(x=>x.id===s.patientId||x.id===s.pacienteId);
@@ -16119,7 +16148,7 @@ window.confirmarRevision=async(id,accion)=>{
     }
   }catch(e){
     if(errEl){errEl.textContent='Error: '+e.message;errEl.style.display='';}
-  }
+  }finally{window._revBusy=false;}
 };
 
 // ── Edición rápida de Dx / Cama / Médico desde la lista del censo ──────────
@@ -18294,7 +18323,7 @@ function _iaRenderConsulta(r,pid){
   const alertas=Array.isArray(r.alertas)?r.alertas.filter(Boolean):[];
   el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">'
     +'<span style="font-family:var(--mono);font-size:10px;color:'+confColor+';border:1px solid '+confColor+';border-radius:10px;padding:2px 10px;">Confianza: '+escHtml(r.confianza||'media')+'</span>'
-    +'<div style="display:flex;gap:6px;"><button onclick="_iaInsertarEnNota('+JSON.stringify(pid)+')" class="btn-sm btn-sm-teal">📝 Pasar a nota PROA</button>'
+    +'<div style="display:flex;gap:6px;"><button onclick="_iaInsertarEnNota('+JSON.stringify(pid).replace(/"/g,'&quot;')+')" class="btn-sm btn-sm-teal">📝 Pasar a nota PROA</button>'
     +'<button onclick="_iaCopiarConsulta()" class="btn-sm btn-sm-ghost">📋 Copiar</button></div></div>'
     +sec('🩺','Impresión clínica',escHtml(r.impresion||''),'var(--blue)')
     +sec('🔬','Interpretación microbiológica (CLSI)',escHtml(r.interpretacionMicro||''),'var(--purple)')
@@ -19656,10 +19685,11 @@ window._initICView=function(){
 // Notificación en tiempo real para PROA cuando llega una nueva interconsulta
 window._suscribirNotificacionesIC=function(){
   if(!window._isAdmin&&!window._isInfectologo)return;
+  if(_icNotifUnsub){try{_icNotifUnsub();}catch(_){}_icNotifUnsub=null;} // libera listener previo (evita toasts IC duplicados al re-suscribir)
   let _knownNotifs=new Set();
   let _firstLoad=true;
   // FIX: query simplificada — single where() + filtro cliente para evitar índice compuesto
-  onSnapshot(
+  _icNotifUnsub=onSnapshot(
     query(collection(db,'hospitals',HOSP,'notifications'),
       where('tipo','==','interconsulta_nueva'),
       orderBy('ts','desc'),limit(50)),
@@ -21239,7 +21269,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v306'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v308'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
@@ -25509,6 +25539,19 @@ window.renderTrasplantePac=function(pid){
   _execScripts(cont); // re-run scripts blocked by innerHTML assignment
 };
 
+// v307: crear un paciente directamente desde el módulo de Trasplante. Abre el formulario del censo
+// con Inmunosupresión = 'trasplante' preseleccionada → al guardar cae en el dropdown del módulo, y
+// el guardado lo exime del requisito de ATB (evaluación pre-TX sin antimicrobiano todavía).
+window._txNuevoPaciente=function(){
+  editId=null;
+  abrirFormPaciente(null);
+  setTimeout(function(){
+    var s=document.getElementById('f-inmuno');
+    if(s){s.value='trasplante';try{if(typeof autoCalcRiesgo==='function')autoCalcRiesgo();}catch(_){}}
+    var nom=document.getElementById('f-nom');if(nom)nom.focus();
+  },60);
+};
+
 // Subtab Vacunación (Fase 2b) — referencia citada. Vivas vs inactivadas + timing pre/post-TX.
 function _renderTxVacunas(p){
   const li=(t)=>`<li style="margin-bottom:4px;">${t}</li>`;
@@ -27953,7 +27996,7 @@ window.uploadClinicaLabFoto=function(pid){
       ${keys.map(k=>`<div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:2px;">${LAB_KEY_MAP[k]?.n||k}</label><input type="number" step="any" id="clf-${k}" value="${extracted[k]}" style="width:100%;border:1px solid rgba(0,212,168,.4);background:var(--s1);color:var(--t1);border-radius:5px;padding:5px 8px;font-size:12px;font-family:var(--mono);"></div>`).join('')}
       </div>
       <div style="display:flex;gap:8px;margin-top:14px;">
-        <button onclick="_confirmarClinicaLabFoto('${pid}',${JSON.stringify(keys)})" style="flex:1;background:linear-gradient(135deg,var(--teal),#0aad8a);border:none;color:#fff;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">✅ Guardar labs extraídos</button>
+        <button onclick="_confirmarClinicaLabFoto('${pid}',${JSON.stringify(keys).replace(/"/g,'&quot;')})" style="flex:1;background:linear-gradient(135deg,var(--teal),#0aad8a);border:none;color:#fff;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">✅ Guardar labs extraídos</button>
         <button onclick="cerrarModal()" style="border:1px solid var(--brd);background:none;color:var(--t2);border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;">Cancelar</button>
       </div></div>`;
       abrirContenido('📸 Labs extraídos por IA',preH,{wide:true});
@@ -28375,6 +28418,7 @@ window.enviarDecision = async function() {
   const just = (document.getElementById('dec-justificacion') || {}).value && document.getElementById('dec-justificacion').value.trim();
   if (!just) { toast('Escribe una justificación clínica', 'err'); return; }
   const altMed = (document.getElementById('alt-med') || {}).value && document.getElementById('alt-med').value.trim() || null;
+  if (_selectedDecision === 'alternativa' && !altMed) { toast('Indica el antibiótico alternativo propuesto', 'rd'); const _el = document.getElementById('alt-med'); if (_el) _el.focus(); return; }
   const durDias = parseInt((document.getElementById('dec-duracion') || {}).value) || null;
   const btn = document.getElementById('btn-enviar-dec');
   if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
@@ -29245,8 +29289,9 @@ window._auxNotificarServicio=function(id){
   if(!s)return;
   const _pac=PACS.find(x=>x.id===s.patientId||x.id===s.pacienteId);
   const _cama=_pac?.cama||s.cama||'—';
+  const _svc=_pac?.servicio||s.servicio||'—'; // servicio ACTUAL desde PACS (evita stale tras traslado)
   const _atb=(s.antibiotico||'ATB').split(/\s*\+\s*/)[0].trim().slice(0,50);
-  const msg=`💊 *ATB LISTO PARA ADMINISTRAR — ${HInfo.nombre||HOSP}*\n\nPaciente: *${s.pacienteNombre||'—'}*\nCama: *${_cama}*\nServicio: ${s.servicio||'—'}\n\nATB: *${_atb}*\nDosis: ${s.dosis||'—'}\n\n✅ El medicamento está listo en Farmacia. Favor pasar a recogerlo o confirmar administración.\n\n— Farmacia · StewardMX`;
+  const msg=`💊 *ATB LISTO PARA ADMINISTRAR — ${HInfo.nombre||HOSP}*\n\nPaciente: *${s.pacienteNombre||'—'}*\nCama: *${_cama}*\nServicio: ${_svc}\n\nATB: *${_atb}*\nDosis: ${s.dosis||'—'}\n\n✅ El medicamento está listo en Farmacia. Favor pasar a recogerlo o confirmar administración.\n\n— Farmacia · StewardMX`;
   window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
 };
 
@@ -29436,8 +29481,18 @@ window.guardarFCReco=async(solicitudId)=>{
       const _cama=_pac?.cama||s?.cama||'—';
       const tel=HInfo.proaWA||'';
       const msg=`🚨 *RECOMENDACIÓN FC URGENTE — StewardMX*\n\nPaciente: *${s?.pacienteNombre||'—'}* · Cama *${_cama}*\nATB: ${(s?.antibiotico||'—').split('+')[0].trim()}\n\n*${tipo}*\n\n${texto}\n\n— Farmacia Clínica · ${HInfo.nombre||HOSP}`;
-      if(tel){window.open('https://wa.me/52'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');}
-      else{window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');}
+      const _fcUrl=(tel?('https://wa.me/52'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg)):('https://wa.me/?text='+encodeURIComponent(msg))).replace(/'/g,'%27');
+      setTimeout(()=>{ // popup click-through (window.open en gesto fresco, no bloqueado tras await) — CLAUDE.md #5
+        const old=document.getElementById('_wa-fc-popup');if(old)old.remove();
+        const div=document.createElement('div');
+        div.id='_wa-fc-popup';
+        div.style.cssText='position:fixed;bottom:80px;right:20px;z-index:9999;background:var(--s1);border:1px solid rgba(255,77,109,.5);border-radius:10px;padding:14px 18px;box-shadow:0 8px 32px rgba(0,0,0,.4);display:flex;gap:10px;align-items:center;max-width:340px;';
+        div.innerHTML='<span style="font-size:13px;color:var(--t1);">🚨 Notificar recomendación FC urgente</span>'
+          +'<button onclick="window.open(\''+_fcUrl+'\',\'_blank\');this.parentNode.remove();" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Enviar WA</button>'
+          +'<button onclick="this.parentNode.remove();" style="background:none;border:1px solid var(--brd);color:var(--t3);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;">Omitir</button>';
+        document.body.appendChild(div);
+        setTimeout(()=>{if(div.parentNode)div.remove();},12000);
+      },400);
     }
   }catch(e){
     if(errEl){errEl.textContent='Error al guardar: '+e.message;errEl.style.display='';}
@@ -31997,9 +32052,12 @@ input:focus,select:focus,textarea:focus{
         <div style="font-size:16px;font-weight:700;">🫀 Módulo Trasplante / Hematología</div>
         <div style="font-size:11px;color:var(--t3);margin-top:2px;">Protocolos infecciosos IDSA · ECMM · EBMT · AST — paciente inmunocomprometido</div>
       </div>
-      <select id="tx-pac-sel" onchange="renderTrasplantePac(this.value)" style="font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:4px;background:var(--s1);border:1px solid var(--brd2);color:var(--t2);">
-        <option value="">— Seleccionar paciente —</option>
-      </select>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button onclick="window._txNuevoPaciente&&window._txNuevoPaciente()" title="Crea un paciente nuevo ya marcado como trasplante (sin necesidad de ATB)" style="font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid var(--purple);background:rgba(167,139,250,.12);color:var(--purple);cursor:pointer;font-weight:700;white-space:nowrap;">➕ Nuevo paciente de trasplante</button>
+        <select id="tx-pac-sel" onchange="renderTrasplantePac(this.value)" style="font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:4px;background:var(--s1);border:1px solid var(--brd2);color:var(--t2);">
+          <option value="">— Seleccionar paciente —</option>
+        </select>
+      </div>
     </div>
     <div id="trasplante-subtabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;"></div>
     <div id="trasplante-content"></div>

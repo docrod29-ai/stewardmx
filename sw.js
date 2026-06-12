@@ -1,4 +1,45 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v308 (CONSOLIDACIÓN de dos sesiones concurrentes)
+//  Dos sesiones de Claude trabajaron el repo a la vez y ambas marcaron v307 (colisión). Este commit
+//  unifica AMBOS conjuntos de cambios (árbol combinado, 204 pruebas en verde, ya en prod):
+//   A) Trasplante v307 (esta sesión): alta de paciente de trasplante SIN ATB (exento como la
+//      interconsulta) + botón "➕ Nuevo paciente de trasplante" en el módulo (window._txNuevoPaciente).
+//   B) QA panel 8 expertos v307 (sesión paralela): 13 bugs funcionales (2 botones muertos por
+//      JSON.stringify en onclick, 2 XSS, toast err→rojo, imipenem convulsiones, popup-blocker WA,
+//      servicio stale en _waTransicion, guard confirmarRevision, fuga de listeners onSnapshot).
+//  Se sube a v308 para dejar UNA sola versión coherente. RECOMENDACIÓN: no correr dos sesiones de
+//  Claude sobre el mismo repo a la vez (se pisan el árbol de trabajo sin commitear).
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v307 (QA panel 8 expertos: 13 bugs funcionales reparados)
+//  Auditoría multiagente + reparación (sin tocar lógica clínica delicada):
+//   · 2 BOTONES MUERTOS: "Pasar a nota PROA" y "Guardar labs extraídos" — onclick roto por
+//     JSON.stringify() (la comilla doble cerraba el atributo); ahora escapan a &quot; y SÍ ejecutan.
+//   · 2 XSS almacenado: notas de laboratorio (faltaba escHtml) y nombre de hospital en panel
+//     plataforma (.replace solo escapaba comilla, no backslash → ahora escJs).
+//   · toast(): alias 'err' caía en verde-éxito → un fallo real de decisión PROA se veía como
+//     éxito; ahora 'err'/'error' → rojo (mapeo centralizado).
+//   · Imipenem: advertencia de convulsiones en ClCr<5 era código inalcanzable → ahora visible.
+//   · Popup-blocker (CLAUDE.md #5): WA de transición farmacia/almacén/enfermería, FC urgente y
+//     resumen PROA usaban window.open tras await → ahora botón flotante click-through (URL endurecida).
+//   · _waTransicion/_auxNotificarServicio: el servicio quedaba stale → se resuelve de PACS (como la cama).
+//   · confirmarRevision: guard anti-doble-click (try/finally). Decisión "alternativa": valida el ATB.
+//   · Fuga de listeners onSnapshot (culture_requests + notificaciones IC) → unsubscribe-antes-de-resuscribir.
+//  Pendiente para criterio clínico (NO autofixeado): respuesta de interconsulta oculta por
+//  ruta+tipo de nota (NOM-004). 202 pruebas verde + check de sintaxis.
+// ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v307 (Trasplante: alta sin ATB + crear paciente desde el módulo)
+//  Reporte (Dr. Rodríguez): (1) al dar de alta un paciente en el censo SIN antibiótico no dejaba
+//  guardar; un paciente pre-TX en evaluación todavía no lleva ATB. (2) No había forma de agregar
+//  un paciente desde el apartado de Trasplante.
+//  FIX 1 — guardar(): el paciente con Inmunosupresión=trasplante (o visita trasplante) queda EXENTO
+//  del requisito de antimicrobiano (igual que la interconsulta). Toast guía al usuario.
+//  FIX 2 — botón "➕ Nuevo paciente de trasplante" en el módulo (window._txNuevoPaciente): abre el
+//  formulario del censo con Inmunosupresión=trasplante preseleccionada → al guardar (sin ATB) cae
+//  en el dropdown del módulo. Así el flujo queda ligado: crear → aparece → trabajar su protocolo.
+//  +2 pruebas (204 total). PENDIENTE propuesto: persistir la evaluación Pre-TX (serologías) al
+//  expediente para que NO se pierda al cambiar de paciente/pestaña.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v306 (Trasplante Pre-TX: TODO valor da recomendación + tipo de TX + VDRL)
 //  Reporte del Dr. Rodríguez (3 cosas): (1) serologías en POSITIVO que no daban recomendación
 //  (EBV, etc.); (2) faltaba elegir el TIPO de trasplante y que module; (3) faltaba VDRL.
@@ -424,7 +465,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v306';
+const CACHE = 'stewardmx-v308';
 const SHELL = [
   '/',
   '/index.html',
