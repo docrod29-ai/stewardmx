@@ -9,6 +9,7 @@
     "test:rules": "firebase emulators:exec --project demo-stewardmx --only firestore \"node --test tests/firestore-rules.test.mjs\"",
     "test:emu": "firebase emulators:exec --project demo-stewardmx --only firestore,functions,auth \"node --test tests/firestore-rules.test.mjs && node --test tests/functions.test.mjs\"",
     "check": "node tests/check-syntax.mjs",
+    "mantenimiento": "node scripts/mantenimiento.mjs",
     "predeploy": "npm run check && npm test",
     "deploy:staging": "firebase hosting:channel:deploy staging --expires 30d",
     "deploy:prod": "firebase deploy --only hosting"
