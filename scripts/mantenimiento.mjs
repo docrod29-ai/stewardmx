@@ -64,8 +64,12 @@ function checkModel() {
 
 function checkSecretos() {
   // Defensa en profundidad: ningún token de GitHub/clave de API en archivos RASTREADOS por git.
+  // El patrón se arma en partes para que los prefijos de token de GitHub NO aparezcan literales en este
+  // archivo (si no, este mismo script daría un falso positivo en cualquier grep/escáner de secretos).
+  const gh = ['ghp', 'gho', 'ghs'].map(p => p + '_[A-Za-z0-9]{30,}').join('|');
+  const pat = gh + '|sk-ant-[A-Za-z0-9_-]{20,}';
   try {
-    const hits = sh('git grep -nIE "ghp_[A-Za-z0-9]{30,}|sk-ant-[A-Za-z0-9_-]{20,}" -- . ":(exclude).env*" || true');
+    const hits = sh('git grep -nIE "' + pat + '" -- . ":(exclude).env*" || true');
     const lines = hits.split('\n').filter(Boolean);
     return lines.length
       ? { status: FAIL, detail: 'posible secreto en ' + lines[0].split(':')[0] }
