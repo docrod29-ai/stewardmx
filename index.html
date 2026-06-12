@@ -21269,7 +21269,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v308'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v309'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
@@ -25552,6 +25552,33 @@ window._txNuevoPaciente=function(){
   },60);
 };
 
+// v309: PERSISTENCIA de la evaluación Pre-Trasplante en el expediente del paciente.
+// _pretxRecs (corre en cada cambio de campo) llama a esto; con debounce de 1.2s escribe p.txPretx en
+// Firestore. _renderTxPreTx pre-carga p.txPretx al seleccionar al paciente. Así la evaluación NO se
+// pierde al cambiar de paciente/pestaña (queda "ligada" al expediente).
+window._txSavePretx=(function(){
+  var _t=null;
+  return function(){
+    if(window._txPretxLoading)return;                 // no guardar durante la pre-carga
+    var p=window._txCurrentPac; if(!p||!p.id)return;
+    var cont=document.getElementById('trasplante-content'); if(!cont)return;
+    var data={};
+    cont.querySelectorAll('[id^="pt_"],[id^="pd_"],[id^="ptv_"]').forEach(function(el){
+      var v=(el.value||'').trim(); if(v!=='')data[el.id]=v;
+    });
+    clearTimeout(_t);
+    _t=setTimeout(function(){
+      updateDoc(doc(db,..._pacPath(),p.id),{txPretx:data,txPretxAt:new Date().toISOString()})
+        .then(function(){
+          p.txPretx=data;
+          var _pi=PACS.find(function(x){return x.id===p.id;}); if(_pi)_pi.txPretx=data;
+          if(typeof toast==='function')toast('Evaluación pre-TX guardada ✓','tl');
+        })
+        .catch(function(e){console.warn('[txPretx save]',e);if(typeof toast==='function')toast('No se pudo guardar la evaluación pre-TX','am');});
+    },1200);
+  };
+})();
+
 // Subtab Vacunación (Fase 2b) — referencia citada. Vivas vs inactivadas + timing pre/post-TX.
 function _renderTxVacunas(p){
   const li=(t)=>`<li style="margin-bottom:4px;">${t}</li>`;
@@ -26413,6 +26440,7 @@ function _renderTxPreTx(p){
     if(P(g('pd_sifilis'))){h+=rec('🟡','VDRL/RPR reactivo DONANTE','No contraindica la donación; tratar al receptor con penicilina post-TX. [AST IDCOP 2019]','var(--amber)');}
     if(!h.includes('border-left:4px solid')){h+='<div style="font-size:11px;color:var(--t3);text-align:center;padding:14px;">Seleccione el tipo de trasplante y complete las serologías para ver las recomendaciones.</div>';}
     el.innerHTML=h;
+    if(window._txSavePretx)window._txSavePretx();   // v309: persistir la evaluación al expediente (debounce)
   };
   window._pretxWordExport=function(){
     const nom=document.getElementById('pt_nombre_doc')?.value||'Paciente';
@@ -26696,7 +26724,11 @@ function _renderTxPreTx(p){
     a.download='EvalPreTX_'+nom.replace(/\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.doc';
     a.click();URL.revokeObjectURL(url);
   };
+  window._txPretxLoading=true;
+  var _saved=${JSON.stringify(p.txPretx||{})};
+  for(var _k in _saved){var _el=document.getElementById(_k);if(_el)_el.value=_saved[_k];}
   window._pretxRecs();
+  window._txPretxLoading=false;
   })();<\/script>`;
   // Dental clearance note
   html+=_txCard('Clearance Dental','<p style="font-size:11px;color:var(--t2);line-height:1.6;margin:0;">Realizar evaluación dental completa y tratar focos infecciosos orales ≥4–6 semanas antes del trasplante. Especialmente crítico en SOT cardíaco y pulmonar.</p>','var(--amber)');

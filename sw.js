@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v309 (Trasplante: la evaluación Pre-TX se LIGA al expediente)
+//  El Dr. pidió que el módulo sea un protocolo y que las pestañas se liguen. Antes la evaluación
+//  Pre-TX (serologías, tipo de TX, VDRL, vacunas) era SOLO-DOM → se perdía al cambiar de paciente.
+//  AHORA persiste: window._txSavePretx recoge todos los campos pt_*/pd_*/ptv_* y, con debounce de
+//  1.2 s, escribe p.txPretx en el expediente (updateDoc). _renderTxPreTx pre-carga p.txPretx al
+//  seleccionar al paciente (con guard _txPretxLoading para no guardar durante la carga). Así la
+//  evaluación queda ligada al paciente y disponible en todas las pestañas y entre sesiones.
+//  +1 prueba (205). node --check + el motor sigue corriendo en DOM simulado.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v308 (CONSOLIDACIÓN de dos sesiones concurrentes)
 //  Dos sesiones de Claude trabajaron el repo a la vez y ambas marcaron v307 (colisión). Este commit
 //  unifica AMBOS conjuntos de cambios (árbol combinado, 204 pruebas en verde, ya en prod):
@@ -465,7 +474,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v308';
+const CACHE = 'stewardmx-v309';
 const SHELL = [
   '/',
   '/index.html',

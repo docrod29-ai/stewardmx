@@ -1041,3 +1041,10 @@ test('TXALTA: hay función + botón para crear paciente desde el módulo (presel
   assert.ok(_idx.includes("s.value='trasplante'"), 'no preselecciona Inmunosupresión=trasplante');
   assert.ok(_idx.includes('window._txNuevoPaciente&&window._txNuevoPaciente()'), 'falta el botón en el módulo');
 });
+test('TXPERSIST: la evaluación Pre-TX se guarda al expediente y se pre-carga (v309)', () => {
+  assert.ok(_idx.includes('window._txSavePretx='), 'falta _txSavePretx');
+  assert.ok(_idx.includes('updateDoc(doc(db,..._pacPath(),p.id),{txPretx:data'), 'no escribe txPretx en el expediente del paciente');
+  assert.ok(_idx.includes('var _saved=${JSON.stringify(p.txPretx||{})}'), 'no precarga p.txPretx al seleccionar paciente');
+  assert.ok(_idx.includes('window._txPretxLoading'), 'falta el guard de pre-carga (evita guardar durante la carga)');
+  assert.ok(_idx.includes('if(window._txSavePretx)window._txSavePretx()'), '_pretxRecs no dispara el guardado');
+});
