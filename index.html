@@ -25989,6 +25989,12 @@ function _renderTxProfilaxis(p){
     h+=rec('💊','Profilaxis Antiviral (VZV/HSV)','<b>Aciclovir 400 mg BID</b> o <b>Valaciclovir 500 mg QD</b> durante todo el período inmunosupresor relevante.<br><b>Bortezomib:</b> Aciclovir MANDATORIO desde D1 (VZV muy frecuente).<br><b>Inhibidores JAK:</b> Aciclovir 400 mg BID.<br><b>TCMH:</b> Aciclovir desde acondicionamiento hasta engraftment.','var(--blue)');
     el.innerHTML=h;
   };
+  // v310: pre-cargar desde la evaluación Pre-TX guardada (txPretx) → las pestañas quedan LIGADAS.
+  var _tp=${JSON.stringify(p.txPretx||{})};
+  var _map={pf_cmv_r:'pt_cmv',pf_cmv_d:'pd_cmv',pf_ebv:'pt_ebv',pf_hbsag:'pt_hbsag',pf_hbc:'pt_hbc',pf_hbv_dna:'pt_hbvdna',pf_qft:'pt_qft',pf_chagas:'pt_chagas',pf_toxo:'pt_toxo',pf_strongy:'pt_strongy',pf_histo:'pt_histo',pf_g6pd:'pt_g6pd',pf_cd4:'pt_cd4'};
+  for(var _pf in _map){var _v=_tp[_map[_pf]];if(_v){var _e=document.getElementById(_pf);if(_e)_e.value=_v;}}
+  var _hcvE=document.getElementById('pf_hcv');
+  if(_hcvE){var _rna=_tp.pt_hcvrna||'',_ac=_tp.pt_hcv||'';if(_rna.indexOf('Detectable')>=0&&_rna.indexOf('Indetectable')<0)_hcvE.value='HCV RNA detectable';else if(_ac.indexOf('+')>=0)_hcvE.value='Anti-HCV+ / RNA indetectable';else if(_ac.indexOf('-')>=0)_hcvE.value='Negativo';}
   window._txProfRec();
   })();<\/script>`;
   html+=`<button onclick="window._txProfWordExport()" style="width:100%;background:rgba(61,155,255,.1);border:1px solid rgba(61,155,255,.3);color:var(--blue);border-radius:6px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px;">📄 Generar Word — Recomendaciones de Profilaxis</button>`;

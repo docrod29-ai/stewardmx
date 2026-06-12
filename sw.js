@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v310 (Trasplante: el tab Profilaxis se LIGA a la evaluación Pre-TX)
+//  Continuación del protocolo ligado. La evaluación Pre-TX ya persiste (v309); AHORA el tab
+//  Profilaxis se PRE-CARGA desde ese p.txPretx: al renderizar mapea las serologías capturadas en
+//  Pre-TX (pt_/pd_) a sus campos pf_ (CMV R/D, EBV, HBsAg, HBc, HBV-DNA, QFT/TB, Chagas, Toxo,
+//  Strongy, Histo, G6PD, CD4) y traduce HCV (Ac+RNA) al esquema del tab. Así dejas de recapturar:
+//  evalúas una vez en Pre-TX y la profilaxis aparece sola. +1 prueba TXLINK que ejecuta el bloque
+//  real en DOM simulado y verifica el mapeo (206). node --check verde.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v309 (Trasplante: la evaluación Pre-TX se LIGA al expediente)
 //  El Dr. pidió que el módulo sea un protocolo y que las pestañas se liguen. Antes la evaluación
 //  Pre-TX (serologías, tipo de TX, VDRL, vacunas) era SOLO-DOM → se perdía al cambiar de paciente.
@@ -474,7 +482,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v309';
+const CACHE = 'stewardmx-v310';
 const SHELL = [
   '/',
   '/index.html',

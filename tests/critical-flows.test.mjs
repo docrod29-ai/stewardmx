@@ -970,7 +970,10 @@ test('PRETX: el tipo de trasplante MODULA las recomendaciones (v306)', () => {
 const _profBlock = (() => {
   const s = _idx.indexOf('window._txProfRec=function(){');
   const e = _idx.indexOf('window._txProfRec();', s);
-  return (s >= 0 && e > s) ? _idx.slice(s, e).split('\\`').join('`').split('\\${').join('${') : '';
+  // v310: el bloque ahora contiene la pre-carga `var _tp=${JSON.stringify(p.txPretx||{})}` (interpolación
+  // del template-literal externo). Sustituirla por `{}` para que el bloque sea JS válido aislado → la
+  // pre-carga no mapea nada y _txProfRec lee los `fields` inyectados como antes.
+  return (s >= 0 && e > s) ? _idx.slice(s, e).split('\\`').join('`').split('\\${').join('${').replace('${JSON.stringify(p.txPretx||{})}', '{}') : '';
 })();
 function _runProf(fields) {
   const recsEl = { innerHTML: '' };
@@ -996,6 +999,28 @@ for (const [id, val, must] of _PROF_CASES) {
     assert.ok(out.includes(must), 'no apareció: ' + must);
   });
 }
+
+/* ═══════════ Trasplante (v310): el tab Profilaxis se PRE-CARGA desde la evaluación Pre-TX (txPretx) ═══════════ */
+/* "Ligar las pestañas": lo capturado en Pre-TX (campos pt_ y pd_, persistidos en p.txPretx) alimenta los
+   campos pf_ del tab Profilaxis al renderizar. Se extrae el bloque REAL, se sustituye la interpolación del
+   txPretx por un caso de prueba, y se verifica que el mapeo ocurra (incl. la traducción especial de HCV). */
+test('TXLINK: Profilaxis pre-carga serologías desde la evaluación Pre-TX guardada (txPretx)', () => {
+  const s = _idx.indexOf('window._txProfRec=function(){');
+  const e = _idx.indexOf('window._txProfRec();', s);
+  const txPretx = { pt_cmv: 'Positivo (+)', pd_cmv: 'Negativo (-)', pt_toxo: 'Positivo (+)', pt_qft: 'Positivo (+)', pt_g6pd: 'Deficiente', pt_hcvrna: 'Detectable', pt_hcv: 'Positivo (+)' };
+  const body = _idx.slice(s, e).split('\\`').join('`').split('\\${').join('${').replace('${JSON.stringify(p.txPretx||{})}', JSON.stringify(txPretx));
+  const fields = {};
+  const recsEl = { innerHTML: '' };
+  const document = { getElementById: id => id === 'pf-recs' ? recsEl : (fields[id] || (fields[id] = { value: '' })) };
+  new Function('window', 'document', body + '\n window._txProfRec();')({}, document);
+  assert.equal(fields.pf_cmv_r && fields.pf_cmv_r.value, 'Positivo (+)', 'CMV receptor no se pre-cargó');
+  assert.equal(fields.pf_cmv_d && fields.pf_cmv_d.value, 'Negativo (-)', 'CMV donante no se pre-cargó');
+  assert.equal(fields.pf_toxo && fields.pf_toxo.value, 'Positivo (+)', 'Toxo no se pre-cargó');
+  assert.equal(fields.pf_qft && fields.pf_qft.value, 'Positivo (+)', 'QFT/TB no se pre-cargó');
+  assert.equal(fields.pf_g6pd && fields.pf_g6pd.value, 'Deficiente', 'G6PD no se pre-cargó');
+  assert.equal(fields.pf_hcv && fields.pf_hcv.value, 'HCV RNA detectable', 'HCV no tradujo a "RNA detectable"');
+  assert.ok(recsEl.innerHTML.length > 80, '_txProfRec no rindió recomendaciones desde la pre-carga');
+});
 
 /* ═══════════ Trasplante (v304): mapa de inmunosupresores/biológicos — agentes críticos + campos completos ═══════════ */
 /* inmunoClases alimenta los checkboxes y _txShowInmuno (cada agente ejecuta su tarjeta). Esta prueba
