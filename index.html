@@ -25375,7 +25375,7 @@ window._txProfWordExport=function(){
     +'<div style="font-size:10.5pt;line-height:1.6;">'+content.replace(/\n/g,'<br>')+'</div>'
     +'<h2>Referencia Rápida: Profilaxis Estándar en Trasplante</h2>'
     +'<table><tr><th>Infección</th><th>Agente</th><th>Dosis</th><th>Duración</th></tr>'
-    +'<tr><td>PCP (Pneumocystis)</td><td>Cotrimoxazol TMP-SMX DS</td><td>1 tab VO TID × 3 días/semana</td><td>≥6 meses SOT / hasta D+180 TCMH</td></tr>'
+    +'<tr><td>PCP (Pneumocystis)</td><td>Cotrimoxazol TMP-SMX DS</td><td>1 tab VO c/24h (o 3×/semana L-M-V)</td><td>≥6 meses SOT / hasta D+180 TCMH</td></tr>'
     +'<tr><td>CMV (D+/R-)</td><td>Letermovir (TCMH) / Valganciclovir (SOT)</td><td>480 mg QD / 900 mg QD</td><td>Hasta D+100 (TCMH); 6 meses SOT riñón</td></tr>'
     +'<tr><td>VZV / HSV</td><td>Aciclovir / Valaciclovir</td><td>400 mg BID / 500 mg QD</td><td>Todo el período IS relevante</td></tr>'
     +'<tr><td>Aspergillus (TCMH GVHD)</td><td>Voriconazol / Posaconazol</td><td>200 mg BID / 300 mg QD</td><td>Mientras GVHD activa + IS alta</td></tr>'
@@ -25708,7 +25708,7 @@ function _renderTxTipo(p){
       {nom:'Venetoclax',riesgo:'MODERADO-ALTO',riesgoColor:'var(--amber)',riesgos:'PCP si + esteroides o + anti-CD20, neutropenia',screening:'HBsAg, Anti-HBc; CMV IgG',profilaxis:'Cotrimoxazol PCP si con corticosteroides o anti-CD20',monitoreo:'BHC semanal en ciclo 1, neutrófilos absolutos'},
     ]},
     {clase:'Inhibidores PI3K',color:'var(--red)',items:[
-      {nom:'Idelalisib',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'PCP mandatoria, CMV, hepatitis, colitis inmune',screening:'HBsAg, Anti-HBc, HBV DNA; CMV/EBV IgG; función hepática basal',profilaxis:'Cotrimoxazol DS TID 3×/semana OBLIGATORIO; valganciclovir si CMV+',monitoreo:'CMV PCR mensual, transaminasas, colonoscopia si diarrea'},
+      {nom:'Idelalisib',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'PCP mandatoria, CMV, hepatitis, colitis inmune',screening:'HBsAg, Anti-HBc, HBV DNA; CMV/EBV IgG; función hepática basal',profilaxis:'Cotrimoxazol DS c/24h o 3×/semana (L-M-V) OBLIGATORIO; valganciclovir si CMV+',monitoreo:'CMV PCR mensual, transaminasas, colonoscopia si diarrea'},
       {nom:'Duvelisib',riesgo:'MUY ALTO',riesgoColor:'var(--red)',riesgos:'PCP mandatoria, CMV, colitis neutropénica',screening:'CMV/EBV serología, HBsAg/Anti-HBc',profilaxis:'Cotrimoxazol PCP OBLIGATORIO',monitoreo:'CMV PCR, transaminasas, BHC'},
       {nom:'Copanlisib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'Infecciones bacterianas y fúngicas, PCP',screening:'CMV IgG, HBsAg',profilaxis:'Cotrimoxazol PCP',monitoreo:'Glucosa (hiperglucemia infusión), BHC'},
       {nom:'Umbralisib',riesgo:'ALTO',riesgoColor:'var(--red)',riesgos:'PCP, CMV, hepatitis inmune',screening:'HBsAg, Anti-HBc, CMV IgG',profilaxis:'Cotrimoxazol PCP',monitoreo:'Transaminasas, CMV PCR'},
@@ -25970,7 +25970,7 @@ function _renderTxProfilaxis(p){
       h+=rec('✅','CMV D-/R- — Riesgo BAJO (<3%)','Sin profilaxis CMV indicada. Algunos centros usan estrategia pre-emptiva. Aciclovir para HSV/VZV estándar. Notificar cualquier donador de último momento + o transfusión CMV+.','var(--teal)');
     }
     // PCP
-    h+=rec('✅','Profilaxis PCP (Pneumocystis jirovecii)','<b>Cotrimoxazol</b> TMP-SMX DS 1 tableta VO TID × 3 días/semana — todos los trasplantados. Duración: ≥6–12 meses SOT; hasta 6 meses post-engraftment TCMH. Continuar si corticosteroides altos o GVHD.'+(g6pd.includes('Deficiente')?'<br><b>G6PD DEFICIENTE:</b> Usar <b>Dapsone 100 mg VO QD</b> o <b>Atovaquone 1500 mg VO QD</b> en lugar de cotrimoxazol.':'<br>Si CD4 <200 cells/μL: cotrimoxazol diario indefinido.')+(cd4<200&&!isNaN(cd4)?'<br><b>CD4 '+cd4+' cells/μL → cotrimoxazol diario.</b>':''),'var(--teal)');
+    h+=rec('✅','Profilaxis PCP (Pneumocystis jirovecii)','<b>Cotrimoxazol</b> TMP-SMX DS 1 tableta VO cada 24h (diario) — alternativa equivalente: 1 DS VO 3 veces/semana (L-M-V) — todos los trasplantados. Duración: ≥6–12 meses SOT; hasta 6 meses post-engraftment TCMH. Continuar si corticosteroides altos o GVHD.'+(g6pd.includes('Deficiente')?'<br><b>G6PD DEFICIENTE:</b> Usar <b>Dapsone 100 mg VO QD</b> o <b>Atovaquone 1500 mg VO QD</b> en lugar de cotrimoxazol.':'<br>Si CD4 <200 cells/μL: cotrimoxazol diario indefinido.')+(cd4<200&&!isNaN(cd4)?'<br><b>CD4 '+cd4+' cells/μL → cotrimoxazol diario.</b>':''),'var(--teal)');
     // HBV
     if(hbsag.includes('+')){
       h+=rec('🔴','HBsAg POSITIVO — Hepatitis B activa','<b>Entecavir 0.5–1 mg VO QD</b> o <b>Tenofovir (TDF/TAF)</b> durante TODA la inmunosupresión + 12–18 meses después. NO usar lamivudina (alta resistencia). Consultar Hepatología. [AASLD 2023]','var(--red)');
@@ -26652,7 +26652,7 @@ function _renderTxPreTx(p){
       if(egfrN>0&&egfrN<30){
         recsNefro.push('TFG '+egfr+' mL/min/1.73m²: ERC avanzada estadio G4-G5. Ajuste de dosis de antimicrobianos obligatorio (cotrimoxazol dosis profiláctica segura hasta TFG >15; tenofovir: TDF contraindicado si TFG <30, preferir TAF o entecavir). Vigilar nefrotoxicidad adicional de antifúngicos.');
       } else if(egfrN>=30&&egfrN<60){
-        recsNefro.push('TFG '+egfr+' mL/min/1.73m²: ERC estadio G3. Ajuste de cotrimoxazol (400/80 mg QD en lugar de DS BID). Vigilar valganciclovir (requiere ajuste: si TFG 25-59: 450 mg QD). Evitar aminoglucósidos sin monitoreo de niveles.');
+        recsNefro.push('TFG '+egfr+' mL/min/1.73m²: ERC estadio G3. Ajuste de cotrimoxazol (400/80 mg QD en lugar de DS QD). Vigilar valganciclovir (requiere ajuste: si TFG 25-59: 450 mg QD). Evitar aminoglucósidos sin monitoreo de niveles.');
       }
     }
     if(recsNefro.length===0){recsNefro.push('Sin contraindicaciones nefrológicas identificadas con los datos disponibles. Confirmar TFG y proteinuria basal pre-TX. Monitoreo de función renal con calcineurina estándar.');}

@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v315 (Auditoría QA — dosis de profilaxis PCP corregida)
+//  P1 CLÍNICO (potencial de daño): la profilaxis de Pneumocystis (PCP) recomendaba
+//  "TMP-SMX DS 1 tableta VO TID × 3 días/semana" — TID (3 veces/día) es INCOMPATIBLE con
+//  "× 3 días/semana" y, tomado literal, da ~3× la dosis profiláctica → toxicidad en
+//  inmunodeprimido. Corregido en los 4 lugares (rec principal, tabla resumen, fila Idelalisib,
+//  nota nefro) a la forma correcta: DS 1 tableta VO cada 24h (diario) o 3×/semana (L-M-V); la
+//  basal renal pasa de "DS BID" a "DS QD". Dapsona/atovacuona (G6PD) quedan intactas. +1 prueba (215).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v314 (Auditoría QA — bloqueo "Total" funcional + sin auto-aprobación)
 //  Dos P1 del módulo de bloqueos PROA:
 //  (1) La severidad "⛔ Total — solo infectología puede liberar" era DECORATIVA: cualquier
@@ -519,7 +527,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v314';
+const CACHE = 'stewardmx-v315';
 const SHELL = [
   '/',
   '/index.html',

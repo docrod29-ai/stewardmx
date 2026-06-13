@@ -612,6 +612,15 @@ test('BLOQUEO P1: quitar el bloqueo NO auto-aprueba solicitudes en lote (saltaba
   assert.ok(!/motivoDecision:'Auto-aprobado al quitar bloqueo global de '\+atb/.test(_idx), 'sigue la auto-aprobación en lote al desbloquear');
 });
 
+/* ═══════════ P1 (auditoría v315): dosis de profilaxis PCP corregida (era contradictoria/sobredosis) ═══════════ */
+test('PCP P1: la profilaxis PCP ya no indica una dosis contradictoria ("TID × 3 días/semana")', () => {
+  assert.ok(!/TID × 3 días\/semana/.test(_idx), 'sigue la dosis PCP contradictoria "TID × 3 días/semana"');
+  assert.ok(!/DS TID 3×\/semana/.test(_idx), 'sigue "DS TID 3×/semana" (Idelalisib)');
+  assert.ok(!/en lugar de DS BID/.test(_idx), 'sigue citando "DS BID" como basal de profilaxis (debe ser DS QD)');
+  // La forma correcta de profilaxis PCP debe estar presente (diaria o 3×/semana L-M-V).
+  assert.ok(/1 tableta VO cada 24h \(diario\)/.test(_idx), 'no aparece la dosis PCP correcta (diaria)');
+});
+
 test('BLINDAJE: paciente nuevo (prev null) → no protege, permite vacío', () => {
   const data = { atbList: [], muestras: [] };
   const cons = _blindar(data, null);
