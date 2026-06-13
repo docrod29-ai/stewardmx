@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v314 (Auditoría QA — bloqueo "Total" funcional + sin auto-aprobación)
+//  Dos P1 del módulo de bloqueos PROA:
+//  (1) La severidad "⛔ Total — solo infectología puede liberar" era DECORATIVA: cualquier
+//      farmacéutico/auxiliar podía quitar el bloqueo. AHORA se aplica — liberarBloqueoATB exige
+//      _isInfectologo/_isAdmin si severidad==='total', y el botón se oculta a Farmacia en ese caso.
+//  (2) Quitar un bloqueo AUTO-APROBABA en lote (Promise.all → status:'aprobado') todas las
+//      solicitudes pendientes del ATB, saltándose confirmarRevision. AHORA solo se quita el bloqueo;
+//      las solicitudes vuelven al flujo normal de revisión PROA (no se aprueban solas).
+//  +2 pruebas (214). Reporte: docs/AUDITORIA_QA_2026-06-12.md
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v313 (Auditoría QA — gate Reserve que no disparaba)
 //  P1 de seguridad PROA: las solicitudes creadas fuera de la ficha (crearSolicitud,
 //  crearSolicitudPaciente, guardarSolicitudUrgente) NO estampaban aware/pol → en
@@ -509,7 +519,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v313';
+const CACHE = 'stewardmx-v314';
 const SHELL = [
   '/',
   '/index.html',

@@ -602,6 +602,16 @@ test('GATE Reserve: las 3 creadoras de solicitud estampan aware/pol', () => {
   assert.ok(/antibiotico:atb,atb,aware:_clsU\.aware,pol:_clsU\.pol/.test(_idx), 'guardarSolicitudUrgente no corrige clave/estampa aware/pol');
 });
 
+/* ═══════════ P1 (auditoría v314): bloqueo "Total" funcional + sin auto-aprobación en lote ═══════════ */
+test('BLOQUEO P1: severidad "total" solo la libera infectología/admin (ya no es decorativa)', () => {
+  assert.ok(/_bloq&&_bloq\.severidad==='total'&&!window\._isInfectologo&&!window\._isAdmin/.test(_idx), 'la severidad total no se aplica en liberarBloqueoATB');
+  // El botón "Quitar bloqueo total" se oculta a Farmacia cuando el bloqueo es total.
+  assert.ok(/\(b\.severidad==='total'\)\?\(window\._isAdmin\|\|window\._isInfectologo\)/.test(_idx), 'el botón total no gatea por severidad');
+});
+test('BLOQUEO P1: quitar el bloqueo NO auto-aprueba solicitudes en lote (saltaba confirmarRevision)', () => {
+  assert.ok(!/motivoDecision:'Auto-aprobado al quitar bloqueo global de '\+atb/.test(_idx), 'sigue la auto-aprobación en lote al desbloquear');
+});
+
 test('BLINDAJE: paciente nuevo (prev null) → no protege, permite vacío', () => {
   const data = { atbList: [], muestras: [] };
   const cons = _blindar(data, null);

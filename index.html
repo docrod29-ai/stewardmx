@@ -16571,7 +16571,7 @@ window.renderBloqueosATB=function(){
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:6px;padding-top:6px;border-top:1px solid var(--brd2);">
         <div style="font-size:10px;color:var(--t3);">${dispensadosN} dispensado(s) este mes</div>
         <div style="display:flex;gap:6px;">
-          ${(window._isFarmaceutico||window._isAdmin||window._isInfectologo)?`<button class="btn-sm btn-sm-teal" onclick="liberarBloqueoATB('${escJs(b.id)}','${escJs(b.atb||'')}')" style="font-size:11px;padding:3px 12px;">🔓 Quitar bloqueo total</button>`:''}
+          ${((b.severidad==='total')?(window._isAdmin||window._isInfectologo):(window._isFarmaceutico||window._isAdmin||window._isInfectologo))?`<button class="btn-sm btn-sm-teal" onclick="liberarBloqueoATB('${escJs(b.id)}','${escJs(b.atb||'')}')" style="font-size:11px;padding:3px 12px;">🔓 Quitar bloqueo total</button>`:''}
           ${(window._isAdmin)?('<button onclick="borrarBloqueoATB(\''+escJs(b.id)+'\')" style="background:none;border:1px solid rgba(255,77,109,.3);color:var(--red);border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;" title="Eliminar historial">🗑</button>'):''}
         </div>
       </div>
@@ -16684,12 +16684,19 @@ window.guardarBloqueoATB=async()=>{
 };
 
 window.liberarBloqueoATB=(id,atb)=>{
+  // Auditoría v314: la severidad 'total' ("solo infectología puede liberar") ahora SE APLICA (era decorativa).
+  const _bloq=(BLOQUEOS||[]).find(b=>b.id===id);
+  if(_bloq&&_bloq.severidad==='total'&&!window._isInfectologo&&!window._isAdmin){
+    toast('⛔ Bloqueo TOTAL: solo Infectología o un administrador puede liberarlo.','rd');return;
+  }
   const _solPend=(SOLICITUDES||[]).filter(s=>
     (s.antibiotico||'').toLowerCase().trim()===(atb||'').toLowerCase().trim()&&
     ['pendiente','en_revision','retenido_farmacia','pendiente_farmacia','solicitado_justif'].includes(s.status)
   );
+  // Auditoría v314: quitar el bloqueo NO auto-aprueba las solicitudes en lote (eso saltaba
+  // confirmarRevision). Vuelven al flujo normal de revisión PROA; cada una se aprueba por su vía.
   const _bMsg=_solPend.length
-    ?'\n\n⚡ '+_solPend.length+' solicitud(es) pendiente(s) de "'+atb+'" también serán aprobadas automáticamente.'
+    ?'\n\n📋 '+_solPend.length+' solicitud(es) pendiente(s) de "'+atb+'" volverán al flujo normal de revisión PROA (NO se aprueban automáticamente).'
     :'';
   _confirmModal(
     '¿Quitar el bloqueo global de "'+atb+'"?\n\nEl ATB volverá a estar disponible para prescripción sin alerta de bloqueo.'+_bMsg,
@@ -16699,18 +16706,9 @@ window.liberarBloqueoATB=(id,atb)=>{
           activo:false,liberadoAt:serverTimestamp(),
           liberadoPor:U?.uid||'',liberadoNombre:window._userName||U?.email||'—',
         },{merge:true});
-        if(_solPend.length){
-          await Promise.all(_solPend.map(s=>setDoc(doc(db,'hospitals',HOSP,'antibiotic_requests',s.id),{
-            status:'aprobado',
-            revisadoAt:serverTimestamp(),
-            revisadoPor:U?.uid||'system',
-            revisadoNombre:window._userName||U?.email||'Farmacia',
-            motivoDecision:'Auto-aprobado al quitar bloqueo global de '+atb,
-          },{merge:true})));
-          toast('✅ '+atb+' desbloqueado — '+_solPend.length+' solicitud(es) auto-aprobadas ✓');
-        }else{
-          toast('✅ '+atb+' desbloqueado ✓');
-        }
+        toast(_solPend.length
+          ?'✅ '+atb+' desbloqueado — '+_solPend.length+' solicitud(es) regresan al flujo de revisión PROA'
+          :'✅ '+atb+' desbloqueado ✓');
       }catch(e){toast('Error: '+e.message,'rd');}
     },
     {labelYes:'✅ Sí, quitar bloqueo',colorYes:'rgba(0,242,190,.15)',borderYes:'rgba(0,242,190,.4)',textYes:'var(--teal)'}
