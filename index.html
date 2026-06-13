@@ -4042,7 +4042,7 @@ window.guardar=async()=>{
     dx:gv('f-dx'),focoInf:gv('f-foco-inf'),gravedad:gv('f-grav'),foco:gv('f-foco'),sofaScore:(gv('f-sofa')!==''&&!isNaN(parseInt(gv('f-sofa')))?parseInt(gv('f-sofa')):null),qsofaScore:(gv('f-qsofa')!==''&&!isNaN(parseInt(gv('f-qsofa')))?parseInt(gv('f-qsofa')):null),
     renal:gv('f-renal'),creat:gv('f-creat'),inmuno:gv('f-inmuno'),
     atb,atbList:atbListData,aware:gv('f-aware')||'Watch',pol:gv('f-pol')||'libre',
-    inicio:gv('f-inicio'),dia:parseInt(gv('f-dia'))||calcDia(prev||{}),abg:getAbg(),
+    inicio:gv('f-inicio'),dia:parseInt(gv('f-dia'))||calcDia(prev||{}),abg:getAbg(),mic:(()=>{const _ag=getAbg();const _m={};if(window._abgMICs)for(const _k in window._abgMICs){if(_ag[_k]!==undefined)_m[_k]=window._abgMICs[_k];}return _m;})(),
     durplan:gv('f-durplan'),via:(document.getElementById('atb-0-via')?.value||'IV'),indicacion:gv('f-indic'),
     muestras:_muestrasMerged,visitaMuestrasIds:_visitaMicIds,
     cult:_cultVal,cultFecha:_cultFechaVal,muestra:_muestraVal,
@@ -4481,6 +4481,7 @@ window._blindarCamposClinicos=function(data, prev){
     {k:'charlsonItems',  label:'índice de Charlson'},
     {k:'atbPrevios',     label:'ATB previos'},
     {k:'abg',            label:'antibiograma'},
+    {k:'mic',            label:'CMI (MIC)'},
     {k:'abgFoto',        label:'foto de antibiograma'},
   ];
   const conservados=[];

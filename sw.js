@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v318 (Auditoría QA — los CMI de la ficha ya no se descartan)
+//  P1: el editor de antibiograma de la FICHA llenaba window._abgMICs (CMI detectados por IA) pero
+//  guardar() solo persistía abg:getAbg(), nunca el mic → MIC50/90 hospitalarios sub-poblados pese
+//  a "8 MICs detectados". FIX: guardar() construye `mic` desde _abgMICs (keyed por a.k, como el
+//  editor de subcolección con _nabgMICs) y `mic` se añade a _blindarCamposClinicos para que no se
+//  pierda en ediciones posteriores (igual que abg). +2 pruebas (220).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v317 (Auditoría QA — IAAS cuenta eventos[]/PICC)
 //  P1 regulatorio: la vigilancia IAAS (CLABSI/CAUTI) y los días-dispositivo leían SOLO
 //  dispositivos.{cvc,foley}.presente (legacy) → la vía principal de enfermería (botón 🩺) y TODO
@@ -547,7 +554,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v317';
+const CACHE = 'stewardmx-v318';
 const SHELL = [
   '/',
   '/index.html',

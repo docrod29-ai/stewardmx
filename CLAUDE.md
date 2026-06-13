@@ -162,7 +162,7 @@ El mensaje de timeout del AbortController es `160 s`, no `45 s`.
 
 Incrementar `CACHE = 'stewardmx-vXXX'` en `sw.js` con cada deploy que cambia lógica importante.
 Documentar el cambio en el bloque de comentarios al inicio de `sw.js`.
-Versión actual: **v317**
+Versión actual: **v318**
 
 ## Deploy
 

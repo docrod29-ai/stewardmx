@@ -897,6 +897,18 @@ test('XLSX IAAS P1 (v317): días-dispositivo y CLABSI/CAUTI cuentan eventos[]/PI
   assert.ok(!/d\.cvc&&d\.cvc\.presente&&_esBactIAAS/.test(_idx), 'sigue contando CLABSI por la vía legacy .presente');
 });
 
+/* ═══════════ P1 (auditoría v318): los CMI (MIC) de la ficha ya no se descartan al guardar ═══════════ */
+test('MIC P1: guardar() persiste los CMI de la ficha desde window._abgMICs', () => {
+  assert.ok(/abg:getAbg\(\),mic:\(\(\)=>\{const _ag=getAbg\(\)/.test(_idx), 'guardar() no construye mic desde _abgMICs');
+});
+test('MIC P1: el CMI (mic) se blinda como el antibiograma (no se pierde en ediciones posteriores)', () => {
+  const data = { mic: {} };
+  const prev = { mic: { mer: '0.25', cro: '>=64' } };
+  const cons = _blindar(data, prev);
+  assert.equal(Object.keys(data.mic).length, 2, 'el mic no se restauró al editar');
+  assert.match(cons.join(','), /CMI|MIC/i);
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));
