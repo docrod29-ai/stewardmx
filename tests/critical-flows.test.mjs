@@ -946,6 +946,18 @@ test('ALARMA P1: _retirarDispositivo marca la alerta24h como resuelta (ambas ram
   assert.ok(/_resolverAlarmaDispositivo\(pid,'dispositivo_'\+ev\[idx\]\.tipo\+'_'\+eventoId\)/.test(_idx), 'rama eventos no resuelve la alarma');
 });
 
+/* ═══════════ P1 (auditoría v322): FC/DDD solo para Farmacéutico titular (UI alineada a firestore.rules) ═══════════ */
+test('PERMFARM P1: la UI de FC/DDD se restringe al titular (el Auxiliar ya no falla en silencio)', () => {
+  // Flag que espeja isHospFarmaceuticoTitular (admin o rol 'Farmacéutico' exacto; NO Auxiliar).
+  assert.ok(/window\._isFarmTitular\s*=window\._isAdmin\|\|_rol==='Farmacéutico'/.test(_idx), 'falta el flag _isFarmTitular');
+  // El botón "Reco FC" se gatea por titular.
+  assert.ok(/const esFarma=window\._isFarmTitular;/.test(_idx), 'el botón Reco FC no gatea por titular');
+  // Guardar DDD: mensaje explícito para el no-titular en vez de fallo silencioso de permisos.
+  assert.ok(/if\(!window\._isFarmTitular\)\{toast\('Solo el Farmacéutico titular puede guardar el consumo DDD'/.test(_idx), 'guardarDDDFarmacia no bloquea al Auxiliar con mensaje claro');
+  // El subtab DDD se oculta y se redirige al no-titular.
+  assert.ok(/data-tab="ddd-farm"\]'\);if\(_dt\)_dt\.style\.display='none'/.test(_idx), 'el subtab DDD no se oculta al Auxiliar');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));

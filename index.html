@@ -1167,6 +1167,10 @@ async function cargarApp(u,isAdmin){
   window._userRol=_rol;
   // Farmacia
   window._isFarmaceutico    =!window._isAdmin&&(_rol==='Farmacéutico'||_rol==='QFB/QBP'||_rol==='Auxiliar Farmacia');
+  // Farmacéutico TITULAR (no Auxiliar) — único que ESCRIBE datos clínicos (Reco FC, captura DDD).
+  // Espeja isHospFarmaceuticoTitular de firestore.rules → la UI deja de prometer al Auxiliar lo que
+  // las reglas le niegan (antes fallaba en silencio "Missing permissions"). Auditoría v322.
+  window._isFarmTitular     =window._isAdmin||_rol==='Farmacéutico';
   window._isAuxiliarFarm    =!window._isAdmin&&_rol==='Auxiliar Farmacia';
   // Equipo clínico PROA (con capacidad de aprobar ATBs y acceso completo)
   window._isInfectologo     =!window._isAdmin&&(_rol==='Infectólogo'||_rol==='Líder PROA');
@@ -3662,7 +3666,7 @@ window.logout=async()=>{
   // Reset de estado en memoria para prevenir leaks de datos al siguiente login
   PACS=[];CONTS=[];SOLICITUDES=[];BLOQUEOS=[];CAMAS={};HInfo={nombre:'Mi Hospital',camas:100};
   window._atbBloqueados=new Set();
-  window._abgApiKey=null;window._userName=null;window._userTel=null;window._isAdmin=false;window._isFarmaceutico=false;window._isPROA=false;
+  window._abgApiKey=null;window._userName=null;window._userTel=null;window._isAdmin=false;window._isFarmaceutico=false;window._isFarmTitular=false;window._isPROA=false;
   try{await signOut(auth);}catch(e){toast('Error cerrando sesión: '+e.message,'rd');}
 };
 
@@ -15313,6 +15317,9 @@ function _waTransicion(s,nuevoStatus){
 }
 
 window.setFarmTab=(tab)=>{
+  // v322: el subtab "DDD Farmacia" (escribe consumo) solo para el Farmacéutico titular/Admin —
+  // las reglas no permiten al Auxiliar escribir DDD (antes fallaba en silencio). Se oculta y se redirige.
+  if(!window._isFarmTitular){var _dt=document.querySelector('.farm-subtab[data-tab="ddd-farm"]');if(_dt)_dt.style.display='none';if(tab==='ddd-farm')tab='solicitudes';}
   _farmTab=tab;
   document.querySelectorAll('.farm-subtab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
   ['solicitudes','almacen','enfermeria','bloqueos','ddd-farm','aux'].forEach(p=>{
@@ -15665,8 +15672,9 @@ function _solicitudCardPROA(s,seccion){
   const fcBadge=s.tieneFCReco
     ?`<span style="display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:2px 8px;border-radius:10px;background:${fcUrgente?'rgba(245,166,35,.18)':'rgba(100,160,255,.12)'};color:${fcUrgente?'var(--amber)':'#7aaeff'};font-size:9px;font-family:var(--mono);border:1px solid ${fcUrgente?'rgba(245,166,35,.35)':'rgba(100,160,255,.25)'};">💊 FC${fcUrgente?' ⚠':''}${s.ultimaFCReco?' · '+escHtml(s.ultimaFCReco.slice(0,22)):''}</span>`
     :'';
-  // Farmacéutico/Admin: puede agregar reco y ver; PROA/otros: solo ver si existe
-  const esFarma=window._isFarmaceutico||window._isAdmin;
+  // Farmacéutico TITULAR/Admin: puede agregar reco FC; Auxiliar/PROA/otros: solo ver si existe
+  // (v322: el Auxiliar ya no ve el botón de editar — las reglas no le permiten escribir la reco FC).
+  const esFarma=window._isFarmTitular;
   const fcBtn=esFarma
     ?`<button onclick="abrirFCReco('${escHtml(s.id)}')" style="font-size:11px;padding:3px 10px;border:1px solid rgba(100,160,255,.35);background:rgba(100,160,255,.08);color:#7aaeff;border-radius:4px;cursor:pointer;">${s.tieneFCReco?'💊 Editar FC':'💊 Reco FC'}</button>`
     :(s.tieneFCReco?`<button onclick="verFCRecos('${escHtml(s.id)}')" style="font-size:11px;padding:3px 10px;border:1px solid ${fcUrgente?'rgba(245,166,35,.4)':'rgba(100,160,255,.3)'};background:${fcUrgente?'rgba(245,166,35,.07)':'rgba(100,160,255,.07)'};color:${fcUrgente?'var(--amber)':'#7aaeff'};border-radius:4px;cursor:pointer;">💊 Ver FC${fcUrgente?' ⚠ URGENTE':''}</button>`:'');
@@ -29476,6 +29484,9 @@ window.renderDDDFarmacia=async function(){
 };
 
 window.guardarDDDFarmacia=async(fecha)=>{
+  // v322: solo el Farmacéutico titular/Admin escribe DDD (espeja firestore.rules). Mensaje
+  // explícito en vez de la falla silenciosa "Missing or insufficient permissions" para el Auxiliar.
+  if(!window._isFarmTitular){toast('Solo el Farmacéutico titular puede guardar el consumo DDD','rd');return;}
   const msgEl=document.getElementById('farm-ddd-msg');
   if(msgEl){msgEl.textContent='Guardando…';msgEl.style.color='var(--teal)';}
   const consumo={};

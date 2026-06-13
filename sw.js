@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v322 (Auditoría QA — FC/DDD solo para Farmacéutico titular)
+//  P1: la UI mostraba al Auxiliar de Farmacia los botones "Reco FC" y captura "DDD", pero
+//  firestore.rules solo permite escribir al titular (isHospFarmaceuticoTitular = rol 'Farmacéutico')
+//  → al Auxiliar le fallaba en SILENCIO ("Missing permissions") creyendo que documentó. Política
+//  elegida por el Dr.: ocultar al Auxiliar (alinear UI a las reglas, sin cambio de seguridad). FIX:
+//  nuevo flag window._isFarmTitular (admin || rol 'Farmacéutico'); el botón Reco FC y el subtab DDD
+//  se gatean/ocultan con él; guardarDDDFarmacia bloquea con mensaje explícito. +1 prueba (224).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v321 (Auditoría QA — retirar dispositivo resuelve su alarma)
 //  P1 (fatiga de alarma): _retirarDispositivo solo ponía fechaRetiro, nunca marcaba status:'resuelta'
 //  en la alerta24h del dispositivo → el panel se llenaba de alarmas no accionables. FIX: nuevo
@@ -576,7 +584,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v321';
+const CACHE = 'stewardmx-v322';
 const SHELL = [
   '/',
   '/index.html',
