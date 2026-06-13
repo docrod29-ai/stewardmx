@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v331 (Función renal: etiqueta inequívoca CKD-EPI 2021)
+//  El Dr. preguntó si la TFG usa la clasificación más actual (Cockcroft es viejo). Confirmado: calcTFG
+//  YA calcula CKD-EPI 2021 race-free (Inker NEJM 2021 / NKF-ASN / KDIGO 2024) como TFG primaria con
+//  estadios G1-G5; el Cockcroft solo se mostraba al lado para ajuste de dosis ATB. Esta versión hace
+//  la etiqueta INEQUÍVOCA: "TFG X mL/min (Gx) [CKD-EPI 2021] · CrCl Y (Cockcroft — solo dosis ATB)".
+//  Se mantiene CKD-EPI creatinina (el Dr. eligió no añadir cistatina C). +1 prueba que fija la
+//  fórmula CKD-EPI como primaria (243).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v330 (Auditoría QA — seguridad/datos: dispensación auxiliar + camas)
 //  (1) marcarDispensadoAux NO tenía gate de rol (cualquiera podía cerrar una dispensación) y guardaba
 //  el nombre en `dispensadoPor` (que en confirmarDispensacion es un UID) → auditoría inconsistente.
@@ -648,7 +656,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v330';
+const CACHE = 'stewardmx-v331';
 const SHELL = [
   '/',
   '/index.html',

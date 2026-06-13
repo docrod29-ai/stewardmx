@@ -8098,8 +8098,10 @@ window.calcTFG=function(){
   // Cockcroft-Gault adicional (si hay peso) — útil para ajuste de dosis de aminoglucósidos/vanco.
   const peso=parseFloat(gv('f-peso'))||0;
   const cg=window.cockcroftGault(edad,peso,creat,sexo);
-  const cgTxt=(cg!=null)?(' · CG '+Math.round(cg)+' mL/min'):'';
-  const renalEl=document.getElementById('f-renal');if(renalEl)renalEl.value=cat+cgTxt;
+  // v331: etiqueta inequívoca — la TFG primaria es CKD-EPI 2021; el Cockcroft es SOLO para ajustar
+  // dosis de ATB (las fichas técnicas/FDA usan CrCl de Cockcroft), no es la clasificación renal.
+  const cgTxt=(cg!=null)?(' · CrCl '+Math.round(cg)+' mL/min (Cockcroft — solo dosis ATB)'):'';
+  const renalEl=document.getElementById('f-renal');if(renalEl)renalEl.value=cat+' [CKD-EPI 2021]'+cgTxt;
 };
 
 // ── Inferir fenotipo automáticamente ──

@@ -1063,6 +1063,14 @@ test('CAMAS P2: addCama/delCama refrescan desde Firestore + guard de admin (anti
   assert.ok((_idx.match(/await _refreshCamas\(\)/g) || []).length >= 2, 'addCama/delCama no refrescan antes de mutar');
 });
 
+/* ═══════════ v331: la TFG primaria es CKD-EPI 2021 (race-free), Cockcroft solo para dosis ATB ═══════════ */
+test('TFG: la función renal usa CKD-EPI 2021 (race-free) como clasificación primaria, no Cockcroft', () => {
+  // Coeficientes Inker NEJM 2021 (race-free): 142 · κ 0.7/0.9 · α −0.241/−0.302 · ×1.012 mujer · 0.9938^edad.
+  assert.ok(/142\*Math\.pow\(minR,alpha\)\*Math\.pow\(maxR,-1\.200\)\*Math\.pow\(0\.9938,edad\)\*mult/.test(_idx), 'calcTFG no usa la fórmula CKD-EPI 2021');
+  assert.ok(/\[CKD-EPI 2021\]/.test(_idx), 'la TFG no se etiqueta como CKD-EPI 2021');
+  assert.ok(/Cockcroft — solo dosis ATB/.test(_idx), 'el Cockcroft no se marca como solo-dosis-ATB');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));
