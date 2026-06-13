@@ -259,7 +259,7 @@ if (document.readyState === 'loading') {
 // ║  Cada ID tiene datos 100% separados en Firebase.        ║
 // ╚══════════════════════════════════════════════════════════╝
 let U=null,HOSP=null,HInfo={nombre:'Mi Hospital',camas:100};
-let unsubP=null,unsubS=null,unsubB=null,_cultUnsub=null,_icNotifUnsub=null,PACS=[],CONTS=[],CAMAS={},SOLICITUDES=[],BLOQUEOS=[],filtro='todos',editId=null,currentView='censo',currentMonth=new Date().toISOString().slice(0,7),_farmFiltro='todos',_farmTab='solicitudes';
+let unsubP=null,unsubS=null,unsubB=null,_cultUnsub=null,_icNotifUnsub=null,PACS=[],CONTS=[],CAMAS={},SOLICITUDES=[],BLOQUEOS=[],filtro='todos',editId=null,currentView='censo',currentMonth=(()=>{const _n=new Date();return _n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');})(),_farmFiltro='todos',_farmTab='solicitudes';
 // ── Módulo Clínica / Expediente Electrónico ──
 let CLINICA_PACS=[],_clinicaSelPac=null,_clinicaSelVid=null,_clinicaTab='expediente',_clinicaSubTab='visitas',_clinicaAppts=[];
 const CLINICA_ESPECIALIDADES=['Medicina Interna','Infectología','Cardiología','Neumología','Gastroenterología','Hepatología','Nefrología','Endocrinología','Reumatología','Hematología','Oncología Médica','Neurología','Psiquiatría','Dermatología','Oftalmología','Otorrinolaringología','Ortopedia y Traumatología','Cirugía General','Cirugía Cardiovascular','Cirugía Plástica y Reconstructiva','Urología','Ginecología y Obstetricia','Pediatría','Neonatología','Geriatría','Medicina de Urgencias','Medicina Crítica / UCI','Anestesiología','Radiología e Imagen','Medicina Nuclear','Medicina del Deporte','Medicina Física y Rehabilitación','Alergología e Inmunología Clínica','Endoscopía Gastrointestinal','Coloproctología','Nutrición Clínica y Metabólica','Medicina Genómica','Cuidados Paliativos','Clínica del Dolor Crónico','Medicina Preventiva y Salud Pública','Psicología Clínica','Estomatología y Cirugía Oral','Medicina del Trabajo','Toxicología Clínica','Microbiología Clínica','Medicina Familiar','Medicina General','Otra especialidad'];
@@ -4494,6 +4494,17 @@ window._blindarCamposClinicos=function(data, prev){
       conservados.push(label);
     }
   });
+  // dispositivos.eventos[] (modal rápido 🩺 / PICC) NO lo produce el formulario: el form solo
+  // reescribe dispositivos.{cvc,foley}. Como guardar() hace updateDoc con el objeto `dispositivos`
+  // completo (sin dot-path), Firestore REEMPLAZA el mapa y borraría eventos[] y cualquier PICC.
+  // Por eso se conserva SIEMPRE el eventos[] del expediente previo (única vía de registro de PICC).
+  if(prev.dispositivos&&Array.isArray(prev.dispositivos.eventos)&&prev.dispositivos.eventos.length){
+    if(!data.dispositivos||typeof data.dispositivos!=='object')data.dispositivos={};
+    if(!Array.isArray(data.dispositivos.eventos)||!data.dispositivos.eventos.length){
+      data.dispositivos.eventos=prev.dispositivos.eventos;
+      conservados.push('dispositivos/PICC');
+    }
+  }
   return conservados;
 };
 // ── Días de terapia / estancia / DOT → js/core/clinical-days.js (extraído v296, 2º módulo) ──

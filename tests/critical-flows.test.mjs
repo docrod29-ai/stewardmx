@@ -551,6 +551,30 @@ test('BLINDAJE: atbPrevios vacíos + prev con datos → restaura', () => {
   assert.equal(data.atbPrevios.length, 1);
 });
 
+/* ═══════════ P0 (auditoría v312): dispositivos.eventos[] / PICC no se pierden al guardar la ficha ═══════════ */
+test('BLINDAJE P0: dispositivos.eventos[] (modal 🩺/PICC) se conserva al guardar la ficha', () => {
+  // El form reescribe dispositivos.{cvc,foley} SIN eventos → sin blindaje, updateDoc borraría el PICC.
+  const data = { dispositivos: { cvc: { presente: false }, foley: { presente: false } } };
+  const prev = { dispositivos: { cvc: { presente: false }, foley: { presente: false }, eventos: [{ id: 'dev_1', tipo: 'picc', fechaInsercion: '2026-06-01' }] } };
+  const cons = _blindar(data, prev);
+  assert.equal((data.dispositivos.eventos || []).length, 1, 'el PICC/eventos[] se perdió al guardar');
+  assert.equal(data.dispositivos.eventos[0].tipo, 'picc');
+  assert.match(cons.join(','), /dispositivos|PICC/i);
+});
+test('BLINDAJE P0: eventos[] provistos por data (edición legítima) NO se sobrescriben', () => {
+  const data = { dispositivos: { cvc: {}, foley: {}, eventos: [{ id: 'dev_nuevo', tipo: 'cvc' }] } };
+  const prev = { dispositivos: { eventos: [{ id: 'dev_viejo', tipo: 'picc' }] } };
+  _blindar(data, prev);
+  assert.equal(data.dispositivos.eventos[0].id, 'dev_nuevo', 'no debe pisar eventos ya provistos');
+});
+
+/* ═══════════ P0 (auditoría v312): mes activo en hora LOCAL (no UTC) ═══════════ */
+test('MESLOCAL P0: currentMonth se calcula en hora LOCAL, no en UTC', () => {
+  // Bug: new Date().toISOString().slice(0,7) salta de mes la noche de fin de mes (MX UTC-6).
+  assert.ok(!/currentMonth=new Date\(\)\.toISOString\(\)\.slice\(0,7\)/.test(_idx), 'currentMonth sigue calculándose en UTC');
+  assert.ok(/currentMonth=\(\(\)=>\{const _n=new Date\(\);return _n\.getFullYear\(\)/.test(_idx), 'currentMonth no usa la construcción en hora local');
+});
+
 test('BLINDAJE: paciente nuevo (prev null) → no protege, permite vacío', () => {
   const data = { atbList: [], muestras: [] };
   const cons = _blindar(data, null);

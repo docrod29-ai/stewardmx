@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v312 (Auditoría QA — los 2 P0 de integridad de datos)
+//  Auditoría multidisciplinaria (23 agentes) → 67 hallazgos. Esta versión cierra los 2 CRÍTICOS:
+//  P0-1 Dispositivos/PICC borrados al guardar: el form reescribía dispositivos.{cvc,foley} y el
+//       updateDoc reemplazaba el mapa completo, destruyendo dispositivos.eventos[] (única vía del
+//       PICC, registrado por enfermería). FIX: _blindarCamposClinicos ahora CONSERVA eventos[].
+//  P0-2 Mes activo en UTC: currentMonth=new Date().toISOString().slice(0,7) saltaba al mes siguiente
+//       la noche de fin de mes (MX UTC-6) → censo "vacío" + pacientes en el mes equivocado. FIX:
+//       currentMonth se calcula en hora LOCAL. +3 pruebas (209). Reporte: docs/AUDITORIA_QA_2026-06-12.md
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v311 (Censo: dar de alta ya NO exige antimicrobiano)
 //  El Dr. pidió quitar el "candado" del ATB. Hay pacientes que ingresan para ABORDAJE/estudio y
 //  todavía no llevan antimicrobiano. Antes guardar() bloqueaba el alta si no había ATB (salvo
@@ -489,7 +498,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v311';
+const CACHE = 'stewardmx-v312';
 const SHELL = [
   '/',
   '/index.html',
