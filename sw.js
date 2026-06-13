@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v320 (Auditoría QA — DOT por-agente, deja de subcontar combinación)
+//  P1 regulatorio: el indicador "DOT" se calculaba con calcDia (1 por PACIENTE = LOT) en vez de
+//  calcDOT (1 por AGENTE, NHSN) → 2 ATB × 5 días contaban 5, no 10. Subestimaba el consumo ante
+//  CONASABI/comité. FIX: kpis muestra el DOT real (calcDOT); el consumo por-servicio (renderReporte
+//  byService + svMap del reporte) acumula con calcDOT([p]); el reporte CONASABI añade una fila de
+//  DOT real (NHSN-AUR) junto al LOT; y las métricas por-paciente que decían "DOT promedio" se
+//  relabelaron a "Duración promedio (LOT/paciente)" (su número siempre fue LOT, no DOT). El export
+//  NHSN-AUR ya usaba calcDOT. +1 prueba (222). Backlog: etiquetas "DOT prom./paciente" en Excel/Word.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v319 (Auditoría QA — cama/servicio actual en tarjetas, no stale)
 //  P1: las tarjetas de solicitud (PROA, Farmacia, almacén, enfermería) imprimían s.cama/s.servicio
 //  directos del documento, que se congelan al crear la solicitud. Tras un traslado, el personal
@@ -561,7 +570,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v319';
+const CACHE = 'stewardmx-v320';
 const SHELL = [
   '/',
   '/index.html',

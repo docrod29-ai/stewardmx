@@ -924,6 +924,20 @@ test('UBIC P1: _ubicacionSol resuelve la ubicación actual del paciente (no la c
   assert.ok(/_ubicacionSol\(s\)\.cama/.test(_idx) && /_ubicacionSol\(s\)\.servicio/.test(_idx), 'las tarjetas no usan _ubicacionSol');
 });
 
+/* ═══════════ P1 (auditoría v320): el DOT usa calcDOT por-agente (no subcuenta combinación) ═══════════ */
+test('DOT P1: el DOT reportado usa calcDOT por-agente; el per-paciente se etiqueta como duración/LOT', () => {
+  // kpis muestra el DOT real (calcDOT), no la suma de calcDia (que es LOT/paciente).
+  assert.ok(/const dotReal=calcDOT\(p\);/.test(_idx), 'kpis no calcula el DOT real con calcDOT');
+  assert.ok(/d:'DOT: '\+dotReal/.test(_idx), 'kpis sigue mostrando el LOT etiquetado como DOT');
+  // Acumulación por servicio usa DOT real por-agente (no calcDia/paciente).
+  assert.ok(/byService\[svc\]\.dot\+=calcDOT\(\[p2\]\)/.test(_idx), 'byService no acumula con calcDOT');
+  assert.ok(/svMap\[sv\]\.dot\+=calcDOT\(\[p\]\)/.test(_idx), 'svMap (CONASABI) no acumula con calcDOT');
+  // El reporte CONASABI incluye una fila de DOT real (NHSN-AUR), además del LOT.
+  assert.ok(/DOT — días de terapia \(NHSN-AUR\)/.test(_idx), 'falta la fila de DOT real (NHSN) en el reporte');
+  // El total-por-paciente del tablero/reporte se relabeló a duración/LOT (ya no "DOT promedio" sin matiz).
+  assert.ok(/Duración prom\. \(LOT\)/.test(_idx) && /Duración promedio de terapia \(LOT/.test(_idx), 'no se relabeló la duración promedio (LOT) en tablero/reporte');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));

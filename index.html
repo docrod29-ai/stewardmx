@@ -5793,7 +5793,10 @@ function stats(){
 
 function kpis(){
   const p=PACS,n=p.length;
+  // Auditoría v320: `dot` (suma de calcDia) es LOT — días de terapia por PACIENTE; sirve para la
+  // duración promedio. El DOT real (NHSN, cada agente cuenta) usa calcDOT → combinación no se subcuenta.
   const dot=p.reduce((s,x)=>s+calcDia(x),0);
+  const dotReal=calcDOT(p);
   const rest=p.filter(x=>x.pol==='restringido').length;
   const cultP=p.filter(x=>x.cult==='sí'||x.cult==='positivo').length;
   const mdrC=p.filter(isMDR).length;
@@ -5808,7 +5811,7 @@ function kpis(){
   const data=[
     {v:'100%',l:'Cobertura PROA',d:n+' revisados',b:100,c:''},
     {v:cultPct+'%',l:'Cultivo previo',d:cultP+'/'+n,b:cultPct,c:cultPct<60?'am':''},
-    {v:durP+'d',l:'Duración prom.',d:'DOT: '+dot,b:0,c:parseFloat(durP)>10?'am':''},
+    {v:durP+'d',l:'Duración prom.',d:'DOT: '+dotReal,b:0,c:parseFloat(durP)>10?'am':''},
     {v:desesc,l:'Intervenciones',d:'Desesc/Susp/VO',b:n>0?Math.round(desesc/n*100):0,c:''},
     {v:restPct+'%',l:'Restringidos',d:rest+' pacs',b:restPct,c:restPct>35?'rd':'am'},
     {v:adecPct+'%',l:'Adecuación',d:adec+'/'+cultP,b:adecPct,c:adecPct<70?'am':''},
@@ -11583,7 +11586,7 @@ window.renderReporte=()=>{
   PACS.forEach(p2=>{
     const svc=p2.servicio||'Sin servicio';
     if(!byService[svc])byService[svc]={n:0,dot:0,rest:0};
-    byService[svc].n++;byService[svc].dot+=calcDia(p2);
+    byService[svc].n++;byService[svc].dot+=calcDOT([p2]);// auditoría v320: DOT real por-agente (no calcDia/paciente)
     if(p2.pol==='restringido')byService[svc].rest++;
   });
   html+='<div class="rep-card rep-full"><div class="rep-ch"><span class="rep-ct">📋 Informe CODECIN — NOM-045-SSA2 (Subcomité Antimicrobianos)</span></div><div class="rep-cb">';
@@ -12170,7 +12173,8 @@ window.exportarXLSXPRO=async()=>{
   const mes=currentMonth,hoy=new Date().toLocaleDateString('es-MX');
   const hosNombre=HInfo.nombre||HOSP,lider=proaLider();
   const n=PACS.length,dc=HInfo.camas||100;
-  const dot=PACS.reduce((s,p)=>s+calcDia(p),0);
+  const dot=PACS.reduce((s,p)=>s+calcDia(p),0);// LOT — días de terapia por PACIENTE
+  const dotReal=calcDOT(PACS);// DOT real NHSN — cada agente cuenta (auditoría v320)
   const cultP=PACS.filter(p=>p.cult==='sí'||p.cult==='positivo').length;
   const mdrC=PACS.filter(isMDR).length;
   const resv=PACS.filter(p=>p.aware==='Reserve').length;
@@ -12331,7 +12335,7 @@ window.exportarXLSXPRO=async()=>{
       ['Pacientes con VIGILADO','Conteo categoría VIGILADO activos','—','','','','','',vigilado,''],
       ['Pacientes con CONTROL','Conteo categoría CONTROL activos','—','','','','','',control,''],
       ['CONTROL sin autorización','CONTROL sin nota de Infectología en expediente','0','','','','','',sinAuth,sinAuth===0?'OK':'🔴 ALERTA'],
-      ['Días promedio de terapia (DOT promedio)','Suma días de terapia / pacientes con ATB','≤7 días (no crítico)','','','','','',dotProm+'d',parseFloat(dotProm)<=7?'OK':'ALERTA'],
+      ['Duración promedio de terapia (LOT/paciente)','Suma días de terapia / pacientes con ATB','≤7 días (no crítico)','','','','','',dotProm+'d',parseFloat(dotProm)<=7?'OK':'ALERTA'],
       ['ATB vigilados con >7 días sin revisión','Pacientes VIGILADO con día Tx >7 sin revisión PROA','0','','','','','',PACS.filter(p=>p.pol==='vigilado'&&calcDia(p)>7).length,''],
       ['Nuevos MDR identificados','MRSA, BLEE invasiva, CRE, Pseudomonas MDR, Acinetobacter MDR','0','','','','','',mdrC,mdrC===0?'OK':'🔴 ALERTA'],
       ['Desescalamientos realizados','Cambios de CONTROL → VIGILADO o LIBRE documentados','—','','','','','',desesc,''],
@@ -12518,7 +12522,7 @@ window.exportarXLSXPRO=async()=>{
   // ══════════════════════════════════════════════════════════════════════
   {
     const NC=7;
-    const svMap={};PACS.forEach(p=>{const sv=p.servicio||'Sin servicio';if(!svMap[sv])svMap[sv]={n:0,dot:0,mdr:0,resv:0};svMap[sv].n++;svMap[sv].dot+=calcDia(p);if(isMDR(p))svMap[sv].mdr++;if(p.aware==='Reserve')svMap[sv].resv++;});
+    const svMap={};PACS.forEach(p=>{const sv=p.servicio||'Sin servicio';if(!svMap[sv])svMap[sv]={n:0,dot:0,mdr:0,resv:0};svMap[sv].n++;svMap[sv].dot+=calcDOT([p]);if(isMDR(p))svMap[sv].mdr++;if(p.aware==='Reserve')svMap[sv].resv++;});// v320: DOT real por-agente
     const svRows=Object.entries(svMap).sort((a,b)=>b[1].n-a[1].n).map(([sv,d])=>[sv,d.n,d.dot,dc>0?+(d.dot/dc*100).toFixed(1):0,d.mdr,d.resv,d.n>0?Math.round(d.resv/d.n*100)+'%':'—']);
     const aoa=[
       ['DOT POR SERVICIO — '+hosNombre,...EF(NC-1)],
@@ -12556,7 +12560,8 @@ window.exportarXLSXPRO=async()=>{
       ['','Revisión a 48-72 horas','Pctes con ATB ≥48h revisados por PROA / total con ATB ≥48h × 100','≥80%',n,n,'100%','✅ CUMPLE','IDSA 2016'],
       ['','Diagnóstico documentado','Prescripciones con Dx infeccioso en expediente / totales × 100','≥90%',n,n,'100%','✅ CUMPLE','NOM-045'],
       ['','Duración planificada registrada','Prescripciones con duración planificada / totales × 100','≥80%',durPlan,n,n>0?Math.round(durPlan/n*100)+'%':'—','—','IDSA 2016'],
-      ['CONSUMO','DOT promedio','DOT total / total pctes con ATB','≤7 días',dot,n,dotProm+'d',parseFloat(dotProm)<=7?'✅ CUMPLE':'⚠ ALERTA','IDSA'],
+      ['CONSUMO','Duración promedio de terapia (LOT)','Σ días de terapia por paciente / pctes con ATB','≤7 días',dot,n,dotProm+'d',parseFloat(dotProm)<=7?'✅ CUMPLE':'⚠ ALERTA','IDSA'],
+      ['','DOT — días de terapia (NHSN-AUR)','Σ días por agente — la combinación cuenta cada ATB','—',dotReal,n,(n>0?+(dotReal/n).toFixed(1):0)+'d','—','NHSN-AUR'],
       ['','DOT/100 camas-día','DOT total / (camas censables × días del mes) × 100','Monitoreo',dot,dc,dotCien,'—','IDSA / CONASABI'],
       ['','% Access AWaRe','ATB Access / total ATB × 100','≥60%',nAcc,n,n>0?Math.round(nAcc/n*100)+'%':'—',n>0&&Math.round(nAcc/n*100)>=60?'✅ CUMPLE':'⚠ ALERTA','OMS'],
       ['','% Watch AWaRe','ATB Watch / total ATB × 100','Monitoreo',nWat,n,n>0?Math.round(nWat/n*100)+'%':'—','—','OMS'],
@@ -13157,7 +13162,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#060d14;color:#dce8f8;fo
   <div class="kpi-grid">
     <div class="kpi teal"><div class="kpi-val">${n}</div><div class="kpi-lbl">Pacientes con ATB</div></div>
     <div class="kpi blue"><div class="kpi-val">${dot}</div><div class="kpi-lbl">DOT Total</div></div>
-    <div class="kpi ${parseFloat(dotProm)<=7?'teal':'amber'}"><div class="kpi-val">${dotProm}d</div><div class="kpi-lbl">DOT Promedio</div></div>
+    <div class="kpi ${parseFloat(dotProm)<=7?'teal':'amber'}"><div class="kpi-val">${dotProm}d</div><div class="kpi-lbl">Duración prom. (LOT)</div></div>
     <div class="kpi ${cultPct>=70?'teal':'amber'}"><div class="kpi-val">${cultPct}%</div><div class="kpi-lbl">Cultivo previo</div></div>
     <div class="kpi ${resvPct<10?'teal':'red'}"><div class="kpi-val">${resvPct}%</div><div class="kpi-lbl">AWaRe Reserve</div></div>
     <div class="kpi ${mdrC===0?'teal':'red'}"><div class="kpi-val">${mdrC}</div><div class="kpi-lbl">MDR</div></div>
@@ -13180,7 +13185,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#060d14;color:#dce8f8;fo
     <tr><td>Cultivo previo</td><td>${cultPct}%</td><td>≥70%</td><td><span class="badge ${cultPct>=70?'badge-ok':'badge-warn'}">${cultPct>=70?'CUMPLE':'ALERTA'}</span></td><td>NOM-045</td></tr>
     <tr><td>Desescalamiento</td><td>${n>0?Math.round(desesc/n*100):0}%</td><td>≥50%</td><td><span class="badge ${n>0&&desesc/n>=0.5?'badge-ok':'badge-warn'}">${n>0&&desesc/n>=0.5?'CUMPLE':'ALERTA'}</span></td><td>OPS</td></tr>
     <tr><td>AWaRe Reserve</td><td>${resvPct}%</td><td>&lt;10%</td><td><span class="badge ${resvPct<10?'badge-ok':'badge-alert'}">${resvPct<10?'CUMPLE':'ALERTA'}</span></td><td>OMS / CONASABI</td></tr>
-    <tr><td>DOT promedio</td><td>${dotProm} días</td><td>≤7 días</td><td><span class="badge ${parseFloat(dotProm)<=7?'badge-ok':'badge-warn'}">${parseFloat(dotProm)<=7?'CUMPLE':'ALERTA'}</span></td><td>IDSA</td></tr>
+    <tr><td>Duración promedio de terapia (LOT/paciente)</td><td>${dotProm} días</td><td>≤7 días</td><td><span class="badge ${parseFloat(dotProm)<=7?'badge-ok':'badge-warn'}">${parseFloat(dotProm)<=7?'CUMPLE':'ALERTA'}</span></td><td>IDSA</td></tr>
     <tr><td>MDR detectados</td><td>${mdrC}</td><td>0</td><td><span class="badge ${mdrC===0?'badge-ok':'badge-alert'}">${mdrC===0?'OK':'ALERTA'}</span></td><td>ENARAM</td></tr>
   </table>
 </div>
@@ -14118,7 +14123,7 @@ window.exportarReportePDF=async()=>{
     {l:'CENSO',v:n,sub:'pacientes con ATB',col:COL.teal},
     {l:'DOT TOTAL',v:dot,sub:'días de terapia acumulados',col:COL.blue},
     {l:'DOT/100 DÍAS-CAMA',v:dotCien,sub:'meta CONASABI <60',col:parseFloat(dotCien)>60?COL.amber:COL.teal},
-    {l:'PROMEDIO DOT',v:dotProm,sub:'días por paciente',col:COL.tealDark},
+    {l:'DURACIÓN PROM. (LOT)',v:dotProm,sub:'días por paciente',col:COL.tealDark},
   ];
   let cy=y;cards.forEach((c,i)=>{
     const cx=10+(i%2)*95;const cyOff=cy+Math.floor(i/2)*38;
