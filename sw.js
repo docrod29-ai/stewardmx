@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v311 (Censo: dar de alta ya NO exige antimicrobiano)
+//  El Dr. pidió quitar el "candado" del ATB. Hay pacientes que ingresan para ABORDAJE/estudio y
+//  todavía no llevan antimicrobiano. Antes guardar() bloqueaba el alta si no había ATB (salvo
+//  interconsulta/trasplante). AHORA lo único obligatorio es el NOMBRE; el ATB se agrega después.
+//  Aplica a TODO el censo (general y trasplante) → se eliminó el candado _esTx y el toast que
+//  bloqueaba. Un paciente sin ATB simplemente no cuenta días de DOT. Prueba ALTA actualizada (206).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v310 (Trasplante: el tab Profilaxis se LIGA a la evaluación Pre-TX)
 //  Continuación del protocolo ligado. La evaluación Pre-TX ya persiste (v309); AHORA el tab
 //  Profilaxis se PRE-CARGA desde ese p.txPretx: al renderizar mapea las serologías capturadas en
@@ -482,7 +489,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v310';
+const CACHE = 'stewardmx-v311';
 const SHELL = [
   '/',
   '/index.html',

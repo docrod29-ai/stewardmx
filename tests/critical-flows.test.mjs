@@ -1056,10 +1056,13 @@ test('TXVAC: _renderTxVacunas ejecuta y produce el contenido clave citado', () =
   }
 });
 
-/* ═══════════ Trasplante v307: alta sin ATB + crear paciente desde el módulo ═══════════ */
-test('TXALTA: el paciente de trasplante queda EXENTO del requisito de ATB en guardar()', () => {
-  assert.ok(_idx.includes("const _esTx=(gv('f-inmuno')||'')==='trasplante'||_tipoVisita==='trasplante';"), 'falta la marca _esTx');
-  assert.ok(_idx.includes('!_esInterconsulta&&!_esTx&&!atb&&atbListData.length===0'), 'la condición de bloqueo no exime trasplante');
+/* ═══════════ Censo v311: dar de alta NO exige ATB (abordaje) — censo general + trasplante ═══════════ */
+test('ALTA: dar de alta NO exige antimicrobiano (el candado de ATB se eliminó)', () => {
+  // v311: pacientes en abordaje/estudio ingresan sin ATB en TODO el censo (general y trasplante).
+  assert.ok(!_idx.includes('!_esInterconsulta&&!_esTx&&!atb&&atbListData.length===0'), 'el candado de ATB sigue presente en guardar()');
+  assert.ok(!_idx.includes('Agrega al menos un antimicrobiano'), 'sigue el toast que bloquea por falta de ATB');
+  // El nombre sí sigue siendo lo único obligatorio.
+  assert.ok(_idx.includes("toast('⚠ El nombre del paciente es obligatorio','rd')"), 'el nombre debe seguir siendo obligatorio');
 });
 test('TXALTA: hay función + botón para crear paciente desde el módulo (preselecciona trasplante)', () => {
   assert.ok(_idx.includes('window._txNuevoPaciente=function()'), 'falta _txNuevoPaciente');

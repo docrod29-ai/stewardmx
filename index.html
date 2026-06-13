@@ -3912,23 +3912,14 @@ window.guardar=async()=>{
   const atbListData=getAtbList();
   const _tipoVisita=(gv('f-tipo-visita')||'seguimiento');
   const _esInterconsulta=_tipoVisita==='interconsulta';
-  // v307: el paciente de TRASPLANTE/inmunodeprimido en evaluación pre-TX todavía NO lleva
-  // antimicrobiano → exento del requisito de ATB (igual que la interconsulta). Así se puede dar
-  // de alta en el censo para trabajar su protocolo en el módulo de Trasplante.
-  const _esTx=(gv('f-inmuno')||'')==='trasplante'||_tipoVisita==='trasplante';
-  if(!nom||(!_esInterconsulta&&!_esTx&&!atb&&atbListData.length===0)){
-    if(!nom){
-      toast('⚠ El nombre del paciente es obligatorio','rd');
-      const fNom=document.getElementById('f-nom');
-      if(fNom){fNom.focus();fNom.style.outline='2px solid var(--red)';}
-    }else{
-      // Cambiar a la pestaña Antimicrobianos para que el médico vea qué falta
-      const _atbTabBtn=document.querySelector('.ftab[onclick*="ft-atb"]');
-      if(_atbTabBtn&&typeof swFTab==='function')swFTab(_atbTabBtn,'ft-atb');
-      toast('⚠ Agrega al menos un antimicrobiano (o marca Inmunosupresión = Trasplante si aún no lleva ATB)','rd');
-      // Flash visual en la sección de ATBs
-      setTimeout(()=>{const _atbSec=document.getElementById('ft-atb');if(_atbSec){_atbSec.style.outline='2px solid var(--red)';setTimeout(()=>{_atbSec.style.outline='';},2000);}},100);
-    }
+  // v311: el ATB ya NO es obligatorio para dar de alta en el censo. Hay pacientes que ingresan
+  // para ABORDAJE/estudio y todavía no llevan antimicrobiano; el ATB se agrega después. Esto
+  // aplica a TODO el censo (general y trasplante). Lo único obligatorio es el nombre. Un paciente
+  // sin ATB simplemente no cuenta días de DOT hasta que se le prescriba uno.
+  if(!nom){
+    toast('⚠ El nombre del paciente es obligatorio','rd');
+    const fNom=document.getElementById('f-nom');
+    if(fNom){fNom.focus();fNom.style.outline='2px solid var(--red)';}
     window._guardarBusy=false;
     if(btnGuardar){btnGuardar.disabled=false;btnGuardar.style.opacity='';}
     return;
