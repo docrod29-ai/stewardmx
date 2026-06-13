@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v319 (Auditoría QA — cama/servicio actual en tarjetas, no stale)
+//  P1: las tarjetas de solicitud (PROA, Farmacia, almacén, enfermería) imprimían s.cama/s.servicio
+//  directos del documento, que se congelan al crear la solicitud. Tras un traslado, el personal
+//  leía la ubicación VIEJA y entregaba el ATB al lugar equivocado. FIX: helper _ubicacionSol(s)
+//  resuelve cama/servicio ACTUAL desde PACS por patientId (patrón CLAUDE.md #2, ya usado en los
+//  helpers WA); aplicado a las 4 tarjetas principales. +1 prueba que lo ejecuta (221).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v318 (Auditoría QA — los CMI de la ficha ya no se descartan)
 //  P1: el editor de antibiograma de la FICHA llenaba window._abgMICs (CMI detectados por IA) pero
 //  guardar() solo persistía abg:getAbg(), nunca el mic → MIC50/90 hospitalarios sub-poblados pese
@@ -554,7 +561,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v318';
+const CACHE = 'stewardmx-v319';
 const SHELL = [
   '/',
   '/index.html',

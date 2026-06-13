@@ -909,6 +909,21 @@ test('MIC P1: el CMI (mic) se blinda como el antibiograma (no se pierde en edici
   assert.match(cons.join(','), /CMI|MIC/i);
 });
 
+/* ═══════════ P1 (auditoría v319): tarjetas resuelven cama/servicio ACTUAL desde PACS (no stale) ═══════════ */
+const _mUbic = _idx.match(/function _ubicacionSol\(s\)\{.*\}/);
+test('UBIC P1: _ubicacionSol resuelve la ubicación actual del paciente (no la congelada en la solicitud)', () => {
+  assert.ok(_mUbic, 'falta _ubicacionSol');
+  const fn = new Function('PACS', _mUbic[0] + '\n return _ubicacionSol;')([{ id: 'p1', cama: 'UCI-4', servicio: 'UCI' }]);
+  // Solicitud con cama vieja (paciente trasladado) → devuelve la ACTUAL de PACS.
+  const u = fn({ patientId: 'p1', cama: 'MI-210', servicio: 'Medicina Interna' });
+  assert.equal(u.cama, 'UCI-4'); assert.equal(u.servicio, 'UCI');
+  // Sin paciente en PACS → cae al valor del documento (back-compat).
+  const u2 = fn({ patientId: 'zzz', cama: 'X-1', servicio: 'Urgencias' });
+  assert.equal(u2.cama, 'X-1'); assert.equal(u2.servicio, 'Urgencias');
+  // Las tarjetas principales (PROA/Farmacia/almacén/enfermería) usan el helper.
+  assert.ok(/_ubicacionSol\(s\)\.cama/.test(_idx) && /_ubicacionSol\(s\)\.servicio/.test(_idx), 'las tarjetas no usan _ubicacionSol');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));

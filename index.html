@@ -15492,7 +15492,7 @@ window.renderSolicitudesFarmacia=function(){
         <span style="font-size:22px;">${si}</span>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:14px;">${escHtml(s.antibiotico||'—')}${urgBadge}${durLine}${slaH}${bloqueoLine}${autoTag}${altaAcuidadTag}${esAwareBadge}${cultureLockBadge}${uciTimerBadge}</div>
-          <div style="font-size:11px;color:var(--t3);">${escHtml(s.dosis||'Sin dosis')} · <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(s.cama||'—')}${s.servicio&&s.servicio!=='—'?' · '+escHtml(s.servicio):''}</div>
+          <div style="font-size:11px;color:var(--t3);">${escHtml(s.dosis||'Sin dosis')} · <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(_ubicacionSol(s).cama)} · ${escHtml(_ubicacionSol(s).servicio)}</div>
           ${s.origenServicio?`<div style="font-size:10px;color:var(--t3);margin-top:2px;">📍 Origen: ${escHtml(s.origenServicio)}${s.origenRol?' · '+escHtml(s.origenRol):''}</div>`:''}
         </div>
         <div style="font-family:var(--mono);font-size:10px;padding:3px 12px;border-radius:12px;color:${sc};border:1px solid ${sc};white-space:nowrap;">${escHtml(s.status.toUpperCase().replace(/_/g,' '))}</div>
@@ -15549,7 +15549,7 @@ window.renderSolicitudesAlmacen=function(){
         <span style="font-size:22px;">${si}</span>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:14px;">${escHtml(s.antibiotico||'—')}${_urgBadge(s)}${slaH}</div>
-          <div style="font-size:11px;color:var(--t3);">${escHtml(s.dosis||'Sin dosis')} · <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(s.cama||'—')} · Servicio: ${escHtml(s.servicio||'—')}</div>
+          <div style="font-size:11px;color:var(--t3);">${escHtml(s.dosis||'Sin dosis')} · <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(_ubicacionSol(s).cama)} · Servicio: ${escHtml(_ubicacionSol(s).servicio)}</div>
         </div>
       </div>
       <div style="font-size:12px;color:var(--t2);background:var(--s2);border-radius:5px;padding:8px 12px;width:100%;"><b>Indicación:</b> ${escHtml(s.indicacion||'—')}</div>
@@ -15579,7 +15579,7 @@ window.renderSolicitudesEnfermeria=function(){
         <span style="font-size:22px;">${si}</span>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:14px;">${escHtml(s.antibiotico||'—')}${slaH}</div>
-          <div style="font-size:11px;color:var(--t3);">${escHtml(s.dosis||'Sin dosis')} · <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(s.cama||'—')} · Servicio: ${escHtml(s.servicio||'—')}</div>
+          <div style="font-size:11px;color:var(--t3);">${escHtml(s.dosis||'Sin dosis')} · <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(_ubicacionSol(s).cama)} · Servicio: ${escHtml(_ubicacionSol(s).servicio)}</div>
         </div>
       </div>
       <div style="font-size:12px;color:var(--t2);background:var(--s2);border-radius:5px;padding:8px 12px;width:100%;"><b>Indicación:</b> ${escHtml(s.indicacion||'—')}</div>
@@ -15670,7 +15670,7 @@ function _solicitudCardPROA(s,seccion){
       <span style="font-size:22px;">${si}</span>
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:14px;">${escHtml(s.antibiotico||'')}${urgBadge}${durLine}${slaH}${fcBadge}</div>
-        <div style="font-size:11px;color:var(--t3);">${escHtml(s.dosis||'Sin dosis')} · <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(s.cama||'—')}${s.servicio?' · '+escHtml(s.servicio):''}</div>
+        <div style="font-size:11px;color:var(--t3);">${escHtml(s.dosis||'Sin dosis')} · <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(_ubicacionSol(s).cama)} · ${escHtml(_ubicacionSol(s).servicio)}</div>
       </div>
       <div style="font-family:var(--mono);font-size:10px;padding:3px 12px;border-radius:12px;color:${sc};border:1px solid ${sc};white-space:nowrap;">${escHtml((s.status||'').toUpperCase())}</div>
     </div>
@@ -15921,6 +15921,11 @@ function _clasificarAware(nombre){
 }
 window._clasificarAware=_clasificarAware;
 
+// Ubicación ACTUAL del paciente de una solicitud — resuelta desde PACS por patientId (auditoría v319).
+// La cama/servicio del doc de solicitud se congelan al crearla; tras un traslado quedan stale y
+// Farmacia/almacén/enfermería entregarían al lugar viejo. Patrón documentado (CLAUDE.md #2).
+function _ubicacionSol(s){const p=PACS.find(x=>x.id===(s&&(s.patientId||s.pacienteId)));return {cama:(p&&p.cama)||(s&&s.cama)||'—',servicio:(p&&p.servicio)||(s&&s.servicio)||'—'};}
+
 window.crearSolicitud=async()=>{
   if(window._solBusy)return;
   window._solBusy=true;
@@ -16051,7 +16056,7 @@ window.abrirRevision=(id,accion)=>{
   const html=`
     <div style="background:var(--s2);border:1px solid var(--brd);border-radius:6px;padding:14px;margin-bottom:16px;">
       <div style="font-weight:700;font-size:15px;margin-bottom:4px;">${escHtml(s.antibiotico||'')}${urgBadge?' <span style="font-size:12px;">'+urgBadge+'</span>':''}</div>
-      <div style="font-size:12px;color:var(--t3);">Paciente: <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(s.cama||'—')}${s.servicio?' · '+escHtml(s.servicio):''}</div>
+      <div style="font-size:12px;color:var(--t3);">Paciente: <b>${escHtml(s.pacienteNombre||'—')}</b> · Cama: ${escHtml(_ubicacionSol(s).cama)} · ${escHtml(_ubicacionSol(s).servicio)}</div>
       ${s.dosis?`<div style="font-size:12px;color:var(--t3);">Dosis propuesta: ${escHtml(s.dosis)}</div>`:''}
       <div style="font-size:12px;color:var(--t2);margin-top:8px;padding-top:8px;border-top:1px solid var(--brd);"><b>Indicación:</b> ${escHtml(s.indicacion||'—')}</div>
       <div style="font-size:11px;color:var(--t3);margin-top:6px;">Solicitado por: ${escHtml(s.solicitadoNombre||s.solicitadoEmail||'—')} · ${_fechaCorta(s.solicitadoAt)}</div>
