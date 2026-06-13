@@ -62,7 +62,9 @@ export function calcDia(p){
     }
   }
   if(p.atbList&&p.atbList.length){
-    const fechasInicio=p.atbList.map(a=>a.fechaInicioIV).filter(Boolean);
+    // Auditoría v324: filtrar por nombre también para la fecha de inicio — una fila a medio llenar
+    // ({nombre:'', fechaInicioIV:'hace 20 días'}) inflaba los días (MIN sobre TODAS las filas, incl. sin nombre).
+    const fechasInicio=p.atbList.filter(a=>a.nombre&&a.nombre.trim()).map(a=>a.fechaInicioIV).filter(Boolean);
     if(fechasInicio.length)fechaRef=fechasInicio.reduce((min,f)=>f<min?f:min);
     // Si TODOS los ATB con nombre están suspendidos, detener en la fechaFinIV más reciente.
     const conNombre=p.atbList.filter(a=>a.nombre&&a.nombre.trim());

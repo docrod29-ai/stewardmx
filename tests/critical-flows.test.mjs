@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 // Módulo extraído del monolito (v295): se prueba la función REAL, no un espejo regex de index.html.
 import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault,
          ci95_wilson, ci95_poisson_rate, fmtPropIC, fmtRateIC } from '../js/core/stats.js';
-import { calcDiaATB, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPer1000 } from '../js/core/clinical-days.js';
+import { calcDiaATB, calcDia, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPer1000 } from '../js/core/clinical-days.js';
 import { clasificarMagiorakos, _intrinsicResistanceKeys } from '../js/core/magiorakos.js';
 import { cie10DeDx, categorizarDx } from '../js/core/dx-cie10.js';
 
@@ -976,6 +976,25 @@ test('M39 P1: clsim39Deduplicate cuenta 1 aislamiento por paciente+organismo+mue
 test('M39 P1: renderCumAbg incluye patientId y deduplica antes de calcular %S/R y MIC', () => {
   assert.ok(/allAbgs\.push\(\{patientId:pac\.id/.test(_idx), 'renderCumAbg no incluye patientId en el aislamiento');
   assert.ok(/const allAbgsDedup=window\.clsim39Deduplicate/.test(_idx), 'renderCumAbg no aplica la deduplicación M39');
+});
+
+/* ═══════════ P2 (auditoría v324): batch de correctitud — calcDia, analítica, auto-solicitud Reserve ═══════════ */
+test('CORR P2: calcDia ignora filas de ATB SIN nombre al fijar la fecha de inicio (no infla días)', () => {
+  const fmt = d => d.toISOString().slice(0, 10);
+  const hoy = new Date();
+  const hace20 = new Date(hoy); hace20.setDate(hoy.getDate() - 20);
+  const hace2 = new Date(hoy); hace2.setDate(hoy.getDate() - 2);
+  const p = { accion: 'mantener', atbList: [{ nombre: '', fechaInicioIV: fmt(hace20) }, { nombre: 'Meropenem', fechaInicioIV: fmt(hace2) }] };
+  const dia = calcDia(p);
+  assert.ok(dia >= 2 && dia <= 4, 'calcDia contó la fila sin nombre (esperaba ~3, obtuvo ' + dia + ')');
+});
+test('CORR P2: analítica 2x2 usa el enum real de acción (mantener / vo), no continuar / switch-vo', () => {
+  assert.ok(/if\(varKey==='continuar'\)return p\.accion==='mantener'/.test(_idx), "_anVarBool 'continuar' no compara contra 'mantener'");
+  assert.ok(/if\(varKey==='switch_vo'\)return p\.accion==='vo'/.test(_idx), "_anVarBool 'switch_vo' no compara contra 'vo'");
+});
+test('CORR P2: la auto-solicitud Reserve usa el nombre del ATB real, no el string concatenado', () => {
+  assert.ok(/const _atbReserve=\(atbListData\|\|\[\]\)\.find\(a=>a&&a\.nombre&&\(a\.aware==='Reserve'/.test(_idx), 'la auto-solicitud no selecciona el ATB Reserve real');
+  assert.ok(/_atbNombreAuto=\(_atbReserve\?\.nombre\|\|/.test(_idx), '_atbNombreAuto no prioriza el ATB Reserve real');
 });
 
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */

@@ -4351,8 +4351,12 @@ window.guardar=async()=>{
     // ── Auto-solicitud Farmacia: ATB restringido / Reserve ──
     // Cuando pol='restringido' o ATB AWaRe Reserve: crear solicitud automáticamente
     // si no existe ya una pendiente para este paciente+ATB.
-    const _atbNombreAuto=(data.atb||atbListData[0]?.nombre||atbListData[0]?.n||'').trim();
-    const _esReserve=data.aware==='Reserve'||(atbListData||[]).some(a=>a.aware==='Reserve'||a.aw==='Reserve');
+    // Auditoría v324: usar el NOMBRE del ATB Reserve/restringido REAL — no data.atb, que es el string
+    // concatenado de TODOS los ATB ("Ceftriaxona 1g + Meropenem 1g") → así el matching de bloqueo y la
+    // deduplicación funcionan y PROA/Farmacia ven el fármaco específico a autorizar.
+    const _atbReserve=(atbListData||[]).find(a=>a&&a.nombre&&(a.aware==='Reserve'||a.aw==='Reserve'||a.pol==='restringido'));
+    const _atbNombreAuto=(_atbReserve?.nombre||atbListData[0]?.nombre||atbListData[0]?.n||data.atb||'').trim();
+    const _esReserve=data.aware==='Reserve'||!!_atbReserve;
     const _esRestringido=data.pol==='restringido'||_esReserve;
     if(_esRestringido && _atbNombreAuto){
       // Verificar si ya existe solicitud ACTIVA (cualquier estado no terminal) para este paciente+ATB
@@ -4366,16 +4370,16 @@ window.guardar=async()=>{
         try{
           await addDoc(collection(db,'hospitals',HOSP,'antibiotic_requests'),{
             antibiotico:_atbNombreAuto,
-            dosis:atbListData[0]?.dosis||data.dosis||'',
-            via:atbListData[0]?.via||data.via||'IV',
+            dosis:_atbReserve?.dosis||atbListData[0]?.dosis||data.dosis||'',
+            via:_atbReserve?.via||atbListData[0]?.via||data.via||'IV',
             indicacion:data.dx||data.indicacion||'',
             pacienteNombre:nom,
             patientId:_savedPid||'',
             cama:data.cama||'',
             servicio:data.servicio||'',
             medico:data.medico||'',
-            aware:data.aware||'',
-            pol:data.pol||'',
+            aware:_atbReserve?.aware||_atbReserve?.aw||data.aware||'',
+            pol:_atbReserve?.pol||data.pol||'',
             status:'pendiente',
             urgente:_esReserve,
             autoCreated:true,
@@ -20732,8 +20736,8 @@ function _anVarBool(p,varKey){
   if(varKey==='desescalada')return p.accion==='desescalar';
   if(varKey==='escalar')return p.accion==='escalar';
   if(varKey==='suspender')return p.accion==='suspender';
-  if(varKey==='continuar')return p.accion==='continuar';
-  if(varKey==='switch_vo')return p.accion==='switch-vo'||p.accion==='switch vo'||(p.via||'').toLowerCase().includes('oral');
+  if(varKey==='continuar')return p.accion==='mantener';// v324: el enum real es 'mantener', no 'continuar'
+  if(varKey==='switch_vo')return p.accion==='vo'||(p.via||'').toLowerCase().includes('oral');// v324: 'vo', no 'switch-vo'
   // ── Indicación / Adecuación ──
   if(varKey==='indicacion_si')return p.indicacion==='sí'||p.indicacion==='si';
   if(varKey==='adecuacion_ok')return p.adecuacion==='adecuado'||p.adecuacion==='adecuada';

@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v324 (Auditoría QA — batch de correctitud P2)
+//  Tres bugs P2 contenidos: (1) calcDia inflaba los días contando filas de ATB SIN nombre con fecha
+//  de inicio → ahora filtra por nombre (consistente con la lógica de suspensión). (2) La analítica
+//  2x2 (_anVarBool) comparaba contra acciones inexistentes 'continuar'/'switch-vo' → ahora 'mantener'/
+//  'vo' (enum real) → Fisher/χ² ya no salen sesgados a cero. (3) La auto-solicitud de Reserve a
+//  Farmacia guardaba como 'antibiotico' el string concatenado de TODOS los ATB → ahora usa el nombre
+//  del ATB Reserve REAL (matching de bloqueo + dedup funcionan). +3 pruebas (229).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v323 (Auditoría QA — antibiograma acumulado deduplica por paciente)
 //  P1 (último del backlog): renderCumAbg (antibiograma acumulado hospitalario) y su hoja Excel
 //  contaban TODOS los aislamientos, incluidos cultivos repetidos del mismo paciente → %S/R y MIC50/90
@@ -592,7 +600,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v323';
+const CACHE = 'stewardmx-v324';
 const SHELL = [
   '/',
   '/index.html',
