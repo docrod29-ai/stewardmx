@@ -575,6 +575,33 @@ test('MESLOCAL P0: currentMonth se calcula en hora LOCAL, no en UTC', () => {
   assert.ok(/currentMonth=\(\(\)=>\{const _n=new Date\(\);return _n\.getFullYear\(\)/.test(_idx), 'currentMonth no usa la construcción en hora local');
 });
 
+/* ═══════════ P1 (auditoría v313): gate Reserve — clasificación AWaRe por nombre (fail-safe) ═══════════ */
+const _mATBX = _idx.match(/const ATBX=\[[\s\S]*?\n\];/);
+const _mNormAtb = _idx.match(/function _normAtbNom\(s\)\{[\s\S]*?\.trim\(\);\}/);
+const _mCls = _idx.match(/function _clasificarAware\(nombre\)\{[\s\S]*?\n\}/);
+let _clasificar = null;
+if (_mATBX && _mNormAtb && _mCls) { _clasificar = new Function(_mATBX[0] + '\n' + _mNormAtb[0] + '\n' + _mCls[0] + '\n return _clasificarAware;')(); }
+test('GATE Reserve: _clasificarAware deriva aware/pol del catálogo ATBX', () => {
+  assert.ok(_clasificar, 'no se extrajo _clasificarAware + ATBX');
+  // Carbapenémico Reserve/restringido → el gate DEBE poder dispararse aunque la solicitud no lo trajera.
+  assert.equal(_clasificar('Meropenem').aware, 'Reserve', 'Meropenem debe clasificar como Reserve');
+  assert.equal(_clasificar('Meropenem').pol, 'restringido', 'Meropenem debe ser restringido');
+  // Matching tolerante por primera palabra (slash/acentos normalizados).
+  assert.equal(_clasificar('Piperacilina-Tazobactam').aware, 'Reserve', 'pip-tazo debe clasificar como Reserve');
+  // Un ATB de menor restricción NO debe quedar como Reserve (no sobre-bloquear el flujo normal).
+  assert.notEqual(_clasificar('Ceftriaxona').aware, 'Reserve', 'Ceftriaxona no es Reserve');
+  // Vacío → sin clasificación (no rompe).
+  assert.equal(_clasificar('').aware, '');
+});
+test('GATE Reserve: el fail-safe re-deriva aware/pol cuando la solicitud no los trae', () => {
+  assert.ok(/if\(!_aw&&!_pol\)\{const _c=_clasificarAware\(s\.antibiotico\|\|s\.atb\)/.test(_idx), 'farmaciaLiberarDirecto no re-deriva aware/pol faltantes');
+});
+test('GATE Reserve: las 3 creadoras de solicitud estampan aware/pol', () => {
+  assert.ok(/antibiotico:atb,dosis,indicacion:ind,aware:_cls\.aware,pol:_cls\.pol/.test(_idx), 'crearSolicitud no estampa aware/pol');
+  assert.ok(/servicio:p\?\.servicio\|\|'—',\s*antibiotico:atb,\s*aware:_cls\.aware,pol:_cls\.pol/.test(_idx), 'crearSolicitudPaciente no estampa servicio+aware/pol');
+  assert.ok(/antibiotico:atb,atb,aware:_clsU\.aware,pol:_clsU\.pol/.test(_idx), 'guardarSolicitudUrgente no corrige clave/estampa aware/pol');
+});
+
 test('BLINDAJE: paciente nuevo (prev null) → no protege, permite vacío', () => {
   const data = { atbList: [], muestras: [] };
   const cons = _blindar(data, null);

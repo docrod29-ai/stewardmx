@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v313 (Auditoría QA — gate Reserve que no disparaba)
+//  P1 de seguridad PROA: las solicitudes creadas fuera de la ficha (crearSolicitud,
+//  crearSolicitudPaciente, guardarSolicitudUrgente) NO estampaban aware/pol → en
+//  farmaciaLiberarDirecto el gate (aware==='Reserve'||pol==='restringido') no disparaba y un
+//  carbapenémico/Reserve podía liberarse para dispensación SIN aprobación PROA. FIX: helper
+//  _clasificarAware(nombre) deriva {aware,pol} del catálogo ATBX; las 3 creadoras ahora estampan,
+//  y farmaciaLiberarDirecto re-deriva como FAIL-SAFE para solicitudes legacy. De paso:
+//  guardarSolicitudUrgente guardaba el ATB en la clave `atb` (no `antibiotico`) → "—" en Farmacia
+//  y evadía el bloqueo: ahora estampa ambas. crearSolicitudPaciente añade el `servicio` faltante.
+//  +3 pruebas que ejecutan _clasificarAware real (212). Reporte: docs/AUDITORIA_QA_2026-06-12.md
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v312 (Auditoría QA — los 2 P0 de integridad de datos)
 //  Auditoría multidisciplinaria (23 agentes) → 67 hallazgos. Esta versión cierra los 2 CRÍTICOS:
 //  P0-1 Dispositivos/PICC borrados al guardar: el form reescribía dispositivos.{cvc,foley} y el
@@ -498,7 +509,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v312';
+const CACHE = 'stewardmx-v313';
 const SHELL = [
   '/',
   '/index.html',

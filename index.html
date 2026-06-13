@@ -15898,6 +15898,28 @@ window.autocompletarCama=()=>{
   // legacy — ya no se usa, mantenida por compatibilidad
 };
 
+// ── Clasificación AWaRe por nombre — fail-safe del gate Reserve (auditoría v313) ──────────────
+// Las solicitudes creadas fuera de la ficha (crearSolicitud / crearSolicitudPaciente /
+// guardarSolicitudUrgente) NO estampaban aware/pol → en farmaciaLiberarDirecto el gate
+// (s.aware==='Reserve'||s.pol==='restringido') no disparaba y un ATB Reserve/restringido podía
+// liberarse para dispensación SIN aprobación PROA. Este helper deriva {aware,pol} del nombre
+// contra el catálogo ATBX; se usa al CREAR (estampa) y al LIBERAR (fail-safe si faltan).
+function _normAtbNom(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\/\-]/g,' ').replace(/\s+/g,' ').trim();}
+function _clasificarAware(nombre){
+  const n=_normAtbNom(nombre);
+  if(!n)return {aware:'',pol:''};
+  const n0=n.split(' ')[0];
+  let best=null;
+  for(const it of ATBX){
+    const cn=_normAtbNom(it.n);
+    if(!cn)continue;
+    if(cn===n){best=it;break;}
+    if(!best&&cn.split(' ')[0]===n0)best=it;
+  }
+  return best?{aware:best.aw||'',pol:best.pol||''}:{aware:'',pol:''};
+}
+window._clasificarAware=_clasificarAware;
+
 window.crearSolicitud=async()=>{
   if(window._solBusy)return;
   window._solBusy=true;
@@ -15965,9 +15987,10 @@ window.crearSolicitud=async()=>{
     const esFinde=dia===0||dia===6;
     const protocoloNocturno=esEmergencia&&(esNocturno||esFinde);
     try{
+      const _cls=_clasificarAware(atb);
       const _atbRef=await addDoc(collection(db,'hospitals',HOSP,'antibiotic_requests'),{
         pacienteNombre:nombre||'Sin nombre',patientId:pacId||null,cama:cama||'—',
-        antibiotico:atb,dosis,indicacion:ind,
+        antibiotico:atb,dosis,indicacion:ind,aware:_cls.aware,pol:_cls.pol,
         urgencia,urgente:urgencia!=='electivo',esEmergencia,servicio:servicio||'—',
         cultivos:muestras,
         status:'pendiente',
@@ -16810,8 +16833,12 @@ window.farmaciaConfirmarRetencion=async function(id){
 window.farmaciaLiberarDirecto=function(id){
   const s=SOLICITUDES.find(x=>x.id===id);if(!s)return;
   if(!window._isFarmaceutico&&!window._isAdmin){toast('Solo Farmacia puede liberar prescripciones','rd');return;}
-  // Verificar que no sea ATB Reserve sin aprobación PROA (esos deben pasar por PROA)
-  if((s.aware==='Reserve'||s.pol==='restringido')&&s.status!=='aprobado'&&!window._isAdmin&&!window._isPROA&&!window._isInfectologo){
+  // Verificar que no sea ATB Reserve sin aprobación PROA (esos deben pasar por PROA).
+  // FAIL-SAFE (auditoría v313): si la solicitud no trae aware/pol (creada fuera de la ficha),
+  // se derivan del nombre del ATB contra ATBX → un Reserve/restringido legacy YA no se escapa del gate.
+  let _aw=s.aware,_pol=s.pol;
+  if(!_aw&&!_pol){const _c=_clasificarAware(s.antibiotico||s.atb);_aw=_c.aware;_pol=_c.pol;}
+  if((_aw==='Reserve'||_pol==='restringido')&&s.status!=='aprobado'&&!window._isAdmin&&!window._isPROA&&!window._isInfectologo){
     toast('⚠ ATB Reserve/Restringido requiere aprobación PROA antes de liberar. Usa "Escalar a PROA" o contacta al infectólogo.','am');
     return;
   }
@@ -17926,10 +17953,11 @@ window.guardarSolicitudUrgente=async function(){
     });
 
     // Crear solicitud ATB urgente → Farmacia la ve priorizada
+    const _clsU=_clasificarAware(atb);
     await addDoc(collection(db,'hospitals',HOSP,'antibiotic_requests'),{
-      pacienteId:targetPid,pacienteNombre:nombre,
+      pacienteId:targetPid,patientId:targetPid,pacienteNombre:nombre,
       servicio:svc,cama:cama||'—',
-      atb,indicacion:dx||'Solicitud urgente desde módulo clínico',
+      antibiotico:atb,atb,aware:_clsU.aware,pol:_clsU.pol,indicacion:dx||'Solicitud urgente desde módulo clínico',
       status:'pendiente',prioridad,
       cultivos:muestras,cultPendiente:true,
       solicitadoPor:U.uid,solicitadoNombre:window._userName||U.email,
@@ -19120,12 +19148,15 @@ window.crearSolicitudPaciente=async(pid)=>{
     _r();return;
   }
   try{
+    const _cls=_clasificarAware(atb);
     await addDoc(collection(db,'hospitals',HOSP,'antibiotic_requests'),{
       pacienteNombre:p?.nombre||'—',
       patientId:pid,
       pacienteId:pid,
       cama:p?.cama||'—',
+      servicio:p?.servicio||'—',
       antibiotico:atb,
+      aware:_cls.aware,pol:_cls.pol,
       dosis,
       indicacion:ind,
       urgente,
