@@ -1,4 +1,16 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v316 (Auditoría QA — dictado por voz: 4 correcciones de seguridad)
+//  El dictado introducía errores clínicos PLAUSIBLES y SILENCIOSOS:
+//  (1) ACCIÓN INVERTIDA: selOpt usaba includes() → 'escalar' caía en 'desescalar'. Ahora match
+//      EXACTO primero; el includes solo como respaldo.
+//  (2) NOMBRE DE ATB perdido: fill() crudo dejaba el <select> vacío para pip-tazo, cefepima,
+//      imipenem, cefta-avi, etc. Nuevo _fillAtbNom hace match tolerante contra ATBX (acentos, / -).
+//  (3) FRECUENCIA perdida: atb-{i}-frec no existe → el intervalo se descartaba. Ahora se concatena
+//      a la dosis ("1g c/8h") sin duplicar.
+//  (4) ORGANISMO equivocado: el match por GÉNERO mapeaba krusei/auris→albicans, M.avium→TB,
+//      neumococo→pyogenes y disparaba inferirFenotipo() sobre el organismo falso. Ahora exige
+//      match de ESPECIE; si no hay match claro, no toca f-org. +2 pruebas (217, una ejecuta selOpt real).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v315 (Auditoría QA — dosis de profilaxis PCP corregida)
 //  P1 CLÍNICO (potencial de daño): la profilaxis de Pneumocystis (PCP) recomendaba
 //  "TMP-SMX DS 1 tableta VO TID × 3 días/semana" — TID (3 veces/día) es INCOMPATIBLE con
@@ -527,7 +539,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v315';
+const CACHE = 'stewardmx-v316';
 const SHELL = [
   '/',
   '/index.html',

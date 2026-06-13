@@ -621,6 +621,26 @@ test('PCP P1: la profilaxis PCP ya no indica una dosis contradictoria ("TID × 3
   assert.ok(/1 tableta VO cada 24h \(diario\)/.test(_idx), 'no aparece la dosis PCP correcta (diaria)');
 });
 
+/* ═══════════ P1 (auditoría v316): dictado por voz — selección correcta, no invierte el plan ═══════════ */
+const _mSelOpt = _idx.match(/const selOpt=\(id,val\)=>\{[\s\S]*?return false;\};/);
+function _mkSel(options) { return { tagName: 'SELECT', value: '', options: options.map(([value, text]) => ({ value, text })), dispatchEvent() {} }; }
+test('VOZ P1: selOpt usa match EXACTO primero — "escalar" ya no cae en "desescalar"', () => {
+  assert.ok(_mSelOpt, 'no se extrajo selOpt del dictado');
+  const sel = _mkSel([['escalar', 'Escalar'], ['desescalar', 'Desescalar'], ['mantener', 'Mantener ATB']]);
+  const selOpt = new Function('document', _mSelOpt[0] + '\n return selOpt;')({ getElementById: () => sel });
+  selOpt('f-accion', 'escalar');
+  assert.equal(sel.value, 'escalar', '"escalar" se mapeó al valor equivocado (¿desescalar?)');
+  sel.value = '';
+  selOpt('f-accion', 'desescalar');
+  assert.equal(sel.value, 'desescalar', '"desescalar" debe seguir funcionando');
+});
+test('VOZ P1: el dictado mapea nombre de ATB (tolerante), frecuencia y organismo por especie', () => {
+  assert.ok(/const _fillAtbNom=\(id,nombre\)=>/.test(_idx), 'falta _fillAtbNom (match tolerante de ATB)');
+  assert.ok(/_fillAtbNom\('atb-'\+i\+'-nom',vnom\)\|\|fill/.test(_idx), 'no usa _fillAtbNom para el nombre del ATB');
+  assert.ok(/const _dosFull=\(vfrec&&!String\(vdos/.test(_idx), 'la frecuencia no se concatena a la dosis');
+  assert.ok(/exigir match de ESPECIE/.test(_idx), 'el organismo no exige match de especie (seguía por género)');
+});
+
 test('BLINDAJE: paciente nuevo (prev null) → no protege, permite vacío', () => {
   const data = { atbList: [], muestras: [] };
   const cons = _blindar(data, null);

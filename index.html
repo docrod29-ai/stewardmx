@@ -25104,7 +25104,14 @@ window._vaApplyConfirmed=async function(d){
   cerrarModal();
   let n=0;
   const fill=(id,val)=>{if(val==null||val===''||String(val)==='null')return false;const el=document.getElementById(id);if(!el)return false;el.value=String(val);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;};
-  const selOpt=(id,val)=>{if(!val)return false;const el=document.getElementById(id);if(!el||el.tagName!=='SELECT')return false;const v=String(val).toLowerCase().trim();const o=Array.from(el.options).find(op=>op.value===val||op.value.toLowerCase()===v||op.text.toLowerCase().includes(v)||v.includes(op.value.toLowerCase()));if(o){el.value=o.value;el.dispatchEvent(new Event('change',{bubbles:true}));return true;}return false;};
+  const selOpt=(id,val)=>{if(!val)return false;const el=document.getElementById(id);if(!el||el.tagName!=='SELECT')return false;const v=String(val).toLowerCase().trim();const opts=Array.from(el.options);
+    // Auditoría v316: match EXACTO primero — evita que 'escalar' empareje 'desescalar' por includes() (invertía el plan).
+    let o=opts.find(op=>op.value===val||op.value.toLowerCase()===v||op.text.toLowerCase().trim()===v);
+    if(!o)o=opts.find(op=>op.text.toLowerCase().includes(v)||v.includes(op.value.toLowerCase()));
+    if(o){el.value=o.value;el.dispatchEvent(new Event('change',{bubbles:true}));return true;}return false;};
+  // Auditoría v316: nombre de ATB del dictado → <select> de ATBX con match tolerante (normaliza
+  // acentos y / -). fill() crudo dejaba el select VACÍO para pip-tazo, cefepima, imipenem, etc.
+  const _fillAtbNom=(id,nombre)=>{const el=document.getElementById(id);if(!el||el.tagName!=='SELECT'||!nombre)return false;const t=_normAtbNom(nombre);if(!t)return false;const t0=t.split(' ')[0];const opts=Array.from(el.options);let o=opts.find(op=>_normAtbNom(op.value)===t||_normAtbNom(op.text)===t);if(!o)o=opts.find(op=>{const ov=_normAtbNom(op.value);return ov&&ov.split(' ')[0]===t0;});if(o){el.value=o.value;el.dispatchEvent(new Event('change',{bubbles:true}));return true;}return false;};
 
   // ── Leer campos del modal de confirmación (valores editados por el usuario) ──
   const gvc=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
@@ -25142,10 +25149,13 @@ window._vaApplyConfirmed=async function(d){
       const vdos=gvc('vac-atb'+i+'-dosis')||a.dosis;
       const vvia=gvc('vac-atb'+i+'-via')||a.via;
       const vfrec=gvc('vac-atb'+i+'-frec')||a.frecuencia||'';
-      if(fill('atb-'+i+'-nom',vnom))n++;
-      if(fill('atb-'+i+'-dosis',vdos))n++;
-      // Guardar frecuencia normalizada en campo de dosis si hay campo dedicado
-      if(vfrec&&fill('atb-'+i+'-frec',vfrec))n++;
+      // Auditoría v316: el nombre va a un <select> de ATBX → match tolerante (antes fill() crudo
+      // dejaba el select vacío para β-lactámicos combinados y varios Reserve, perdiendo el ATB).
+      if(_fillAtbNom('atb-'+i+'-nom',vnom)||fill('atb-'+i+'-nom',vnom))n++;
+      // La frecuencia NO tiene campo propio (atb-{i}-frec no existe) → se concatena a la dosis
+      // para no perder el intervalo (p.ej. "1g c/8h"). No duplica si la dosis ya lo incluye.
+      const _dosFull=(vfrec&&!String(vdos||'').toLowerCase().includes(String(vfrec).toLowerCase()))?[vdos,vfrec].filter(Boolean).join(' ').trim():vdos;
+      if(fill('atb-'+i+'-dosis',_dosFull))n++;
       // Actualizar el objeto ATB con frecuencia validada
       if(d.atb&&d.atb[i])d.atb[i].frecuencia=vfrec;
       const vEl=document.getElementById('atb-'+i+'-via');
@@ -25157,7 +25167,13 @@ window._vaApplyConfirmed=async function(d){
   if(d.micro){
     if(selOpt('f-cult',d.micro.cult))n++;
     if(fill('f-muestra',d.micro.muestra))n++;
-    if(d.micro.organismo){const orgEl=document.getElementById('f-org');if(orgEl){const ov=Array.from(orgEl.options).find(op=>op.text.toLowerCase().includes(d.micro.organismo.toLowerCase())||d.micro.organismo.toLowerCase().includes(op.text.toLowerCase().split(' ')[0]));if(ov){orgEl.value=ov.value;n++;try{inferirFenotipo();}catch(_){}try{mostrarResistenciasIntrinsecas(ov.value);}catch(_){}}}  }
+    if(d.micro.organismo){const orgEl=document.getElementById('f-org');if(orgEl){const _on=d.micro.organismo.toLowerCase().trim();
+      // Auditoría v316: exigir match de ESPECIE (texto completo), no de GÉNERO. El match por género
+      // mapeaba 'Candida krusei/auris'→albicans, 'M. avium'→tuberculosis, 'S. pneumoniae'→pyogenes,
+      // y disparaba inferirFenotipo() sobre el organismo equivocado. Si no hay match claro, NO toca f-org.
+      let ov=Array.from(orgEl.options).find(op=>op.text.toLowerCase().trim()===_on);
+      if(!ov)ov=Array.from(orgEl.options).find(op=>{const ot=op.text.toLowerCase().trim();return ot.length>3&&(ot.includes(_on)||_on.includes(ot));});
+      if(ov){orgEl.value=ov.value;n++;try{inferirFenotipo();}catch(_){}try{mostrarResistenciasIntrinsecas(ov.value);}catch(_){}}}  }
   }
 
   // ── Nota de visita → llenar textareas si están visibles ──
