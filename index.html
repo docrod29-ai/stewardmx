@@ -15532,6 +15532,8 @@ window.renderSolicitudesFarmacia=function(){
 // ── Farmacia: confirmar stock o reportar sin stock ────────────────────────
 window.farmaciaConfirmarStock=async(id,resultado)=>{
   const s=SOLICITUDES.find(x=>x.id===id);if(!s)return;
+  // Auditoría v325: guard anti-doble-click (como guardar/crearSolicitud/confirmarRevision).
+  if(window._stockBusy)return; window._stockBusy=true;
   const nuevoStatus=resultado==='ok'?'en_almacen':'sin_stock';
   try{
     const upd={
@@ -15548,6 +15550,7 @@ window.farmaciaConfirmarStock=async(id,resultado)=>{
       toast('Sin stock reportado. PROA notificado ✓','am');
     }
   }catch(e){toast('Error: '+e.message,'rd');}
+  finally{window._stockBusy=false;}
 };
 
 // ── Tab Almacén: solicitudes en estado en_almacen ──────────────────────────
@@ -18672,9 +18675,11 @@ window.renderMisSolicitudes=function(){
   // Filtrar solicitudes propias del usuario actual
   let misSols=(SOLICITUDES||[]).filter(s=>s.solicitadoPor===uid||s.solicitadoUID===uid||s.uid===uid);
   if(filtro!=='todas')misSols=misSols.filter(s=>{
-    if(filtro==='pendiente')return['pendiente','en_revision','en_farmacia','pendiente_farmacia','solicitado_justif','cultureLock','waiting_micro'].some(st=>s.status===st||s.cultureLock==='waiting_micro');
-    if(filtro==='aprobado')return['aprobado','farmacia_ok','liberado_farmacia','entregado','administrado'].includes(s.status);
-    if(filtro==='denegado')return['denegado','rechazado','retenido_farmacia','sin_stock'].includes(s.status);
+    // Auditoría v325: retenido_farmacia y sin_stock NO son rechazos clínicos → van a "en proceso"
+    // (pendiente), no a "Rechazadas". Y en_almacen es una solicitud aprobada en curso.
+    if(filtro==='pendiente')return['pendiente','en_revision','en_farmacia','pendiente_farmacia','solicitado_justif','retenido_farmacia','sin_stock','cultureLock','waiting_micro'].some(st=>s.status===st||s.cultureLock==='waiting_micro');
+    if(filtro==='aprobado')return['aprobado','farmacia_ok','liberado_farmacia','en_almacen','entregado','administrado'].includes(s.status);
+    if(filtro==='denegado')return['denegado','rechazado'].includes(s.status);
     return true;
   });
 
@@ -25621,11 +25626,11 @@ window.renderTrasplantePac=function(pid){
     subCont.innerHTML=_TX_SUBTABS.map(t=>`<button onclick="window._txSubTab='${t.id}';renderTrasplantePac('${escJs(pid)}');" style="padding:7px 13px;border-radius:20px;border:1px solid ${window._txSubTab===t.id?'var(--purple)':'var(--brd)'};background:${window._txSubTab===t.id?'rgba(167,139,250,.12)':'transparent'};color:${window._txSubTab===t.id?'var(--purple)':'var(--t2)'};cursor:pointer;font-size:12px;font-weight:${window._txSubTab===t.id?'700':'400'};transition:.15s;">${t.label}</button>`).join('');
   }
   if(sub==='tx-tipo')cont.innerHTML=_renderTxTipo(p);
-  else if(sub==='tx-profilaxis')cont.innerHTML=_renderTxProfilaxis(p);
+  else if(sub==='tx-profilaxis')cont.innerHTML=p?_renderTxProfilaxis(p):'<div style="padding:30px;text-align:center;color:var(--t3);font-size:13px;">Selecciona primero un paciente de trasplante para ver su profilaxis.</div>';// v325: guard anti-crash sin paciente
   else if(sub==='tx-patogenos')cont.innerHTML=_renderTxPatogenos(p);
   else if(sub==='tx-cmv')cont.innerHTML=_renderTxCMV(p);
   else if(sub==='tx-neutropenia')cont.innerHTML=_renderTxNeutropenia(p);
-  else if(sub==='tx-pretx')cont.innerHTML=_renderTxPreTx(p);
+  else if(sub==='tx-pretx')cont.innerHTML=p?_renderTxPreTx(p):'<div style="padding:30px;text-align:center;color:var(--t3);font-size:13px;">Selecciona primero un paciente de trasplante para su evaluación Pre-TX.</div>';// v325: guard anti-crash sin paciente
   else if(sub==='tx-vacunas')cont.innerHTML=_renderTxVacunas(p);
   else if(sub==='tx-24h')cont.innerHTML=_renderTxProtocolo24h(p);
   _execScripts(cont); // re-run scripts blocked by innerHTML assignment

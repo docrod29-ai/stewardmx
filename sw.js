@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v325 (Auditoría QA — Mis-Solicitudes, guard de stock, crash Pre-TX)
+//  Tres P2: (1) "Mis Solicitudes" clasificaba retenido_farmacia/sin_stock como RECHAZADAS → el médico
+//  creía denegado un ATB solo retenido. Ahora van a "en proceso" y en_almacen cuenta como aprobada.
+//  (2) farmaciaConfirmarStock sin guard anti-doble-click → ahora _stockBusy + finally. (3) Las
+//  pestañas Pre-TX/Profilaxis del módulo de Trasplante CRASHEABAN si no había paciente seleccionado
+//  (deref p.txPretx) → ahora muestran "selecciona un paciente". +3 pruebas (232).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v324 (Auditoría QA — batch de correctitud P2)
 //  Tres bugs P2 contenidos: (1) calcDia inflaba los días contando filas de ATB SIN nombre con fecha
 //  de inicio → ahora filtra por nombre (consistente con la lógica de suspensión). (2) La analítica
@@ -600,7 +607,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v324';
+const CACHE = 'stewardmx-v325';
 const SHELL = [
   '/',
   '/index.html',

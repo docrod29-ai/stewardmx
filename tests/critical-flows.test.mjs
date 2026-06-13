@@ -997,6 +997,21 @@ test('CORR P2: la auto-solicitud Reserve usa el nombre del ATB real, no el strin
   assert.ok(/_atbNombreAuto=\(_atbReserve\?\.nombre\|\|/.test(_idx), '_atbNombreAuto no prioriza el ATB Reserve real');
 });
 
+/* ═══════════ P2 (auditoría v325): clasificación Mis-Solicitudes, guard de stock, crash Pre-TX ═══════════ */
+test('MISSOL P2: retenido/sin_stock NO se clasifican como Rechazadas (van a en proceso)', () => {
+  assert.ok(/filtro==='denegado'\)return\['denegado','rechazado'\]\.includes/.test(_idx), "'denegado' aún incluye retenido/sin_stock");
+  assert.ok(/'solicitado_justif','retenido_farmacia','sin_stock'/.test(_idx), 'retenido/sin_stock no pasaron a pendiente');
+  assert.ok(/'liberado_farmacia','en_almacen','entregado'/.test(_idx), 'en_almacen no cuenta como aprobada');
+});
+test('STOCK P2: farmaciaConfirmarStock tiene guard anti-doble-click', () => {
+  assert.ok(/if\(window\._stockBusy\)return; window\._stockBusy=true;/.test(_idx), 'falta el guard _stockBusy');
+  assert.ok(/finally\{window\._stockBusy=false;\}/.test(_idx), 'no libera el lock _stockBusy');
+});
+test('TXCRASH P2: Pre-TX/Profilaxis no crashean sin paciente seleccionado', () => {
+  assert.ok(/sub==='tx-pretx'\)cont\.innerHTML=p\?_renderTxPreTx\(p\):/.test(_idx), 'Pre-TX no está guardado contra p null');
+  assert.ok(/sub==='tx-profilaxis'\)cont\.innerHTML=p\?_renderTxProfilaxis\(p\):/.test(_idx), 'Profilaxis no está guardada contra p null');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));
