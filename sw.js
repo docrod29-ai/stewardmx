@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v323 (Auditoría QA — antibiograma acumulado deduplica por paciente)
+//  P1 (último del backlog): renderCumAbg (antibiograma acumulado hospitalario) y su hoja Excel
+//  contaban TODOS los aislamientos, incluidos cultivos repetidos del mismo paciente → %S/R y MIC50/90
+//  sesgados (un paciente con 5 hemocultivos R dominaba el %R). FIX: cada aislamiento ahora lleva
+//  patientId+muestra+fecha y se pasa por clsim39Deduplicate (1 por paciente+organismo+muestra, el
+//  primero por fecha) ANTES de calcular — cumple CLSI M39-A5. +2 pruebas (226). Con esto el set de
+//  P1 de la auditoría queda cerrado (2 P0 + 17 P1, v312→v323). Backlog: 26 P2 + 17 P3.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v322 (Auditoría QA — FC/DDD solo para Farmacéutico titular)
 //  P1: la UI mostraba al Auxiliar de Farmacia los botones "Reco FC" y captura "DDD", pero
 //  firestore.rules solo permite escribir al titular (isHospFarmaceuticoTitular = rol 'Farmacéutico')
@@ -584,7 +592,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v322';
+const CACHE = 'stewardmx-v323';
 const SHELL = [
   '/',
   '/index.html',

@@ -958,6 +958,26 @@ test('PERMFARM P1: la UI de FC/DDD se restringe al titular (el Auxiliar ya no fa
   assert.ok(/data-tab="ddd-farm"\]'\);if\(_dt\)_dt\.style\.display='none'/.test(_idx), 'el subtab DDD no se oculta al Auxiliar');
 });
 
+/* ═══════════ P1 (auditoría v323): antibiograma acumulado deduplica por paciente (CLSI M39) ═══════════ */
+const _mNormSpec = _idx.match(/function _normalizeSpecimen\(tipo\)\{[\s\S]*?\n\}/);
+const _mM39 = _idx.match(/function clsim39Deduplicate\(isolates,opts\)\{[\s\S]*?\n\}/);
+let _m39 = null;
+if (_mNormSpec && _mM39) _m39 = new Function(_mNormSpec[0] + '\n' + _mM39[0] + '\n return clsim39Deduplicate;')();
+test('M39 P1: clsim39Deduplicate cuenta 1 aislamiento por paciente+organismo+muestra', () => {
+  assert.ok(_m39, 'no se extrajo clsim39Deduplicate');
+  const iso = [
+    { patientId: 'p1', organismo: 'E. coli', muestra: 'Hemocultivo', fecha: '2026-06-01' },
+    { patientId: 'p1', organismo: 'E. coli', muestra: 'Hemocultivo', fecha: '2026-06-05' }, // duplicado → se descarta
+    { patientId: 'p1', organismo: 'E. coli', muestra: 'Urocultivo', fecha: '2026-06-03' },  // otra muestra → cuenta
+    { patientId: 'p2', organismo: 'E. coli', muestra: 'Hemocultivo', fecha: '2026-06-02' }, // otro paciente → cuenta
+  ];
+  assert.equal(_m39(iso).length, 3, 'no deduplicó los cultivos repetidos del mismo paciente');
+});
+test('M39 P1: renderCumAbg incluye patientId y deduplica antes de calcular %S/R y MIC', () => {
+  assert.ok(/allAbgs\.push\(\{patientId:pac\.id/.test(_idx), 'renderCumAbg no incluye patientId en el aislamiento');
+  assert.ok(/const allAbgsDedup=window\.clsim39Deduplicate/.test(_idx), 'renderCumAbg no aplica la deduplicación M39');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));

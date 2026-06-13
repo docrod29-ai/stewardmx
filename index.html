@@ -11468,20 +11468,23 @@ window.renderCumAbg=async()=>{
         const dat=d.data();
         // Antibiogram SIR data is nested in dat.abg{key→S/I/R}
         // Include organism from top-level doc
-        allAbgs.push({organismo:dat.organismo||'Desconocido',_abg:dat.abg||{}});
+        allAbgs.push({patientId:pac.id,organismo:dat.organismo||'Desconocido',muestra:dat.muestra||dat.tipo||'',fecha:dat.fecha||'',_abg:dat.abg||{}});
       });
     }
     if(!allAbgs.length){out.innerHTML='<div style="color:var(--t3);font-size:11px;text-align:center;padding:20px;">No hay antibiogramas registrados en el sistema.</div>';return;}
+    // Auditoría v323: de-duplicación CLSI M39-A5 — 1 aislamiento por paciente+organismo+muestra
+    // (el primero por fecha). Antes contaba cultivos repetidos del mismo paciente → sesgaba %S/R y MIC.
+    const allAbgsDedup=window.clsim39Deduplicate?window.clsim39Deduplicate(allAbgs):allAbgs;
     // Group by organism
     const byOrg={};
-    allAbgs.forEach(entry=>{
+    allAbgsDedup.forEach(entry=>{
       const org=(entry.organismo||'Desconocido').trim();
       if(!byOrg[org])byOrg[org]=[];
       byOrg[org].push(entry._abg);
     });
     const mes=new Date().toLocaleDateString('es-MX',{month:'long',year:'numeric'});
     let h='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
-    h+='<div style="font-size:10px;color:var(--t3);font-family:var(--mono);">Total aislamientos: <b style="color:var(--teal);">'+allAbgs.length+'</b> · CLSI M39-A5: mín. 10 para reportar · '+mes+'</div>';
+    h+='<div style="font-size:10px;color:var(--t3);font-family:var(--mono);">Aislamientos (M39, sin duplicados): <b style="color:var(--teal);">'+allAbgsDedup.length+'</b> · CLSI M39-A5: mín. 10 para reportar · '+mes+'</div>';
     h+='<div style="font-size:9px;color:var(--t3);font-family:var(--mono);">🟢 ≥80%S  🟡 50-79%S  🔴 <50%S</div>';
     h+='</div>';
     let hasData=false;
