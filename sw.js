@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v327 (Dictado por voz: cascada de modelos — paridad agenda médica, parte A)
+//  Cierra el overhaul de voz. Cloud Function whisperTranscribe: ANTES usaba solo whisper-1; AHORA
+//  cascada por precisión gpt-4o-transcribe (~30% menos WER en español médico) → gpt-4o-mini-transcribe
+//  → whisper-1 (fallback), temperature 0, prompt médico, con fallback automático por 404/403/400
+//  (modelo no disponible para la cuenta). Devuelve `model` usado. Junto con el corrector
+//  fonético/Levenshtein del cliente (v326), el dictado iguala las fortalezas de la app de agenda
+//  médica. (Cambio server-side; se sube CACHE por trazabilidad.) Requiere deploy de functions.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v326 (Dictado por voz: corrector médico — paridad con agenda médica, parte B)
 //  El Dr. pidió que el dictado por voz tenga las fortalezas del sistema de su app de agenda médica.
 //  Parte B (cliente): nuevo módulo PURO js/core/medical-voice.js (portado de medical-vocabulary.ts):
@@ -618,7 +626,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v326';
+const CACHE = 'stewardmx-v327';
 const SHELL = [
   '/',
   '/index.html',

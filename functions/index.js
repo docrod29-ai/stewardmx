@@ -1771,21 +1771,41 @@ exports.whisperTranscribe = onRequest(
 
       // OpenAI SDK acepta un File-like object con toFile helper
       const { toFile } = require('openai');
-      const audioFile = await toFile(audioBuffer, `audio.${ext}`, { type: mimeType || 'audio/webm' });
-
-      const whisperRes = await openai.audio.transcriptions.create({
-        file: audioFile,
-        model: 'whisper-1',
-        language: 'es',
-        response_format: 'verbose_json',
-        // v270: prompt enriquecido con vocabulario médico (clinical-vocabulary.json). Whisper
-        // limita el prompt a ~224 tokens → se priorizan los términos con mayor riesgo de error
-        // fonético (antibióticos de nombre largo, mecanismos de resistencia, marcas).
-        prompt: 'Transcripción de visita médica PROA en español de México. Términos: meropenem, piperacilina/tazobactam, ceftazidima/avibactam, ceftolozano/tazobactam, cefepime, ertapenem, vancomicina, daptomicina, linezolid, tigeciclina, colistina, amikacina, levofloxacino, trimetoprim/sulfametoxazol, fosfomicina, anfotericina, caspofungina, fluconazol, voriconazol, isavuconazol. Microorganismos: Klebsiella pneumoniae, Escherichia coli, Pseudomonas aeruginosa, Acinetobacter baumannii, Stenotrophomonas maltophilia, Staphylococcus aureus, Enterococcus faecium, Candida auris, Clostridioides difficile. Resistencia: BLEE, KPC, NDM, OXA-48, VIM, MRSA, VRE, CRE, CRAB, MDR, XDR. Antirretrovirales: Biktarvy, Dovato, dolutegravir, bictegravir, tenofovir. Labs: procalcitonina, PCR, lactato, creatinina, leucocitos. Síndromes: bacteriemia, sepsis, choque séptico, neumonía, pielonefritis, endocarditis, neutropenia febril.',
-      });
-
-      const transcript = whisperRes.text || '';
-      const durationSec = whisperRes.duration || durationEstSec || 60;
+      // v327: prompt enriquecido con vocabulario médico (Whisper limita a ~224 tokens → se
+      // priorizan los términos con mayor riesgo de error fonético). El cliente además aplica el
+      // corrector fonético/Levenshtein (js/core/medical-voice.js).
+      const MED_PROMPT = 'Transcripción de visita médica PROA en español de México. Términos: meropenem, piperacilina/tazobactam, ceftazidima/avibactam, ceftolozano/tazobactam, cefepime, ertapenem, vancomicina, daptomicina, linezolid, tigeciclina, colistina, amikacina, levofloxacino, trimetoprim/sulfametoxazol, fosfomicina, anfotericina, caspofungina, fluconazol, voriconazol, isavuconazol. Microorganismos: Klebsiella pneumoniae, Escherichia coli, Pseudomonas aeruginosa, Acinetobacter baumannii, Stenotrophomonas maltophilia, Staphylococcus aureus, Enterococcus faecium, Candida auris, Clostridioides difficile. Resistencia: BLEE, KPC, NDM, OXA-48, VIM, MRSA, VRE, CRE, CRAB, MDR, XDR. Antirretrovirales: Biktarvy, Dovato, dolutegravir, bictegravir, tenofovir. Labs: procalcitonina, PCR, lactato, creatinina, leucocitos. Síndromes: bacteriemia, sepsis, choque séptico, neumonía, pielonefritis, endocarditis, neutropenia febril.';
+      // v327: CASCADA de modelos por precisión (paridad con la app de agenda médica):
+      //   gpt-4o-transcribe (~30% menos WER en español médico) → gpt-4o-mini-transcribe → whisper-1.
+      // temperature 0 = determinístico (no improvisa fármacos). Override: OPENAI_TRANSCRIBE_MODEL.
+      // gpt-4o-* no soportan verbose_json → usan 'json' (duración del estimado del cliente).
+      const TRANSCRIBE_MODELS = process.env.OPENAI_TRANSCRIBE_MODEL
+        ? [process.env.OPENAI_TRANSCRIBE_MODEL]
+        : ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe', 'whisper-1'];
+      let transcript = '', durationSec = durationEstSec || 60, usedModel = '', _lastErr = null;
+      for (const _model of TRANSCRIBE_MODELS) {
+        try {
+          const _af = await toFile(audioBuffer, `audio.${ext}`, { type: mimeType || 'audio/webm' });
+          const _isW = _model === 'whisper-1';
+          const _r = await openai.audio.transcriptions.create({
+            file: _af, model: _model, language: 'es', temperature: 0,
+            response_format: _isW ? 'verbose_json' : 'json',
+            prompt: MED_PROMPT,
+          });
+          transcript = _r.text || '';
+          durationSec = _r.duration || durationEstSec || 60;
+          usedModel = _model;
+          break;
+        } catch (e) {
+          _lastErr = e;
+          const _st = (e && (e.status || (e.response && e.response.status))) || 0;
+          console.warn(`[whisperTranscribe] ${_model} falló (${_st}) — probando siguiente`);
+          // 404/403/400 = modelo no disponible para la cuenta → probar el siguiente.
+          // Otros (auth/rate-limit/server) → abortar la cascada.
+          if (_st && _st !== 404 && _st !== 403 && _st !== 400) throw e;
+        }
+      }
+      if (!usedModel) throw (_lastErr || new Error('Transcripción no disponible'));
       const durationMin = durationSec / 60;
 
       // ── Actualizar uso ──
@@ -1802,6 +1822,7 @@ exports.whisperTranscribe = onRequest(
         ok: true,
         transcript,
         durationSec,
+        model: usedModel, // v327: modelo de la cascada que respondió (gpt-4o-transcribe / mini / whisper-1)
         minutesUsed: (usageData.minutesUsed || 0) + durationMin,
         cap: capMin === Infinity ? -1 : capMin,
       });
