@@ -23055,16 +23055,23 @@ async function _buildGoogleSheet(token,pacs,mode){
   ];
 
   // ═══ v289 FASE 4 — TASAS DE IAAS POR DENSIDAD (NHSN-AUR / NOM-045) + LOT/DOT ═══
-  const _devDays=(dev)=>{let tot=0;pacs.forEach(p=>{const d=(p.dispositivos||{})[dev];if(!d||!d.presente)return;
-    const ini=_fechaADate(d.fechaInsercion);if(!ini)return;const corte=_fechaADate(hasta)||new Date();
-    let fin=_fechaADate(d.fechaRetiro)||corte;if(fin>corte)fin=corte;
-    const dias=Math.floor((fin.getTime()-ini.getTime())/86400000)+1;if(dias>0)tot+=dias;});return tot;};
+  // Auditoría v317: días-dispositivo y CLABSI/CAUTI desde la lista UNIFICADA (_dispositivosDe =
+  // eventos[] + legacy cvc/foley), no solo dispositivos.{cvc,foley}.presente. Antes la vía principal
+  // de enfermería (botón 🩺) y el PICC NO se contaban → tasas falseadas a la baja. El PICC cuenta
+  // como acceso CENTRAL (CLABSI), junto con el CVC.
+  const _devDaysTipos=(tipos)=>{let tot=0;pacs.forEach(p=>{_dispositivosDe(p).forEach(e=>{
+    if(!tipos.includes(e.tipo))return;
+    const ini=_fechaADate(e.fechaInsercion);if(!ini)return;const corte=_fechaADate(hasta)||new Date();
+    let fin=_fechaADate(e.fechaRetiro)||corte;if(fin>corte)fin=corte;
+    const dias=Math.floor((fin.getTime()-ini.getTime())/86400000)+1;if(dias>0)tot+=dias;});});return tot;};
   const _diasPacIAAS=window.calcDiasPaciente(pacs,hasta);
-  const _cvcDays=_devDays('cvc'), _foleyDays=_devDays('foley');
+  const _cvcDays=_devDaysTipos(['cvc','picc']), _foleyDays=_devDaysTipos(['foley']);
   const _esBactIAAS=p=>{const b=String(p.bacteriemia||'').toLowerCase();return b==='sí'||b==='si'||p.bacteriemia===true||/bacteriem|sepsis|choque sépt|choque septic/i.test((p.dx||'')+' '+(p.focoInf||''));};
   const _esITUIAAS=p=>/itu|infecci[oó]n urinaria|urinari|pielonefritis|cistitis/i.test((p.dx||'')+' '+(p.focoInf||''));
   let _clabsi=0,_cauti=0;
-  pacs.forEach(p=>{const d=p.dispositivos||{};if(d.cvc&&d.cvc.presente&&_esBactIAAS(p))_clabsi++;if(d.foley&&d.foley.presente&&_esITUIAAS(p))_cauti++;});
+  pacs.forEach(p=>{const ds=_dispositivosDe(p);
+    if(ds.some(e=>(e.tipo==='cvc'||e.tipo==='picc')&&e.activo)&&_esBactIAAS(p))_clabsi++;
+    if(ds.some(e=>e.tipo==='foley'&&e.activo)&&_esITUIAAS(p))_cauti++;});
   const _ru=(dd)=>_diasPacIAAS>0?+(dd/_diasPacIAAS).toFixed(2):0;
   const _lotTot=pacs.reduce((s,p)=>s+(calcDia(p)||0),0);
   const _dotTotN=window.calcDOT(pacs,hasta);

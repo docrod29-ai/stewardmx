@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v317 (Auditoría QA — IAAS cuenta eventos[]/PICC)
+//  P1 regulatorio: la vigilancia IAAS (CLABSI/CAUTI) y los días-dispositivo leían SOLO
+//  dispositivos.{cvc,foley}.presente (legacy) → la vía principal de enfermería (botón 🩺) y TODO
+//  PICC no se contaban: días-dispositivo y tasas falseados a la baja, inválidos ante CONASABI/NHSN.
+//  FIX: _devDaysTipos y los contadores CLABSI/CAUTI ahora leen la lista UNIFICADA _dispositivosDe(p)
+//  (eventos[] + legacy). El PICC cuenta como acceso CENTRAL junto con el CVC (días-catéter/CLABSI).
+//  +1 prueba (218). Reporte: docs/AUDITORIA_QA_2026-06-12.md (backlog: DOT, MIC ficha, dedup M39).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v316 (Auditoría QA — dictado por voz: 4 correcciones de seguridad)
 //  El dictado introducía errores clínicos PLAUSIBLES y SILENCIOSOS:
 //  (1) ACCIÓN INVERTIDA: selOpt usaba includes() → 'escalar' caía en 'desescalar'. Ahora match
@@ -539,7 +547,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v316';
+const CACHE = 'stewardmx-v317';
 const SHELL = [
   '/',
   '/index.html',

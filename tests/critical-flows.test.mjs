@@ -881,9 +881,20 @@ test('XLSX IAAS: CLABSI/CAUTI por 1000 días-dispositivo con IC Poisson', () => 
   assert.match(blk, /inferido/);   // numeradores etiquetados como inferidos (honestidad)
 });
 test('XLSX IAAS: días-dispositivo reales (inserción→retiro) + LOT/DOT', () => {
-  assert.match(_idx, /const _devDays=\(dev\)=>/);
+  // v317: el conteo migró de la lectura legacy `_devDays(dev)` a la lista unificada `_devDaysTipos(tipos)`.
+  assert.match(_idx, /const _devDaysTipos=\(tipos\)=>/);
   assert.match(_idx, /Razón DOT\/LOT/);
   assert.match(_idx, /VAP no calculable|requiere capturar el dispositivo ventilador/);
+});
+test('XLSX IAAS P1 (v317): días-dispositivo y CLABSI/CAUTI cuentan eventos[]/PICC (no solo legacy .presente)', () => {
+  const blk = _idx.match(/const _devDaysTipos[\s\S]*?_cauti\+\+;\}\);/)[0];
+  // Lee desde la lista unificada (incluye eventos[] del botón 🩺 y el PICC).
+  assert.match(blk, /_dispositivosDe\(p\)/);
+  // PICC cuenta como acceso central junto con CVC para días-catéter y CLABSI.
+  assert.match(blk, /\['cvc','picc'\]/);
+  assert.match(blk, /e\.tipo==='cvc'\|\|e\.tipo==='picc'/);
+  // Ya NO usa la lectura legacy d.cvc.presente para contar.
+  assert.ok(!/d\.cvc&&d\.cvc\.presente&&_esBactIAAS/.test(_idx), 'sigue contando CLABSI por la vía legacy .presente');
 });
 
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
