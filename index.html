@@ -25346,7 +25346,12 @@ window._vaApplyConfirmed=async function(d){
         medico:editedPac.medico||'',dx:editedPac.dx||'',focoInf:editedPac.focoInf||'',
         gravedad:editedPac.gravedad||'',atb:(d.atb?.[0]?.nombre)||'',
         dosis:(d.atb?.[0]?.dosis)||'',via:(d.atb?.[0]?.via)||'IV',
-        pol:'libre',aware:'Watch',riesgo:'moderado',
+        // v329: construir atbList + inicio + ingreso → calcDia/DOT/días-paciente dejan de congelarse
+        // en Día 1 / 0 DOT. aware/pol se derivan del 1er ATB (no se asume 'Watch'/'libre' a ciegas).
+        atbList:(d.atb||[]).filter(a=>a&&a.nombre).map(a=>({nombre:a.nombre,dosis:a.dosis||'',via:a.via||'IV',fechaInicioIV:new Date().toISOString().slice(0,10)})),
+        inicio:new Date().toISOString().slice(0,10),ingreso:new Date().toISOString().slice(0,10),
+        pol:(d.atb?.[0]?.nombre&&_clasificarAware(d.atb[0].nombre).pol)||'libre',
+        aware:(d.atb?.[0]?.nombre&&_clasificarAware(d.atb[0].nombre).aware)||'Watch',riesgo:'moderado',
         ts:serverTimestamp(),updatedBy:U.email,updatedAt:new Date().toISOString(),source:'voice',
       });
       toast('➕ Nuevo paciente creado desde asistente de voz');n++;
@@ -26347,7 +26352,7 @@ function _renderTxPreTx(p){
   }
   function vacc(id,lbl){
     return `<label style="display:flex;align-items:center;gap:8px;margin-bottom:5px;cursor:pointer;font-size:11px;color:var(--t2);">
-      <select id="${id}" style="padding:3px 7px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;">
+      <select id="${id}" onchange="window._pretxRecs&&window._pretxRecs()" style="padding:3px 7px;border:1px solid var(--brd2);border-radius:4px;background:var(--s2);color:var(--t2);font-size:11px;">
         <option value="">—</option>
         <option>Completa ✓</option>
         <option>Pendiente</option>

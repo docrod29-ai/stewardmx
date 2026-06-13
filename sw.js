@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v329 (Auditoría QA — integridad: paciente por voz + vacunación Pre-TX)
+//  (1) El paciente creado por dictado de voz guardaba solo `atb` (string) sin atbList/inicio/ingreso
+//  → calcDia congelado en "Día 1", 0 DOT, 0 días-paciente. AHORA construye atbList[] + inicio +
+//  ingreso (aware/pol derivados del 1er ATB con _clasificarAware). (2) Los selects de vacunación
+//  Pre-TX (ptv_) no tenían onchange → no disparaban la persistencia y se perdía el estado vacunal
+//  (dato load-bearing pre-TX). AHORA disparan _pretxRecs (debounce de _txSavePretx). +2 pruebas (240).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v328 (Auditoría QA — seguridad clínica: fenotipo ESBL + gate qSOFA ficha)
 //  (1) detectPhenotypes marcaba BLEE incluyendo cefepime y contando solo 'R': falso positivo de BLEE
 //  (cfp-R apunta a carbapenemasa/AmpC, no a BLEE) → podía inducir carbapenémico innecesario. AHORA
@@ -633,7 +640,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v328';
+const CACHE = 'stewardmx-v329';
 const SHELL = [
   '/',
   '/index.html',

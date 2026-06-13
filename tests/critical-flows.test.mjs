@@ -1042,6 +1042,15 @@ test('QSOFA P2: el gate de cultivo (qSOFA≥2) también aplica al solicitar desd
   assert.ok(/await window\._checkCultGate\(pid\)/.test(_idx), 'la ficha no consulta _checkCultGate');
 });
 
+/* ═══════════ P2 (auditoría v329): integridad — paciente por voz con atbList + vacunación persiste ═══════════ */
+test('VOZPAC P2: el paciente creado por voz incluye atbList + inicio + ingreso (no Día 1 congelado)', () => {
+  assert.ok(/atbList:\(d\.atb\|\|\[\]\)\.filter\(a=>a&&a\.nombre\)\.map\(a=>\(\{nombre:a\.nombre/.test(_idx), 'el paciente por voz no construye atbList');
+  assert.ok(/inicio:new Date\(\)\.toISOString\(\)\.slice\(0,10\),ingreso:new Date\(\)\.toISOString\(\)\.slice\(0,10\)/.test(_idx), 'no setea inicio/ingreso');
+});
+test('VACPTX P2: los selects de vacunación Pre-TX disparan la persistencia (onchange)', () => {
+  assert.ok(/<select id="\$\{id\}" onchange="window\._pretxRecs&&window\._pretxRecs\(\)"/.test(_idx), 'vacc() no dispara _pretxRecs al cambiar');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));
