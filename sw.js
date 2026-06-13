@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v328 (Auditoría QA — seguridad clínica: fenotipo ESBL + gate qSOFA ficha)
+//  (1) detectPhenotypes marcaba BLEE incluyendo cefepime y contando solo 'R': falso positivo de BLEE
+//  (cfp-R apunta a carbapenemasa/AmpC, no a BLEE) → podía inducir carbapenémico innecesario. AHORA
+//  el cribado es ['cro','ctaz','azt'] con no-susceptible (R o I), por CLSI. (2) El gate de sepsis
+//  (cultivos antes de ATB si qSOFA≥2 en Urgencias) vivía solo en crearSolicitud; un médico evadía la
+//  regla solicitando desde la ficha. AHORA crearSolicitudPaciente también aplica el gate. +2 pruebas (238).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v327 (Dictado por voz: cascada de modelos — paridad agenda médica, parte A)
 //  Cierra el overhaul de voz. Cloud Function whisperTranscribe: ANTES usaba solo whisper-1; AHORA
 //  cascada por precisión gpt-4o-transcribe (~30% menos WER en español médico) → gpt-4o-mini-transcribe
@@ -626,7 +633,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v327';
+const CACHE = 'stewardmx-v328';
 const SHELL = [
   '/',
   '/index.html',

@@ -1032,6 +1032,16 @@ test('TXCRASH P2: Pre-TX/Profilaxis no crashean sin paciente seleccionado', () =
   assert.ok(/sub==='tx-profilaxis'\)cont\.innerHTML=p\?_renderTxProfilaxis\(p\):/.test(_idx), 'Profilaxis no está guardada contra p null');
 });
 
+/* ═══════════ P2 (auditoría v328): seguridad clínica — fenotipo ESBL + gate qSOFA desde la ficha ═══════════ */
+test('ESBL P2: el cribado de BLEE excluye cefepime y usa no-susceptible (R o I) por CLSI', () => {
+  assert.ok(/\['cro','ctaz','azt'\]\.some\(k=>abg\[k\]==='R'\|\|abg\[k\]==='I'\)\)phenos\.ESBL=true/.test(_idx), 'el cribado ESBL no se corrigió');
+  assert.ok(!/\['cro','ctaz','cfp','azt'\]\.some\(k=>abg\[k\]==='R'\)/.test(_idx), 'el cribado ESBL aún incluye cefepime / solo R');
+});
+test('QSOFA P2: el gate de cultivo (qSOFA≥2) también aplica al solicitar desde la ficha', () => {
+  assert.ok(/window\._isUrgencias&&p&&\(\(p\.urgenciasQsofa\|\|p\.sofaScore\|\|0\)>=2\)/.test(_idx), 'falta el gate qSOFA en crearSolicitudPaciente');
+  assert.ok(/await window\._checkCultGate\(pid\)/.test(_idx), 'la ficha no consulta _checkCultGate');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));

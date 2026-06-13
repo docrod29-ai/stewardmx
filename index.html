@@ -854,7 +854,7 @@ function detectPhenotypes(abg,organismo){
   const org=(organismo||'').toLowerCase();
   // ESBL screen (CLSI): R/I a ceftriaxona/cefotaxima/ceftazidima/aztreonam en Enterobacterales
   if(/coli|klebsi|enterobacter|prote|serratia/.test(org)){
-    if(['cro','ctaz','cfp','azt'].some(k=>abg[k]==='R'))phenos.ESBL=true;
+    if(['cro','ctaz','azt'].some(k=>abg[k]==='R'||abg[k]==='I'))phenos.ESBL=true;// v328: cefepime FUERA (BLEE suele ser cfp-S; cfp-R apunta a carbapenemasa/AmpC+porinas); usar no-susceptible (R o I) por CLSI
   }
   // CRE: R/I a cualquier carbapenémico en Enterobacterales
   if(/coli|klebsi|enterobacter|prote|serratia/.test(org)){
@@ -19191,6 +19191,21 @@ window.crearSolicitudPaciente=async(pid)=>{
   if(!atb||!ind){
     if(errEl){errEl.textContent='El antibiótico y la indicación clínica son obligatorios.';errEl.style.display='';}
     _r();return;
+  }
+  // v328: gate de cultivo qSOFA≥2 también desde la ficha (antes solo en crearSolicitud) — el médico
+  // de Urgencias no debe evadir la regla PROA de sepsis (cultivos antes de ATB) entrando por la ficha.
+  if(window._isUrgencias&&p&&((p.urgenciasQsofa||p.sofaScore||0)>=2)){
+    const _tc=await window._checkCultGate(pid);
+    if(!_tc){
+      _r();
+      abrirContenido('⚠ Gate de cultivo — qSOFA '+(p.urgenciasQsofa||p.sofaScore||0),`
+        <div style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:8px;padding:14px;margin-bottom:14px;font-size:13px;color:var(--t2);line-height:1.7;">
+          <b>${escHtml(p.nombre||'—')}</b> tiene <b>qSOFA ${(p.urgenciasQsofa||p.sofaScore||0)}/3</b>.<br>
+          Según el protocolo de sepsis, registra la solicitud de cultivos <b>antes</b> de prescribir ATB de amplio espectro.
+        </div>
+        <div style="display:flex;gap:8px;"><button class="btn-main" style="flex:1;" onclick="cerrarModal()">Entendido</button></div>`);
+      return;
+    }
   }
   try{
     const _cls=_clasificarAware(atb);
