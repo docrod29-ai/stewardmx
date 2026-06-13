@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v326 (Dictado por voz: corrector médico — paridad con agenda médica, parte B)
+//  El Dr. pidió que el dictado por voz tenga las fortalezas del sistema de su app de agenda médica.
+//  Parte B (cliente): nuevo módulo PURO js/core/medical-voice.js (portado de medical-vocabulary.ts):
+//  corrección en 3 capas conservadora — (1) CONFUSIONES_CONOCIDAS (frase completa, errores
+//  irrecuperables tipo "septriasona"→ceftriaxona, "plátano pros"→latanoprost), (2) fonética del
+//  español (fonetEs: seseo/yeísmo/v↔b…), (3) Levenshtein con umbral por longitud contra vocabulario
+//  médico PROA (ATB/antifúngicos/antivirales/ARV/microbiología + comorbilidad). Se aplica a la
+//  transcripción ANTES de la extracción. No toca palabras comunes. +4 pruebas que ejecutan el módulo
+//  real (236). PENDIENTE parte A (v327): cascada gpt-4o-transcribe→mini→whisper-1 + prompt médico en
+//  la Cloud Function whisperTranscribe. js/core/medical-voice.js añadido a SHELL.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v325 (Auditoría QA — Mis-Solicitudes, guard de stock, crash Pre-TX)
 //  Tres P2: (1) "Mis Solicitudes" clasificaba retenido_farmacia/sin_stock como RECHAZADAS → el médico
 //  creía denegado un ATB solo retenido. Ahora van a "en proceso" y en_almacen cuenta como aprobada.
@@ -607,7 +618,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v325';
+const CACHE = 'stewardmx-v326';
 const SHELL = [
   '/',
   '/index.html',
@@ -617,6 +628,7 @@ const SHELL = [
   '/js/core/clinical-days.js',
   '/js/core/magiorakos.js',
   '/js/core/dx-cie10.js',
+  '/js/core/medical-voice.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',
   '/icons/icon-maskable.svg'

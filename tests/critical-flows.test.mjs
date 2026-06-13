@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault,
          ci95_wilson, ci95_poisson_rate, fmtPropIC, fmtRateIC } from '../js/core/stats.js';
 import { calcDiaATB, calcDia, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPer1000 } from '../js/core/clinical-days.js';
+import { corregirTranscripcionMedica, fonetEs, levenshtein } from '../js/core/medical-voice.js';
 import { clasificarMagiorakos, _intrinsicResistanceKeys } from '../js/core/magiorakos.js';
 import { cie10DeDx, categorizarDx } from '../js/core/dx-cie10.js';
 
@@ -995,6 +996,25 @@ test('CORR P2: analítica 2x2 usa el enum real de acción (mantener / vo), no co
 test('CORR P2: la auto-solicitud Reserve usa el nombre del ATB real, no el string concatenado', () => {
   assert.ok(/const _atbReserve=\(atbListData\|\|\[\]\)\.find\(a=>a&&a\.nombre&&\(a\.aware==='Reserve'/.test(_idx), 'la auto-solicitud no selecciona el ATB Reserve real');
   assert.ok(/_atbNombreAuto=\(_atbReserve\?\.nombre\|\|/.test(_idx), '_atbNombreAuto no prioriza el ATB Reserve real');
+});
+
+/* ═══════════ VOZ (v326): corrector de transcripción médica (portado de agenda médica) ═══════════ */
+test('VOZMED: corrige confusiones conocidas (septriasona → ceftriaxona)', () => {
+  const r = corregirTranscripcionMedica('inicié septriasona un gramo IV');
+  assert.match(r.corregido, /ceftriaxona/i);
+});
+test('VOZMED: corrige un fármaco mal transcrito por fonética/Levenshtein (meropenen → meropenem)', () => {
+  const r = corregirTranscripcionMedica('dejé meropenen para la sepsis');
+  assert.match(r.corregido, /meropenem/i);
+  assert.ok(r.cambios.length >= 1, 'no registró el cambio');
+});
+test('VOZMED: NO toca palabras comunes del español (conservador)', () => {
+  const r = corregirTranscripcionMedica('el paciente presenta fiebre y dolor');
+  assert.equal(r.corregido, 'el paciente presenta fiebre y dolor');
+});
+test('VOZMED: fonetEs normaliza (c/k seseo) y levenshtein mide edición', () => {
+  assert.equal(fonetEs('amikacina'), fonetEs('amicacina'));
+  assert.equal(levenshtein('meropenem', 'meropenen'), 1);
 });
 
 /* ═══════════ P2 (auditoría v325): clasificación Mis-Solicitudes, guard de stock, crash Pre-TX ═══════════ */

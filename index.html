@@ -816,6 +816,10 @@ function _grupoEdad(edad){
 // Se importan aquí (los import se elevan/hoisted) y se reexponen en window.* para los onclick.
 import { chiSquareTest, fisherExact2x2, testAuto2x2, parseMICnum, micStats, cockcroftGault,
          ci95_wilson, ci95_poisson_rate, fmtPropIC, fmtRateIC } from './js/core/stats.js';
+// Corrector de transcripción médica (v326) — portado de la app de agenda médica: fonético +
+// Levenshtein + confusiones conocidas. Puro/testeable. Reexpuesto para el pipeline de dictado.
+import { corregirTranscripcionMedica, fonetEs, levenshtein, WHISPER_PROMPT_MEDICO } from './js/core/medical-voice.js';
+window.corregirTranscripcionMedica=corregirTranscripcionMedica; window.WHISPER_PROMPT_MEDICO=WHISPER_PROMPT_MEDICO;
 window.chiSquareTest=chiSquareTest; window.fisherExact2x2=fisherExact2x2; window.testAuto2x2=testAuto2x2;
 window.parseMICnum=parseMICnum; window.micStats=micStats; window.cockcroftGault=cockcroftGault;
 window.ci95_wilson=ci95_wilson; window.ci95_poisson_rate=ci95_poisson_rate; window.fmtPropIC=fmtPropIC; window.fmtRateIC=fmtRateIC;
@@ -24693,6 +24697,18 @@ window._vaFill=async function(){
     }
 
     if(!transcript){if(btn){btn.disabled=false;btn.textContent='✨ Llenar con IA';}window._va.processing=false;return;}
+
+    // v326: corrección médica de la transcripción (fonético + Levenshtein + confusiones conocidas) —
+    // portado del sistema de voz de la app de agenda médica. Conservador; no toca palabras comunes.
+    try{
+      if(window.corregirTranscripcionMedica){
+        const _corr=window.corregirTranscripcionMedica(transcript);
+        if(_corr&&_corr.corregido){
+          if(_corr.cambios&&_corr.cambios.length)console.info('[voz] correcciones médicas:',_corr.cambios.map(c=>c.original+'→'+c.corregido).join(', '));
+          transcript=_corr.corregido;
+        }
+      }
+    }catch(_cv){console.warn('[voz] corrector médico:',_cv&&_cv.message);}
 
     // ── 2. Extracción con Claude (con fallback a regex si falla) ───
     // Si estamos offline, saltar directamente a regex
