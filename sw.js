@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v330 (Auditoría QA — seguridad/datos: dispensación auxiliar + camas)
+//  (1) marcarDispensadoAux NO tenía gate de rol (cualquiera podía cerrar una dispensación) y guardaba
+//  el nombre en `dispensadoPor` (que en confirmarDispensacion es un UID) → auditoría inconsistente.
+//  AHORA exige Farmacia/Admin y unifica el esquema (dispensadoPorUid + dispensadoNombre + email).
+//  (2) addCama/delCama reescribían el doc completo sobre un CAMAS cargado una sola vez → lost-update
+//  entre dos admins (una sala desaparecía). AHORA refrescan CAMAS desde Firestore antes de mutar
+//  (_refreshCamas) y exigen rol admin. +2 pruebas (242).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v329 (Auditoría QA — integridad: paciente por voz + vacunación Pre-TX)
 //  (1) El paciente creado por dictado de voz guardaba solo `atb` (string) sin atbList/inicio/ingreso
 //  → calcDia congelado en "Día 1", 0 DOT, 0 días-paciente. AHORA construye atbList[] + inicio +
@@ -640,7 +648,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v329';
+const CACHE = 'stewardmx-v330';
 const SHELL = [
   '/',
   '/index.html',

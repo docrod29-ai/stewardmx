@@ -5143,8 +5143,11 @@ window.obFinalizar=async()=>{
   const dispTxt=infectoDisp==='lv'?'Lunes a viernes — fin de semana → revisar el lunes':'Todos los días — ≤ 24 h';
   toast('¡Mapa de camas listo! Infectólogo: '+dispTxt+' ✓');
 };
-window.addCama=async svc=>{const inp=document.getElementById('nc-'+svc.replace(/\W/g,'_'));const val=(inp?.value||'').trim();if(!val)return;if(!CAMAS[svc])CAMAS[svc]=[];if(CAMAS[svc].includes(val)){toast('Ya existe','am');return;}CAMAS[svc].push(val);try{await saveCamas();renderCamas();toast('Cama agregada ✓');}catch(_){}};
-window.delCama=async(svc,cama)=>{CAMAS[svc]=(CAMAS[svc]||[]).filter(c=>c!==cama);try{await saveCamas();renderCamas();}catch(_){}};
+// v330: refresca CAMAS desde Firestore ANTES de mutar → evita lost-update entre dos admins (CAMAS
+// se cargaba una vez con getDoc, sin onSnapshot, y saveCamas reescribía el doc completo). + guard de rol.
+async function _refreshCamas(){try{const _s=await getDoc(doc(db,'hospitals',HOSP,'info','camas'));if(_s.exists())CAMAS=_s.data()||{};}catch(_){}}
+window.addCama=async svc=>{if(!window._isAdmin){toast('Solo el administrador puede editar el mapa de camas','rd');return;}const inp=document.getElementById('nc-'+svc.replace(/\W/g,'_'));const val=(inp?.value||'').trim();if(!val)return;try{await _refreshCamas();if(!CAMAS[svc])CAMAS[svc]=[];if(CAMAS[svc].includes(val)){toast('Ya existe','am');return;}CAMAS[svc].push(val);await saveCamas();renderCamas();toast('Cama agregada ✓');}catch(e){toast('Error: '+(e&&e.message||e),'rd');}};
+window.delCama=async(svc,cama)=>{if(!window._isAdmin){toast('Solo el administrador puede editar el mapa de camas','rd');return;}try{await _refreshCamas();CAMAS[svc]=(CAMAS[svc]||[]).filter(c=>c!==cama);await saveCamas();renderCamas();}catch(e){toast('Error: '+(e&&e.message||e),'rd');}};
 window.delServicio=(svc)=>{
   if(!window._isAdmin){toast('Solo el administrador puede eliminar servicios','rd');return;}
   const pOcup=PACS.filter(p=>p.servicio===svc).length;
@@ -29439,6 +29442,8 @@ window.renderVistaAuxiliarFarm=function(){
 };
 
 window.marcarDispensadoAux=async(id)=>{
+  // v330: gate de rol (faltaba; a diferencia de confirmarDispensacion) — solo Farmacia/Admin.
+  if(!window._isFarmaceutico&&!window._isAdmin){toast('Solo Farmacia puede registrar dispensación','rd');return;}
   const s=SOLICITUDES.find(x=>x.id===id);
   if(!s){toast('Solicitud no encontrada','rd');return;}
   _confirmModal(`¿Confirmar dispensación de *${(s.antibiotico||'ATB').split('+')[0].trim().slice(0,40)}* para ${s.pacienteNombre||'paciente'}?`,async()=>{
@@ -29446,8 +29451,11 @@ window.marcarDispensadoAux=async(id)=>{
       await updateDoc(doc(db,'hospitals',HOSP,'antibiotic_requests',id),{
         status:'dispensado',
         dispensadoAt:serverTimestamp(),
-        dispensadoPor:window._userName||U.email,
+        // v330: esquema de auditoría UNIFICADO con confirmarDispensacion — el nombre NO va en
+        // dispensadoPor (que en la otra ruta es un UID); se usa dispensadoNombre.
         dispensadoPorUid:U.uid,
+        dispensadoNombre:window._userName||U.displayName||U.email,
+        dispensadoEmail:U.email,
       });
       toast('✅ Dispensación registrada');
       renderVistaAuxiliarFarm();

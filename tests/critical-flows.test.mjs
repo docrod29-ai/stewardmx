@@ -1051,6 +1051,18 @@ test('VACPTX P2: los selects de vacunación Pre-TX disparan la persistencia (onc
   assert.ok(/<select id="\$\{id\}" onchange="window\._pretxRecs&&window\._pretxRecs\(\)"/.test(_idx), 'vacc() no dispara _pretxRecs al cambiar');
 });
 
+/* ═══════════ P2 (auditoría v330): seguridad/datos — gate de dispensación auxiliar + camas anti lost-update ═══════════ */
+test('DISPAUX P2: marcarDispensadoAux tiene gate de rol y esquema de auditoría unificado', () => {
+  assert.ok(/if\(!window\._isFarmaceutico&&!window\._isAdmin\)\{toast\('Solo Farmacia puede registrar dispensación'/.test(_idx), 'falta el gate de rol en marcarDispensadoAux');
+  assert.ok(/dispensadoPorUid:U\.uid,\s*dispensadoNombre:window\._userName/.test(_idx), 'no unificó el esquema (dispensadoPorUid + dispensadoNombre)');
+});
+test('CAMAS P2: addCama/delCama refrescan desde Firestore + guard de admin (anti lost-update)', () => {
+  assert.ok(/async function _refreshCamas\(\)/.test(_idx), 'falta _refreshCamas');
+  assert.ok(/window\.addCama=async svc=>\{if\(!window\._isAdmin\)/.test(_idx), 'addCama sin guard de admin');
+  assert.ok(/window\.delCama=async\(svc,cama\)=>\{if\(!window\._isAdmin\)/.test(_idx), 'delCama sin guard de admin');
+  assert.ok((_idx.match(/await _refreshCamas\(\)/g) || []).length >= 2, 'addCama/delCama no refrescan antes de mutar');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));
