@@ -1,4 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v321 (Auditoría QA — retirar dispositivo resuelve su alarma)
+//  P1 (fatiga de alarma): _retirarDispositivo solo ponía fechaRetiro, nunca marcaba status:'resuelta'
+//  en la alerta24h del dispositivo → el panel se llenaba de alarmas no accionables. FIX: nuevo
+//  _resolverAlarmaDispositivo(pid,dispKey) marca la alerta como resuelta; se llama en ambas ramas
+//  (legacy cvc/foley + eventos[]). dispKey uniforme 'dispositivo_'+tipo+'_'+id. +1 prueba (223).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v320 (Auditoría QA — DOT por-agente, deja de subcontar combinación)
 //  P1 regulatorio: el indicador "DOT" se calculaba con calcDia (1 por PACIENTE = LOT) en vez de
 //  calcDOT (1 por AGENTE, NHSN) → 2 ATB × 5 días contaban 5, no 10. Subestimaba el consumo ante
@@ -570,7 +576,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v320';
+const CACHE = 'stewardmx-v321';
 const SHELL = [
   '/',
   '/index.html',

@@ -16376,6 +16376,16 @@ window._agregarDispositivo=async(pid)=>{
   }catch(e){if(errEl){errEl.textContent='Error al guardar: '+e.message;errEl.style.display='';}}
 };
 
+// Auditoría v321: al retirar un dispositivo, RESOLVER su alarma24h (antes solo se ponía
+// fechaRetiro → la alerta seguía activa = fatiga de alarma). El dispKey es uniforme:
+// 'dispositivo_'+tipo+'_'+id (legacy usa id='legacy_'+tipo).
+async function _resolverAlarmaDispositivo(pid,dispKey){
+  try{
+    const snap=await getDocs(query(collection(db,'hospitals',HOSP,'alertas24h'),where('patientId','==',pid)));
+    await Promise.all(snap.docs.filter(d=>d.data().dispKey===dispKey&&d.data().status!=='resuelta').map(d=>
+      updateDoc(doc(db,'hospitals',HOSP,'alertas24h',d.id),{status:'resuelta',resueltaAt:serverTimestamp(),resueltaPor:window._userName||U?.email||'—',motivoResolucion:'dispositivo retirado'})));
+  }catch(_){}
+}
 window._retirarDispositivo=async(pid,eventoId)=>{
   const p=PACS.find(x=>x.id===pid);
   if(!p)return;
@@ -16386,6 +16396,7 @@ window._retirarDispositivo=async(pid,eventoId)=>{
       const t=eventoId.replace('legacy_','');
       await updateDoc(doc(db,..._pacPath(),pid),{['dispositivos.'+t+'.fechaRetiro']:today,updatedAt:serverTimestamp()});
       if(p.dispositivos&&p.dispositivos[t])p.dispositivos[t].fechaRetiro=today;
+      await _resolverAlarmaDispositivo(pid,'dispositivo_'+t+'_'+eventoId);
     }else{
       const ev=Array.isArray(p?.dispositivos?.eventos)?p.dispositivos.eventos.map(e=>({...e})):[];
       const idx=ev.findIndex(e=>e.id===eventoId);
@@ -16393,8 +16404,9 @@ window._retirarDispositivo=async(pid,eventoId)=>{
       ev[idx].fechaRetiro=today;
       await updateDoc(doc(db,..._pacPath(),pid),{'dispositivos.eventos':ev,updatedAt:serverTimestamp()});
       if(p.dispositivos)p.dispositivos.eventos=ev;
+      await _resolverAlarmaDispositivo(pid,'dispositivo_'+ev[idx].tipo+'_'+eventoId);
     }
-    toast('✓ Dispositivo retirado');
+    toast('✓ Dispositivo retirado · alarma resuelta');
     _abrirQuickDispositivo(pid);
   }catch(e){toast('Error: '+e.message,'rd');}
 };

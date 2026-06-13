@@ -938,6 +938,14 @@ test('DOT P1: el DOT reportado usa calcDOT por-agente; el per-paciente se etique
   assert.ok(/Duración prom\. \(LOT\)/.test(_idx) && /Duración promedio de terapia \(LOT/.test(_idx), 'no se relabeló la duración promedio (LOT) en tablero/reporte');
 });
 
+/* ═══════════ P1 (auditoría v321): retirar un dispositivo resuelve su alarma (no fatiga de alarma) ═══════════ */
+test('ALARMA P1: _retirarDispositivo marca la alerta24h como resuelta (ambas ramas)', () => {
+  assert.ok(/async function _resolverAlarmaDispositivo\(pid,dispKey\)/.test(_idx), 'falta _resolverAlarmaDispositivo');
+  assert.ok(/status:'resuelta',resueltaAt:serverTimestamp\(\)/.test(_idx), 'no marca la alerta como resuelta');
+  assert.ok(/_resolverAlarmaDispositivo\(pid,'dispositivo_'\+t\+'_'\+eventoId\)/.test(_idx), 'rama legacy no resuelve la alarma');
+  assert.ok(/_resolverAlarmaDispositivo\(pid,'dispositivo_'\+ev\[idx\]\.tipo\+'_'\+eventoId\)/.test(_idx), 'rama eventos no resuelve la alarma');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));
