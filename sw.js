@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v342 (Antibiograma — extracción Vision reforzada + cefotaxima en el panel)
+//  Mejora el eslabón más débil del "100% confiable": la EXTRACCIÓN de la foto. (1) Prompt Vision (ambas
+//  copias: analizarNabgConIA + analizarAbgConIA) con REGLAS DE INTEGRIDAD anti-alucinación: transcribe solo
+//  lo legible, NO inventa/infiere antibióticos ausentes, NO interpreta mecanismos (eso es del motor), y marca
+//  "needs_review":true lo borroso/dudoso. JSON suma metodo (disco|mic) + conf (alta/media/baja) + needs_review
+//  por resultado. (2) El handler ya NO da por cierto lo dudoso: recolecta los de baja confianza y AVISA al
+//  clínico ("VERIFICA: …"). (3) CEFOTAXIMA (ctx) añadida al panel ABG_ATBS y al cribado 3GC de BLEE — CTX-M
+//  (la BLEE dominante) hidroliza cefotaxima preferentemente sobre ceftazidima; algunos labs reportan
+//  cefotaxima en vez de ceftriaxona. +3 pruebas (261).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v341 (Antibiograma — el panel del motor también al VER aislamientos guardados)
 //  El panel "🧠 Interpretación del motor" (mecanismo inferido + alertas EUCAST + recomendación dirigida)
 //  antes solo aparecía al CAPTURAR el antibiograma. Ahora también se muestra al VER cada aislamiento
@@ -758,7 +768,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v341';
+const CACHE = 'stewardmx-v342';
 const SHELL = [
   '/',
   '/index.html',

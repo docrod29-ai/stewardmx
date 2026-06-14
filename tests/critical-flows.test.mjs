@@ -1035,9 +1035,9 @@ test('TXCRASH P2: Pre-TX/Profilaxis no crashean sin paciente seleccionado', () =
 
 /* ═══════════ P2 (auditoría v328): seguridad clínica — fenotipo ESBL + gate qSOFA desde la ficha ═══════════ */
 test('ESBL P2: el cribado de BLEE excluye cefepime y usa no-susceptible (R o I) por CLSI', () => {
-  // v334: el cribado 3GC se movió a la variable _3gcNoS (sigue cro/ctaz/azt con R||I, sin cefepime).
-  assert.ok(/const _3gcNoS=\['cro','ctaz','azt'\]\.some\(k=>abg\[k\]==='R'\|\|abg\[k\]==='I'\)/.test(_idx), 'el cribado ESBL no usa cro/ctaz/azt con no-susceptible');
-  assert.ok(!/\['cro','ctaz','cfp','azt'\]\.some\(k=>abg\[k\]==='R'\)/.test(_idx), 'el cribado ESBL aún incluye cefepime / solo R');
+  // v334: el cribado 3GC se movió a la variable _3gcNoS (R||I, sin cefepime). v342: + cefotaxima (ctx).
+  assert.ok(/const _3gcNoS=\['cro','ctx','ctaz','azt'\]\.some\(k=>abg\[k\]==='R'\|\|abg\[k\]==='I'\)/.test(_idx), 'el cribado ESBL no usa cro/ctx/ctaz/azt con no-susceptible');
+  assert.ok(!/'cfp'[^\]]*\.some\(k=>abg\[k\]==='R'\)/.test(_idx), 'el cribado ESBL aún incluye cefepime / solo R');
 });
 test('QSOFA P2: el gate de cultivo (qSOFA≥2) también aplica al solicitar desde la ficha', () => {
   assert.ok(/window\._isUrgencias&&p&&\(\(p\.urgenciasQsofa\|\|p\.sofaScore\|\|0\)>=2\)/.test(_idx), 'falta el gate qSOFA en crearSolicitudPaciente');
@@ -1210,6 +1210,22 @@ test('ABGSAFE v341: la interpretación del motor también se muestra al VER un a
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');
   // En el antibiograma legacy de la ficha (p.abg).
   assert.ok(/window\._renderAbgInterpretacionHTML\(p\.abg,p\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en el antibiograma legacy de la ficha');
+});
+test('ABGVISION v342: cefotaxima (ctx) en el panel y dispara BLEE (CTX-M la hidroliza preferentemente)', () => {
+  assert.ok(/\{k:'ctx',n:'Cefotaxima'\}/.test(_idx), 'falta cefotaxima (ctx) en el panel ABG_ATBS');
+  assert.ok(_detPheno, 'no se extrajo detectPhenotypes');
+  // Cefotaxima-R + inhibidor-S + cefoxitina-S → BLEE (vía el motor REAL).
+  assert.equal(_detPheno({ ctx: 'R', pitaz: 'S' }, 'Escherichia coli').ESBL, true, 'cefotaxima-R no dispara el cribado BLEE');
+});
+test('ABGVISION v342: prompt Vision con reglas de integridad + extracción de baja confianza marcada', () => {
+  // El prompt prohíbe inventar/inferir y exige needs_review en lo dudoso (anti-alucinación).
+  assert.ok(/REGLAS DE INTEGRIDAD/.test(_idx), 'el prompt Vision no incluye reglas de integridad');
+  assert.ok(/NO infieras ni inventes antibióticos/.test(_idx), 'el prompt no prohíbe inventar antibióticos');
+  assert.ok(/"needs_review":false/.test(_idx), 'el JSON del prompt no pide needs_review');
+  assert.ok(/Cefotaxima→ctx/.test(_idx), 'el mapeo del prompt no incluye Cefotaxima→ctx');
+  // El handler avisa de los resultados de baja confianza en vez de darlos por ciertos.
+  assert.ok(/if\(r\.needs_review\|\|r\.conf==='baja'\)revisar\.push/.test(_idx), 'el handler no recolecta los resultados de baja confianza');
+  assert.ok(/de baja confianza — VERIFICA/.test(_idx), 'el handler no avisa de la baja confianza');
 });
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');

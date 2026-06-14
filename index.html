@@ -863,7 +863,7 @@ function detectPhenotypes(abg,organismo){
   // pip-tazo) → BLEE. El requisito de inhibidor-S distingue BLEE de AmpC (que es inhibidor-R y
   // cefoxitina-R). v328: cefepime FUERA del cribado (BLEE suele ser cfp-S). Usar no-susceptible (R o I).
   if(/coli|klebsi|enterobacter|prote|serratia/.test(org)){
-    const _3gcNoS=['cro','ctaz','azt'].some(k=>abg[k]==='R'||abg[k]==='I');
+    const _3gcNoS=['cro','ctx','ctaz','azt'].some(k=>abg[k]==='R'||abg[k]==='I');
     const _foxR=abg['fox']==='R';
     const _bliTested=['amcl','amsul','pitaz'].some(k=>abg[k]);
     const _bliS=['amcl','amsul','pitaz'].some(k=>abg[k]==='S');
@@ -4576,7 +4576,7 @@ window.calcDiasEstancia=calcDiasEstancia; window.calcDiasPaciente=calcDiasPacien
 
 const ABG_ATBS=[
   {g:'Penicilinas',a:[{k:'amp',n:'Ampicilina'},{k:'amsul',n:'Amp-Sulbactam'},{k:'amcl',n:'Amox-Clav'},{k:'oxa',n:'Oxacilina'},{k:'pitaz',n:'Pip-Tazobactam'}]},
-  {g:'Cefalosporinas',a:[{k:'cefa',n:'Cefazolina'},{k:'cfx',n:'Cefuroxima'},{k:'fox',n:'Cefoxitina'},{k:'cro',n:'Ceftriaxona'},{k:'ctaz',n:'Ceftazidima'},{k:'cfp',n:'Cefepime'},{k:'cfol',n:'Ceftoloz-Tazo'}]},
+  {g:'Cefalosporinas',a:[{k:'cefa',n:'Cefazolina'},{k:'cfx',n:'Cefuroxima'},{k:'fox',n:'Cefoxitina'},{k:'cro',n:'Ceftriaxona'},{k:'ctx',n:'Cefotaxima'},{k:'ctaz',n:'Ceftazidima'},{k:'cfp',n:'Cefepime'},{k:'cfol',n:'Ceftoloz-Tazo'}]},
   {g:'Carbapenémicos',a:[{k:'imi',n:'Imipenem'},{k:'mer',n:'Meropenem'},{k:'ert',n:'Ertapenem'}]},
   {g:'β-Lact. Nuevos',a:[{k:'cazavi',n:'Cef-Avibactam'},{k:'azt',n:'Aztreonam'},{k:'cfid',n:'Cefiderocol'},{k:'imrel',n:'Imi-Relebactam'}]},
   {g:'Aminoglucósidos',a:[{k:'gen',n:'Gentamicina'},{k:'ami',n:'Amikacina'},{k:'tob',n:'Tobramicina'}]},
@@ -10441,7 +10441,7 @@ window.analizarNabgConIA=async()=>{
     const result=await llamarAnthropicSeguro(
       [{role:'user',content:[
         mediaBlock,
-        {type:'text',text:`Eres experto en microbiología clínica. Analiza este reporte de laboratorio latinoamericano.\n\nFORMATO IMPORTANTE: El valor CMI puede aparecer DENTRO del nombre del antibiótico. Ejemplo: "Ampicilina/Sulbactam CMI 16" → antibiótico=amsul, mic="16", resultado=INTERMEDIO. Los decimales pueden usar coma (0,12) — conviértelos a punto (0.12).\n\nExtrae:\n1. MICROORGANISMO: el organismo identificado (busca "RESULTADO:", el nombre del microorganismo reportado).\n2. ANTIBIÓTICOS: mapea cada uno a su clave y anota resultado (SENSIBLE→S, INTERMEDIO→I, RESISTENTE→R) y CMI si aparece.\n\nMAPEO (nombre en reporte → clave):\nAmpicilina→amp, Ampicilina/Sulbactam→amsul, Amoxicilina/Clavulanato→amcl, Oxacilina→oxa,\nPiperacilina/Tazobactam→pitaz, Cefazolina/Cefazolina Oral→cefa, Cefuroxima→cfx, Ceftriaxona→cro,\nCeftazidima→ctaz, Cefepima/Cefepime→cfp, Ceftolozano-Tazobactam→cfol, Imipenem→imi,\nMeropenem→mer, Ertapenem→ert, Ceftazidima-Avibactam→cazavi, Aztreonam→azt,\nCefiderocol→cfid, Imipenem-Relebactam→imrel, Gentamicina→gen, Amikacina/Amicacina→ami,\nTobramicina→tob, Ciprofloxacino→cip, Levofloxacino→lev, Moxifloxacino→mox,\nVancomicina→van, Teicoplanina→tei, Linezolid→lin, Daptomicina→dap,\nTMP-SMX→tmp, Nitrofurantoína→nit, Fosfomicina→fos, Colistina→col,\nTigeciclina/Tigecilina→tig, Clindamicina→cli, Minociclina→mino\n\nResponde ÚNICAMENTE en JSON (sin texto extra):\n{"organismo":"nombre completo o null","resultados":[{"antibiotico":"clave","resultado":"S","mic":"valor"}]}\n\nPara mic: escribe el valor exacto del CMI con punto decimal (ej: "16", "<=4", ">=16", "0.25", "<=0.12").`}
+        {type:'text',text:`Eres experto en microbiología clínica. Analiza este reporte de laboratorio latinoamericano.\n\nREGLAS DE INTEGRIDAD (críticas): (1) transcribe SOLO lo que se lee con claridad; NO infieras ni inventes antibióticos que no aparezcan. (2) NO interpretes mecanismos de resistencia ni añadas resistencias "esperadas" — eso lo hace un motor aparte; tú solo lees el S/I/R impreso. (3) si un valor está borroso, cortado, ambiguo o ilegible, márcalo "needs_review":true y NO lo adivines.\n\nFORMATO IMPORTANTE: El valor CMI puede aparecer DENTRO del nombre del antibiótico. Ejemplo: "Ampicilina/Sulbactam CMI 16" → antibiótico=amsul, mic="16", resultado=INTERMEDIO. Los decimales pueden usar coma (0,12) — conviértelos a punto (0.12).\n\nExtrae:\n1. MICROORGANISMO: el organismo identificado (busca "RESULTADO:", el nombre del microorganismo reportado).\n2. ANTIBIÓTICOS: mapea cada uno a su clave y anota resultado (SENSIBLE→S, INTERMEDIO→I, RESISTENTE→R) y CMI si aparece.\n\nMAPEO (nombre en reporte → clave):\nAmpicilina→amp, Ampicilina/Sulbactam→amsul, Amoxicilina/Clavulanato→amcl, Oxacilina→oxa,\nPiperacilina/Tazobactam→pitaz, Cefazolina/Cefazolina Oral→cefa, Cefuroxima→cfx, Ceftriaxona→cro, Cefotaxima→ctx,\nCeftazidima→ctaz, Cefepima/Cefepime→cfp, Ceftolozano-Tazobactam→cfol, Imipenem→imi,\nMeropenem→mer, Ertapenem→ert, Ceftazidima-Avibactam→cazavi, Aztreonam→azt,\nCefiderocol→cfid, Imipenem-Relebactam→imrel, Gentamicina→gen, Amikacina/Amicacina→ami,\nTobramicina→tob, Ciprofloxacino→cip, Levofloxacino→lev, Moxifloxacino→mox,\nVancomicina→van, Teicoplanina→tei, Linezolid→lin, Daptomicina→dap,\nTMP-SMX→tmp, Nitrofurantoína→nit, Fosfomicina→fos, Colistina→col,\nTigeciclina/Tigecilina→tig, Clindamicina→cli, Minociclina→mino\n\nResponde ÚNICAMENTE en JSON (sin texto extra):\n{"organismo":"nombre completo o null","metodo":"disco|mic|null","resultados":[{"antibiotico":"clave","resultado":"S","mic":"valor","conf":"alta|media|baja","needs_review":false}]}\nconf = legibilidad del resultado; needs_review:true si el dato es dudoso (NO lo adivines).\n\nPara mic: escribe el valor exacto del CMI con punto decimal (ej: "16", "<=4", ">=16", "0.25", "<=0.12").`}
       ]}],
       null, 1024, 'claude-sonnet-4-6'
     );
@@ -10456,16 +10456,19 @@ window.analizarNabgConIA=async()=>{
     }
     // Guardar MICs en variable global para que guardarAntibiograma los incluya
     window._nabgMICs={};
-    let filled=0;
+    let filled=0; const revisar=[];
     resultados.forEach(r=>{
       if(r.antibiotico&&['S','I','R'].includes((r.resultado||'').toUpperCase())){
         const btn=document.querySelector('#modal-bdy .sir-btn[data-k="'+r.antibiotico+'"][data-v="'+r.resultado.toUpperCase()+'"]');
         if(btn){document.querySelectorAll('#modal-bdy .sir-btn[data-k="'+r.antibiotico+'"]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');filled++;}
         if(r.mic)window._nabgMICs[r.antibiotico]=r.mic;
+        // Integridad: la IA marca lo dudoso → avisamos al clínico para que lo verifique (no se da por cierto).
+        if(r.needs_review||r.conf==='baja')revisar.push(r.antibiotico);
       }
     });
     const micCount=Object.keys(window._nabgMICs||{}).length;
-    setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+'. '+(window._anthropicProxyURL?'🔒 Sin exponer la key. ':'')+' Revisa y ajusta si es necesario.','ok');
+    const _rev=revisar.length?' ⚠ '+revisar.length+' de baja confianza — VERIFICA: '+revisar.join(', '):'';
+    setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+_rev+'. '+(window._anthropicProxyURL?'🔒 Sin exponer la key. ':'')+' Revisa y ajusta si es necesario.',revisar.length?'info':'ok');
     if(window._refreshAbgInterpret)window._refreshAbgInterpret();
   }catch(e){setStatus('🔴 Error: '+e.message,'err');}
 };
@@ -11468,7 +11471,7 @@ window.analizarAbgConIA=async()=>{
     const result=await llamarAnthropicSeguro(
       [{role:'user',content:[
         mediaBlock,
-        {type:'text',text:`Eres experto en microbiología clínica. Analiza este reporte de laboratorio latinoamericano.\n\nFORMATO IMPORTANTE: El valor CMI puede aparecer DENTRO del nombre del antibiótico. Ejemplo: "Ampicilina/Sulbactam CMI 16" → antibiótico=amsul, mic="16", resultado=INTERMEDIO. Los decimales pueden usar coma (0,12) — conviértelos a punto (0.12).\n\nExtrae:\n1. MICROORGANISMO: el organismo identificado (busca "RESULTADO:", el nombre del microorganismo reportado).\n2. ANTIBIÓTICOS: mapea cada uno a su clave y anota resultado (SENSIBLE→S, INTERMEDIO→I, RESISTENTE→R) y CMI si aparece.\n\nMAPEO (nombre en reporte → clave):\nAmpicilina→amp, Ampicilina/Sulbactam→amsul, Amoxicilina/Clavulanato→amcl, Oxacilina→oxa,\nPiperacilina/Tazobactam→pitaz, Cefazolina/Cefazolina Oral→cefa, Cefuroxima→cfx, Ceftriaxona→cro,\nCeftazidima→ctaz, Cefepima/Cefepime→cfp, Ceftolozano-Tazobactam→cfol, Imipenem→imi,\nMeropenem→mer, Ertapenem→ert, Ceftazidima-Avibactam→cazavi, Aztreonam→azt,\nCefiderocol→cfid, Imipenem-Relebactam→imrel, Gentamicina→gen, Amikacina/Amicacina→ami,\nTobramicina→tob, Ciprofloxacino→cip, Levofloxacino→lev, Moxifloxacino→mox,\nVancomicina→van, Teicoplanina→tei, Linezolid→lin, Daptomicina→dap,\nTMP-SMX→tmp, Nitrofurantoína→nit, Fosfomicina→fos, Colistina→col,\nTigeciclina/Tigecilina→tig, Clindamicina→cli, Minociclina→mino\n\nResponde ÚNICAMENTE en JSON (sin texto extra):\n{"organismo":"nombre completo o null","resultados":[{"antibiotico":"clave","resultado":"S","mic":"valor"}]}\n\nPara mic: escribe el valor exacto del CMI con punto decimal (ej: "16", "<=4", ">=16", "0.25", "<=0.12").`}
+        {type:'text',text:`Eres experto en microbiología clínica. Analiza este reporte de laboratorio latinoamericano.\n\nREGLAS DE INTEGRIDAD (críticas): (1) transcribe SOLO lo que se lee con claridad; NO infieras ni inventes antibióticos que no aparezcan. (2) NO interpretes mecanismos de resistencia ni añadas resistencias "esperadas" — eso lo hace un motor aparte; tú solo lees el S/I/R impreso. (3) si un valor está borroso, cortado, ambiguo o ilegible, márcalo "needs_review":true y NO lo adivines.\n\nFORMATO IMPORTANTE: El valor CMI puede aparecer DENTRO del nombre del antibiótico. Ejemplo: "Ampicilina/Sulbactam CMI 16" → antibiótico=amsul, mic="16", resultado=INTERMEDIO. Los decimales pueden usar coma (0,12) — conviértelos a punto (0.12).\n\nExtrae:\n1. MICROORGANISMO: el organismo identificado (busca "RESULTADO:", el nombre del microorganismo reportado).\n2. ANTIBIÓTICOS: mapea cada uno a su clave y anota resultado (SENSIBLE→S, INTERMEDIO→I, RESISTENTE→R) y CMI si aparece.\n\nMAPEO (nombre en reporte → clave):\nAmpicilina→amp, Ampicilina/Sulbactam→amsul, Amoxicilina/Clavulanato→amcl, Oxacilina→oxa,\nPiperacilina/Tazobactam→pitaz, Cefazolina/Cefazolina Oral→cefa, Cefuroxima→cfx, Ceftriaxona→cro, Cefotaxima→ctx,\nCeftazidima→ctaz, Cefepima/Cefepime→cfp, Ceftolozano-Tazobactam→cfol, Imipenem→imi,\nMeropenem→mer, Ertapenem→ert, Ceftazidima-Avibactam→cazavi, Aztreonam→azt,\nCefiderocol→cfid, Imipenem-Relebactam→imrel, Gentamicina→gen, Amikacina/Amicacina→ami,\nTobramicina→tob, Ciprofloxacino→cip, Levofloxacino→lev, Moxifloxacino→mox,\nVancomicina→van, Teicoplanina→tei, Linezolid→lin, Daptomicina→dap,\nTMP-SMX→tmp, Nitrofurantoína→nit, Fosfomicina→fos, Colistina→col,\nTigeciclina/Tigecilina→tig, Clindamicina→cli, Minociclina→mino\n\nResponde ÚNICAMENTE en JSON (sin texto extra):\n{"organismo":"nombre completo o null","metodo":"disco|mic|null","resultados":[{"antibiotico":"clave","resultado":"S","mic":"valor","conf":"alta|media|baja","needs_review":false}]}\nconf = legibilidad del resultado; needs_review:true si el dato es dudoso (NO lo adivines).\n\nPara mic: escribe el valor exacto del CMI con punto decimal (ej: "16", "<=4", ">=16", "0.25", "<=0.12").`}
       ]}],
       null,
       1024,
