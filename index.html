@@ -5990,6 +5990,17 @@ function alertas(){
 // BASE DE CONOCIMIENTO MICROBIOLÓGICO
 // ══════════════════════════════════════════
 const TX={
+CRE_PHENO:{title:'Carbapenemasa FENOTÍPICA — mecanismo NO confirmado',nivel:'high',desc:'El antibiograma muestra resistencia a carbapenémicos (CRE) pero NO hay flag molecular del mecanismo. El esquema difiere radicalmente según sea serina-carbapenemasa (KPC/OXA-48) o metalo-β-lactamasa (NDM/VIM/IMP) — CONFIRMAR por PCR/inmunocromatografía (KPC/OXA-48/NDM/VIM/IMP) antes de fijar el tratamiento. Recomendación inferida del antibiograma estructurado.',
+  trampas:[
+    {t:'⚠ Confirmar el mecanismo ANTES de elegir',b:'Ceftazidima-avibactam cubre KPC y OXA-48 pero NO metalo-β-lactamasas (NDM/VIM/IMP). Elegir sin confirmar puede dejar al paciente sin cobertura efectiva.'},
+    {t:'⚠ No asumir KPC en México/Latam',b:'Circula NDM (MBL). Si la cepa es ceftazidima-avibactam-R, sospechar MBL → cefiderocol o aztreonam + ceftazidima-avibactam. Involucrar a Infectología.'}
+  ],
+  ops:[
+    {r:'first',n:'Serina-carbapenemasa probable (KPC/OXA-48) mientras se confirma',ev:'A',d:'Ceftazidima-avibactam 2.5g c/8h IV (infusión extendida 3h)',rat:'Cubre KPC y OXA-48 (IDSA 2024). NO cubre metalo-β-lactamasas.',nota:'Si CAZ-AVI resulta resistente, sospechar MBL y cambiar.',renal:true},
+    {r:'alt',n:'Metalo-β-lactamasa (NDM/VIM/IMP) confirmada o sospechada',ev:'A',d:'Cefiderocol 2g c/8h IV (infusión 3h) — O — Aztreonam + Ceftazidima-avibactam (combinación anti-MBL)',rat:'Las MBL hidrolizan todos los β-lactámicos salvo aztreonam; CAZ-AVI protege al aztreonam de β-lactamasas acompañantes (IDSA 2024).',nota:'Manejo conjunto con Infectología.',renal:true},
+    {r:'alt',n:'Meropenem-vaborbactam (solo si KPC confirmada)',ev:'A',d:'Meropenem-vaborbactam 4g c/8h IV (infusión 3h)',rat:'Alternativa para KPC; NO cubre OXA-48 ni MBL.',nota:'',renal:true}
+  ]
+},
 MSSA:{title:'S. aureus MSSA',nivel:'low',desc:'Susceptible a beta-lactámicos antiestafilocócicos. Cefazolina es el fármaco de elección (CloCeBa RCT, Lancet 2025). Vancomicina es INFERIOR a cefazolina (IDSA/AHA). Ceftobiprole aprobado FDA 2024 para bacteriemia por S. aureus.',
   trampas:[
     {t:'⚠ NO usar vancomicina cuando hay beta-lactámico activo',b:'Mayor mortalidad y falla microbiológica con vancomicina vs cefazolina en bacteriemia MSSA. Desescalar siempre. (Tong et al. JAMA 2025)'},
@@ -6220,6 +6231,11 @@ function detectarCombos(p){
 }
 
 function elegirTX(p){
+  // Auditoría v332: derivar fenotipos del ANTIBIOGRAMA estructurado (p.abg) con detectPhenotypes()
+  // cuando faltan los flags mec_* — antes el motor ignoraba el S/I/R y podía recomendar un esquema
+  // inadecuado pese a tener la resistencia capturada. Los flags MOLECULARES (más específicos) ganan;
+  // el fenotipo del antibiograma solo llena los huecos.
+  const _ph=(p.abg&&Object.keys(p.abg).length&&typeof detectPhenotypes==='function')?detectPhenotypes(p.abg,p.organismo||''):null;
   if(p.mec_triple)return TX.MBL;
   // Metalo-BL: NDM, VIM, IMP — todos requieren esquema MBL
   if(p.mec_metalo_kpc||p.mec_ndm||p.mec_vim||p.mec_imp)return TX.MBL;
@@ -6228,13 +6244,16 @@ function elegirTX(p){
   if(p.mec_oxa48||p.mec_oxa23)return TX.OXA48;
   // GES (Clase A) → tratar como KPC en ausencia de protocolo específico
   if(p.mec_ges)return TX.KPC;
+  // Carbapenemasa FENOTÍPICA (CRE en el antibiograma) sin flag molecular → rama que exige confirmar
+  // el mecanismo (KPC/MBL/OXA no se distinguen del S/I/R). Va tras los flags moleculares (que ganan).
+  if(_ph&&(_ph.CRE||_ph.Carbapenemase))return TX.CRE_PHENO;
   if(p.mec_vrsa)return TX.VRSA;
   if(p.mec_visa)return TX.VISA;
-  if(p.mec_mrsa||/MRSA/i.test(p.organismo||''))return TX.MRSA;
-  if(p.mec_vre||p.mec_vre_vanb||/VRE|vanA|vanB/i.test(p.organismo||''))return TX.VRE;
+  if(p.mec_mrsa||(_ph&&_ph.MRSA)||/MRSA/i.test(p.organismo||''))return TX.MRSA;
+  if(p.mec_vre||p.mec_vre_vanb||(_ph&&_ph.VRE)||/VRE|vanA|vanB/i.test(p.organismo||''))return TX.VRE;
   if(p.mec_mssa||/MSSA/i.test(p.organismo||''))return TX.MSSA;
-  // BLEE confirmada o R-Ceftriaxona sin confirmación: mismo abordaje terapéutico
-  if(p.mec_blee||p.mec_blee_ctxm||p.mec_blee_shv||p.mec_blee_tem||p.mec_r_ceftriaxona)return TX.BLEE;
+  // BLEE confirmada, R-Ceftriaxona, o ESBL FENOTÍPICA del antibiograma: mismo abordaje terapéutico
+  if(p.mec_blee||p.mec_blee_ctxm||p.mec_blee_shv||p.mec_blee_tem||p.mec_r_ceftriaxona||(_ph&&_ph.ESBL))return TX.BLEE;
   if(p.mec_ampc||p.mec_ampc_hiper||/Enterobacter|Citrobacter|Serratia|Morganella|aerogenes/i.test(p.organismo||''))return TX.AmpC;
   if(/Pseudomonas/i.test(p.organismo||''))return TX.PsaeMDR;
   if(/Acinetobacter/i.test(p.organismo||''))return TX.AbaciMDR;

@@ -1071,6 +1071,26 @@ test('TFG: la función renal usa CKD-EPI 2021 (race-free) como clasificación pr
   assert.ok(/Cockcroft — solo dosis ATB/.test(_idx), 'el Cockcroft no se marca como solo-dosis-ATB');
 });
 
+/* ═══════════ P2 (auditoría v332): el motor de tratamiento lee el antibiograma estructurado ═══════════ */
+const _mDP = _idx.match(/function detectPhenotypes\(abg,organismo\)\{[\s\S]*?\n\}/);
+let _detPheno = null;
+if (_mDP) _detPheno = new Function('const CLSI_CATEGORIES={PSEUDOMONAS:{}};' + _mDP[0] + '\n return detectPhenotypes;')();
+test('MOTOR P2: detectPhenotypes deriva CRE/ESBL/MRSA/VRE del antibiograma (S/I/R)', () => {
+  assert.ok(_detPheno, 'no se extrajo detectPhenotypes');
+  assert.equal(_detPheno({ mer: 'R' }, 'Klebsiella pneumoniae').CRE, true, 'no detecta CRE por carbapenémico-R');
+  assert.equal(_detPheno({ cro: 'R' }, 'E. coli').ESBL, true, 'no detecta ESBL');
+  assert.equal(_detPheno({ cro: 'I' }, 'E. coli').ESBL, true, 'no usa no-susceptible (I) para ESBL');
+  assert.equal(_detPheno({ cfp: 'R' }, 'E. coli').ESBL, false, 'cefepime-R NO debe marcar ESBL (v328)');
+  assert.equal(_detPheno({ oxa: 'R' }, 'S. aureus').MRSA, true, 'no detecta MRSA');
+  assert.equal(_detPheno({ van: 'R' }, 'E. faecium').VRE, true, 'no detecta VRE');
+});
+test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
+  assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
+  assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)return TX\.CRE_PHENO;/.test(_idx), 'elegirTX no rutea CRE fenotípica a TX.CRE_PHENO');
+  assert.ok(/\(_ph&&_ph\.MRSA\)/.test(_idx) && /\(_ph&&_ph\.VRE\)/.test(_idx) && /\(_ph&&_ph\.ESBL\)/.test(_idx), 'elegirTX no usa MRSA/VRE/ESBL fenotípicos');
+  assert.ok(/CRE_PHENO:\{title:'Carbapenemasa FENOTÍPICA/.test(_idx), 'falta la rama TX.CRE_PHENO');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));

@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v332 (Refactor clínico — el motor de TX lee el antibiograma estructurado)
+//  P2 clínico (el hueco más relevante que quedaba): elegirTX/detectarCombos dependían SOLO de los flags
+//  mec_* y de regex sobre el organismo → si nadie marcaba el mecanismo, el motor ignoraba la resistencia
+//  que SÍ estaba en el S/I/R y recomendaba un esquema inadecuado. AHORA elegirTX deriva el fenotipo del
+//  antibiograma (p.abg) con detectPhenotypes(): los flags moleculares (más específicos) ganan; el
+//  fenotipo llena huecos → MRSA (oxa/fox-R), VRE (van-R), ESBL fenotípica van directo a su esquema; la
+//  carbapenemasa fenotípica (CRE) va a una rama nueva TX.CRE_PHENO que EXIGE confirmar el mecanismo
+//  (KPC vs MBL vs OXA no se distinguen del antibiograma) con opciones por tipo (IDSA 2024). +2 pruebas
+//  (245; una ejecuta detectPhenotypes real). El motor ya no es ciego al dato de resistencia capturado.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v331 (Función renal: etiqueta inequívoca CKD-EPI 2021)
 //  El Dr. preguntó si la TFG usa la clasificación más actual (Cockcroft es viejo). Confirmado: calcTFG
 //  YA calcula CKD-EPI 2021 race-free (Inker NEJM 2021 / NKF-ASN / KDIGO 2024) como TFG primaria con
@@ -656,7 +666,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v331';
+const CACHE = 'stewardmx-v332';
 const SHELL = [
   '/',
   '/index.html',
