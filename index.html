@@ -875,9 +875,14 @@ function detectPhenotypes(abg,organismo){
     // E. coli/Klebsiella (sin AmpC cromosómica), además de la cromosómica por organismo (más abajo).
     if(_foxR&&_3gcNoS)phenos.AmpC=true;
   }
-  // CRE: R/I a cualquier carbapenémico en Enterobacterales
-  if(/coli|klebsi|enterobacter|prote|serratia/.test(org)){
-    if(['ert','imi','mer'].some(k=>abg[k]==='R'||abg[k]==='I'))phenos.CRE=true;
+  // CRE: R/I a cualquier carbapenémico en Enterobacterales. EXCEPCIÓN (Simner/Pitout/Dingle, Clin Microbiol
+  // Rev 2024;37(4) + CLSI/EUCAST): Proteus/Morganella/Providencia tienen MIC de IMIPENEM intrínsecamente
+  // elevada por mecanismos NO carbapenemasa → el imipenem NO define carbapenem-R en este subgrupo; usar
+  // ertapenem/meropenem para no marcar CRE falsa. (v343: + morganella/providencia al cribado vía ert/mer.)
+  if(/coli|klebsi|enterobacter|prote|serratia|morganella|providencia/.test(org)){
+    const _isProteae=/prote|morganella|providencia/.test(org);
+    const _carbas=_isProteae?['ert','mer']:['ert','imi','mer'];
+    if(_carbas.some(k=>abg[k]==='R'||abg[k]==='I'))phenos.CRE=true;
   }
   // Carbapenem-R NO ENZIMÁTICO — pérdida de porina ± BLEE/AmpC (NO carbapenemasa).
   // Mammeri & Skurnik, PLoS Pathog 2025;21(2):e1012902 (Tablas 1-2): la pérdida de porina SOLA no eleva
@@ -6383,7 +6388,7 @@ function elegirTX(p){
     // el mecanismo más probable es PÉRDIDA DE PORINA + BLEE/AmpC, no carbapenemasa. Aun así cumple cribado
     // CRE → confirmar por método molecular y tratar la β-lactamasa subyacente (Mammeri & Skurnik, PLoS
     // Pathog 2025;21:e1012902 — en series clínicas este mecanismo puede superar a la carbapenemasa).
-    if(_ph.CRE&&_ph.PorinLoss&&!_ph.Carbapenemase)return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ PATRÓN NO ENZIMÁTICO: ertapenem no-S con imipenem y meropenem S sugiere PÉRDIDA DE PORINA + BLEE/AmpC más que carbapenemasa (el ertapenem es el carbapenémico más sensible a la impermeabilidad). Cumple cribado CRE: confirmar mecanismo por método molecular antes de fijar el esquema — y tratar la BLEE/AmpC subyacente.'};
+    if(_ph.CRE&&_ph.PorinLoss&&!_ph.Carbapenemase)return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ PATRÓN ERTAPENEM-AISLADO (ertapenem no-S con imipenem y meropenem S): diferencial = (1) pérdida de porina + BLEE/AmpC, o (2) carbapenemasa de BAJO nivel tipo OXA-48-like, que típicamente solo eleva el ertapenem (el ertapenem es el carbapenémico más sensible tanto a la impermeabilidad como a OXA-48). CONFIRMAR SIEMPRE por método molecular (incluido OXA-48) antes de fijar el esquema; si es OXA-48 → ceftazidima-avibactam (NO mero-vaborbactam). Cita: Simner/Pitout, Clin Microbiol Rev 2024;37(4); IDSA AMR 2024.'};
     return TX.CRE_PHENO;
   }
   if(p.mec_vrsa)return TX.VRSA;

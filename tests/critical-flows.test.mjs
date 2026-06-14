@@ -1135,7 +1135,7 @@ test('ABGMOTOR v337: carbapenem-R NO enzimático — pérdida de porina (Enterob
 });
 test('ABGMOTOR v337: elegirTX matiza la rama CRE como porina+BLEE/AmpC cuando el patrón es ertapenem-aislado', () => {
   assert.ok(/_ph\.CRE&&_ph\.PorinLoss&&!_ph\.Carbapenemase/.test(_idx), 'elegirTX no distingue el patrón de pérdida de porina dentro de la rama CRE');
-  assert.ok(/PATRÓN NO ENZIMÁTICO/.test(_idx), 'falta el mensaje de pérdida de porina en la rama CRE');
+  assert.ok(/pérdida de porina \+ BLEE\/AmpC/i.test(_idx), 'falta el diferencial de pérdida de porina en la rama CRE');
 });
 
 /* ═══════════ v338: capa de seguridad EUCAST — resistencia intrínseca + fenotipos excepcionales ═══════════ */
@@ -1226,6 +1226,19 @@ test('ABGVISION v342: prompt Vision con reglas de integridad + extracción de ba
   // El handler avisa de los resultados de baja confianza en vez de darlos por ciertos.
   assert.ok(/if\(r\.needs_review\|\|r\.conf==='baja'\)revisar\.push/.test(_idx), 'el handler no recolecta los resultados de baja confianza');
   assert.ok(/de baja confianza — VERIFICA/.test(_idx), 'el handler no avisa de la baja confianza');
+});
+test('ABGMOTOR v343: Proteae excluyen imipenem del cribado CRE (imipenem-R intrínseco, Simner CMR 2024)', () => {
+  assert.ok(_detPheno, 'no se extrajo detectPhenotypes');
+  // Proteus/Morganella/Providencia: imipenem-R intrínseco NO define CRE → usar ert/mer.
+  assert.equal(_detPheno({ imi: 'R' }, 'Proteus mirabilis').CRE, false, 'imipenem-R intrínseco NO debe marcar CRE en Proteus');
+  assert.equal(_detPheno({ imi: 'R' }, 'Morganella morganii').CRE, false, 'imipenem-R intrínseco NO debe marcar CRE en Morganella');
+  assert.equal(_detPheno({ mer: 'R' }, 'Proteus mirabilis').CRE, true, 'meropenem-R SÍ debe marcar CRE en Proteus');
+  // En Enterobacterales NO Proteae, el imipenem sigue contando.
+  assert.equal(_detPheno({ imi: 'R' }, 'Klebsiella pneumoniae').CRE, true, 'imipenem-R debe marcar CRE en Klebsiella');
+});
+test('ABGMOTOR v343: el patrón ertapenem-aislado incluye OXA-48-like en el diferencial (no sub-llamar carbapenemasa)', () => {
+  assert.ok(/PATRÓN ERTAPENEM-AISLADO/.test(_idx), 'falta el mensaje refinado del patrón ertapenem-aislado');
+  assert.ok(/OXA-48-like/.test(_idx) && /CONFIRMAR SIEMPRE por método molecular/.test(_idx), 'el diferencial no incluye OXA-48 ni exige confirmación molecular');
 });
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');

@@ -1,4 +1,16 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v343 (Antibiograma — carbapenemasas: Proteae sin imipenem + diferencial OXA-48)
+//  Leída letra por letra la pieza rectora de carbapenemasas (Simner, Pitout & Dingle, Clin Microbiol Rev
+//  2024;37(4) — "Laboratory detection of carbapenemases"). Dos refinamientos de SEGURIDAD citados:
+//  (1) Proteus/Morganella/Providencia tienen MIC de IMIPENEM intrínsecamente elevada por mecanismos NO
+//  carbapenemasa → el imipenem NO define CRE en este subgrupo (CLSI/EUCAST). detectPhenotypes ahora usa
+//  ert/mer (no imi) en Proteae → evita CRE falsa; y añade morganella/providencia al cribado CRE vía ert/mer.
+//  (2) OXA-48-like es carbapenemasa de BAJO nivel que típicamente solo eleva ertapenem (Fig 3: ertapenem
+//  detecta OXA-48 al 97%, meropenem solo 64%) → el patrón ertapenem-aislado ya NO se etiqueta solo como
+//  "pérdida de porina"; el diferencial incluye OXA-48-like y EXIGE confirmación molecular (si OXA-48 →
+//  CAZ-AVI, no mero-vaborbactam). pbp.pdf (E. faecium PBP5, Nat Commun 2023) leído — mecanismo molecular,
+//  sin regla S/I/R nueva (ya cubierto). +2 pruebas (263).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v342 (Antibiograma — extracción Vision reforzada + cefotaxima en el panel)
 //  Mejora el eslabón más débil del "100% confiable": la EXTRACCIÓN de la foto. (1) Prompt Vision (ambas
 //  copias: analizarNabgConIA + analizarAbgConIA) con REGLAS DE INTEGRIDAD anti-alucinación: transcribe solo
@@ -768,7 +780,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v342';
+const CACHE = 'stewardmx-v343';
 const SHELL = [
   '/',
   '/index.html',
