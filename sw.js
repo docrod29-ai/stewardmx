@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v340 (Antibiograma — recomendación DIRIGIDA en el panel: mecanismo→qué dar)
+//  Cierra el círculo del panel "🧠 Interpretación del motor": tras mecanismo inferido + alertas EUCAST,
+//  ahora muestra la RECOMENDACIÓN DIRIGIDA (IDSA AMR 2024 / EUCAST) reusando elegirTX/TX — la misma fuente
+//  del Motor PROA. Se construye p={abg,organismo} → elegirTX → primeras líneas (nombre + dosis + evidencia).
+//  Gated al mecanismo inferido (flags de detectPhenotypes): en un aislamiento sensible NO se sugiere un
+//  esquema MDR; excluye el fallback empírico. Orden clínico: mecanismo → alertas (intrínseca/excepcional/
+//  edición FQ/aviso) → qué dar. +1 prueba (258).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v339 (Antibiograma — cross-resistencia FQ + HLAR enterococo, EUCAST T12/T13)
 //  Sigue la capa de seguridad: js/core/abg-phenotype.js suma 2 reglas interpretativas citadas (EUCAST
 //  Expert Rules T12/T13, CMI 2013). (1) quinoloneCrossResistance: la R a la fluoroquinolona MÁS ACTIVA
@@ -742,7 +750,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v339';
+const CACHE = 'stewardmx-v340';
 const SHELL = [
   '/',
   '/index.html',

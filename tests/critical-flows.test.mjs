@@ -1199,6 +1199,12 @@ test('ABGSAFE v339: HLAR enterococo — aviso de pérdida de sinergia (EUCAST T1
   assert.equal(aminoglycosideSynergy({ gen: 'S' }, 'Enterococcus faecalis').length, 0, 'no debe avisar con gentamicina S');
   assert.equal(aminoglycosideSynergy({ gen: 'R' }, 'Escherichia coli').length, 0, 'HLAR-synergy es solo de enterococo');
 });
+test('ABGSAFE v340: el panel muestra la recomendación DIRIGIDA (elegirTX/TX) derivada del mecanismo', () => {
+  assert.ok(/const tx=elegirTX\(\{abg,organismo:org\|\|''\}\)/.test(_idx), 'el panel no deriva la recomendación de elegirTX');
+  assert.ok(/💊 Recomendación dirigida/.test(_idx), 'falta el bloque de recomendación dirigida en el panel');
+  assert.ok(/flags\.length&&typeof elegirTX==='function'/.test(_idx), 'la recomendación no está gated al mecanismo inferido (evita ruido en sensibles)');
+  assert.ok(/!\/Empírico\/i\.test\(tx\.title\)/.test(_idx), 'no excluye el fallback empírico del panel dirigido');
+});
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
   assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)\{/.test(_idx), 'elegirTX no rutea CRE fenotípica a la rama CRE_PHENO');

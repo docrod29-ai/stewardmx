@@ -4635,6 +4635,21 @@ window._renderAbgInterpretacionHTML=function(abg,org){
   const edits=qx.edits||[]; const avisos=[...(qx.avisos||[]),...(ag||[])];
   const flags=ph?Object.keys(ph).filter(k=>ph[k]&&window._abgFenoLabels[k]):[];
   if(!flags.length&&!ic.length&&!ex.length&&!edits.length&&!avisos.length)return '';
+  // Recomendación DIRIGIDA (IDSA AMR 2024 / EUCAST) derivada del mecanismo inferido — reusa elegirTX/TX.
+  // Solo cuando hay un mecanismo inferido (flags): en un aislamiento sensible no procede un esquema MDR.
+  let recoHTML='';
+  if(flags.length&&typeof elegirTX==='function'){
+    try{
+      const tx=elegirTX({abg,organismo:org||''});
+      if(tx&&tx.title&&!/Empírico/i.test(tx.title)){
+        const firsts=(tx.ops||[]).filter(o=>o.r==='first').slice(0,3);
+        const nivCol=tx.nivel==='critical'?'var(--red)':tx.nivel==='high'?'var(--am)':'var(--teal)';
+        recoHTML='<div style="border-left:3px solid '+nivCol+';background:rgba(0,212,168,.06);border-radius:4px;padding:8px 10px;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:'+nivCol+';margin-bottom:4px;">💊 Recomendación dirigida — '+escHtml(tx.title)+'</div>';
+        firsts.forEach(o=>{recoHTML+='<div style="font-size:11px;color:var(--t2);margin-top:3px;"><b>'+escHtml(o.n)+'</b>'+(o.ev?' <span style="opacity:.6;">(ev. '+escHtml(o.ev)+')</span>':'')+(o.d?'<br><span style="color:var(--t3);">'+escHtml(o.d)+'</span>':'')+'</div>';});
+        recoHTML+='<div style="font-size:10px;color:var(--t3);margin-top:5px;">Esquema dirigido (IDSA AMR 2024 / EUCAST). Ver el Motor PROA para alternativas, dosis renal y trampas.</div></div>';
+      }
+    }catch(_){}
+  }
   let h='<div style="border:1px solid var(--brd2);border-radius:8px;padding:12px;background:rgba(0,212,168,.04);">';
   h+='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:8px;">🧠 Interpretación del motor (determinista · EUCAST/CLSI)</div>';
   if(flags.length){
@@ -4662,6 +4677,7 @@ window._renderAbgInterpretacionHTML=function(abg,org){
     avisos.forEach(a=>{h+='<div style="font-size:11px;color:var(--t2);margin-top:2px;">• '+escHtml(a.msg)+' <span style="color:var(--t3);">'+escHtml(a.cita)+'</span></div>';});
     h+='</div>';
   }
+  h+=recoHTML;
   h+='<div style="font-size:10px;color:var(--t3);margin-top:4px;">Apoyo decisional determinista (no sustituye el juicio del microbiólogo/infectólogo). El LLM solo extrae S/I/R; el mecanismo lo infiere este motor citado.</div></div>';
   return h;
 };
