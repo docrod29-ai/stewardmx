@@ -6127,7 +6127,7 @@ function alertas(){
 // BASE DE CONOCIMIENTO MICROBIOLÓGICO
 // ══════════════════════════════════════════
 const TX={
-CRE_PHENO:{title:'Carbapenemasa FENOTÍPICA — mecanismo NO confirmado',nivel:'high',desc:'El antibiograma muestra resistencia a carbapenémicos (CRE) pero NO hay flag molecular del mecanismo. El esquema difiere radicalmente según sea serina-carbapenemasa (KPC/OXA-48) o metalo-β-lactamasa (NDM/VIM/IMP) — CONFIRMAR por PCR/inmunocromatografía (KPC/OXA-48/NDM/VIM/IMP) antes de fijar el tratamiento. Recomendación inferida del antibiograma estructurado.',
+CRE_PHENO:{title:'Carbapenemasa FENOTÍPICA — mecanismo NO confirmado',nivel:'high',desc:'El antibiograma muestra resistencia a carbapenémicos (CRE) pero NO hay flag molecular del mecanismo. El esquema difiere radicalmente según sea serina-carbapenemasa (KPC/OXA-48) o metalo-β-lactamasa (NDM/VIM/IMP) — CONFIRMAR por método molecular antes de fijar el tratamiento. ⚠ EPIDEMIOLOGÍA LOCAL (México): la Red INVIFAR reporta que ~80% de las carbapenemasas en Enterobacterales son NDM (metalo-β-lactamasa) — la probabilidad pre-test de MBL supera a la de KPC; empíricamente debe sospecharse MBL PRIMERO (no trasladar el esquema KPC-céntrico de guías de otras regiones). Confirmar con mCIM/eCIM, inmunocromatografía (Carba 5 / RESIST-5) o PCR (Xpert Carba-R); el test de Hodge está obsoleto. Recomendación inferida del antibiograma estructurado.',
   trampas:[
     {t:'⚠ Confirmar el mecanismo ANTES de elegir',b:'Ceftazidima-avibactam cubre KPC y OXA-48 pero NO metalo-β-lactamasas (NDM/VIM/IMP). Elegir sin confirmar puede dejar al paciente sin cobertura efectiva.'},
     {t:'⚠ No asumir KPC en México/Latam',b:'Circula NDM (MBL). Si la cepa es ceftazidima-avibactam-R, sospechar MBL → cefiderocol o aztreonam + ceftazidima-avibactam. Involucrar a Infectología.'}
@@ -6397,6 +6397,16 @@ function elegirTX(p){
     // la CAZ-AVI protege al aztreonam de BLEE/AmpC acompañantes; la CAZ-AVI SOLA es inactiva contra MBL. No se
     // excluye MBL si aztreonam-R (BLEE/AmpC coexistente lo enmascara). Cita: Agarwal/Tiwari/Varadwaj, Curr Med
     // Chem 2022 (DOI 10.2174/0929867329666220620165429); IDSA AMR Guidance 2024.
+    // v345 (Regla 4 del Dr. Rodríguez Luna + caso de apertura del guion): la CEFTAZIDIMA-AVIBACTAM no-S en una
+    // CRE EXCLUYE KPC y OXA-48 (la CAZ-AVI cubre ambas serino-carbapenemasas) → el mecanismo más probable es una
+    // METALO-β-LACTAMASA (NDM/VIM/IMP). Si el AZTREONAM también es no-S, hay una serino-β-lactamasa COPRODUCIDA
+    // (BLEE/AmpC) que sí hidroliza el aztreonam → "no es una carbapenemasa, son dos". En México (Red INVIFAR
+    // ~80% NDM) éste es el escenario dominante. Gana sobre la pista de aztreonam-S porque la CAZ-AVI discrimina
+    // la clase con más fuerza (cubre A/C/D, no B). Cita: IDSA AMR 2024; Simner CMR 2024.
+    if(p.abg&&(p.abg['cazavi']==='R'||p.abg['cazavi']==='I')){
+      const _aztNoS=p.abg['azt']==='R'||p.abg['azt']==='I';
+      return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ CEFTAZIDIMA-AVIBACTAM no-S en CRE: EXCLUYE KPC y OXA-48 (la CAZ-AVI cubre ambas) → orienta a METALO-β-LACTAMASA (NDM/VIM/IMP).'+(_aztNoS?' Aztreonam TAMBIÉN no-S → además hay una serino-β-lactamasa COPRODUCIDA (BLEE/AmpC): "no es una carbapenemasa, son dos" — el escenario que define el uso de aztreonam + CAZ-AVI.':'')+' Esquema dirigido: AZTREONAM + CEFTAZIDIMA-AVIBACTAM (infusión 3h) o CEFIDEROCOL; la CAZ-AVI SOLA es INACTIVA contra MBL. Confirmar por método molecular (NDM/VIM/IMP). Cita: IDSA AMR 2024; Simner/Pitout, Clin Microbiol Rev 2024;37(4).'};
+    }
     if(p.abg&&p.abg['azt']==='S'&&!_ph.PorinLoss)return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ AZTREONAM CONSERVADO (S) con carbapenémicos no-S → orienta a METALO-β-LACTAMASA (MBL: NDM/VIM/IMP): las MBL hidrolizan todos los β-lactámicos EXCEPTO los monobactámicos. Esquema dirigido: AZTREONAM + CEFTAZIDIMA-AVIBACTAM (la CAZ-AVI protege al aztreonam de la BLEE/AmpC acompañante) o aztreonam-avibactam. ⚠ La ceftazidima-avibactam SOLA es INACTIVA contra MBL. Aztreonam-R NO excluye MBL (BLEE/AmpC coexistente). Confirmar SIEMPRE por método molecular (NDM/VIM/IMP). Cita: Agarwal et al., Curr Med Chem 2022 (DOI 10.2174/0929867329666220620165429); IDSA AMR 2024.'};
     return TX.CRE_PHENO;
   }

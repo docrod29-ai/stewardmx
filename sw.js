@@ -1,4 +1,17 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v345 (Antibiograma — motor alineado a las 7 Reglas de Oro del Dr.)
+//  Leídos los materiales docentes del Dr. Rodríguez Luna (guion del orador, 79k chars, 67 slides). De sus
+//  "7 reglas de oro" se alinean al motor las 2 de mayor impacto fenotípico:
+//  · Regla 4 — discriminador por CEFTAZIDIMA-AVIBACTAM: CAZ-AVI no-S en CRE EXCLUYE KPC y OXA-48 (la CAZ-AVI
+//    cubre A/C/D, no B) → orienta a metalo-β-lactamasa (NDM/VIM/IMP); si aztreonam también no-S, hay serina
+//    coproducida (BLEE/AmpC) → "no es una carbapenemasa, son dos" (su caso de apertura). elegirTX lo emite y
+//    gana sobre la pista de aztreonam-S (v344) por discriminar la clase con más fuerza.
+//  · Regla 5 — prior epidemiológico LOCAL: en México la Red INVIFAR reporta ~80% NDM entre las carbapenemasas
+//    → CRE_PHENO ahora instruye sospechar MBL PRIMERO (no el esquema KPC-céntrico de otras regiones).
+//  · Regla 6 — métodos confirmatorios: Hodge obsoleto → mCIM/eCIM, Carba 5/RESIST-5, PCR Xpert Carba-R.
+//  Reglas 1 (exigir MIC), 2 (SDD=dosis alta) y 7 (de-escalar) anotadas; 3 (cefoxitin-R+cefepime-S=AmpC) ya en
+//  el motor (v336). +2 pruebas (266).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v344 (Antibiograma — aztreonam-sparing → orienta a metalo-β-lactamasa)
 //  Cerrada la bibliografía pendiente, leída letra por letra: (1) "Pared Celular" = Silhavy/Kahne/Walker,
 //  "The Bacterial Cell Envelope", Cold Spring Harb Perspect Biol 2010;2:a000414 → base mecanística (porinas
@@ -792,7 +805,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v344';
+const CACHE = 'stewardmx-v345';
 const SHELL = [
   '/',
   '/index.html',

@@ -1249,6 +1249,19 @@ test('ABGMOTOR v344: aztreonam conservado (S) en CRE fenotípica → orienta a M
   assert.ok(/ceftazidima-avibactam SOLA es INACTIVA contra MBL/i.test(_idx), 'no advierte que CAZ-AVI sola no cubre MBL');
   assert.ok(/Aztreonam-R NO excluye MBL/i.test(_idx), 'no advierte que aztreonam-R no excluye MBL (BLEE/AmpC coexistente)');
 });
+test('ABGMOTOR v345: CAZ-AVI no-S en CRE → excluye KPC/OXA-48 → MBL (Regla 4 del Dr.; + serina si azt-R)', () => {
+  // La ceftazidima-avibactam cubre KPC y OXA-48 (serino-carbapenemasas A/D) pero NO las MBL (clase B). Por
+  // eso CAZ-AVI no-S en una CRE excluye KPC/OXA-48 y orienta a metalo-β-lactamasa; si aztreonam también es
+  // no-S, hay una serino-β-lactamasa coproducida ("no es una carbapenemasa, son dos" — caso de apertura).
+  assert.ok(/if\(p\.abg&&\(p\.abg\['cazavi'\]==='R'\|\|p\.abg\['cazavi'\]==='I'\)\)\{/.test(_idx), 'elegirTX no usa CAZ-AVI no-S como discriminador de clase en la rama CRE');
+  assert.ok(/EXCLUYE KPC y OXA-48/.test(_idx) && /orienta a METALO-β-LACTAMASA/.test(_idx), 'falta el mensaje del discriminador por CAZ-AVI');
+  assert.ok(/serino-β-lactamasa COPRODUCIDA/.test(_idx) && /son dos/.test(_idx), 'no contempla la serina coproducida cuando aztreonam también es no-S');
+});
+test('ABGMOTOR v345: prior mexicano NDM (Red INVIFAR) + métodos confirmatorios (Reglas 5-6 del Dr.)', () => {
+  assert.ok(/Red INVIFAR.{0,40}80%/s.test(_idx) || /~80% de las carbapenemasas en Enterobacterales son NDM/.test(_idx), 'CRE_PHENO no refleja el prior mexicano NDM-dominante (INVIFAR)');
+  assert.ok(/sospecharse MBL PRIMERO/.test(_idx), 'no instruye sospechar MBL primero en el contexto mexicano');
+  assert.ok(/mCIM\/eCIM/.test(_idx) && /Hodge está obsoleto/.test(_idx), 'no actualiza los métodos confirmatorios (Hodge jubilado → mCIM/eCIM/Carba 5/Xpert)');
+});
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
   assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)\{/.test(_idx), 'elegirTX no rutea CRE fenotípica a la rama CRE_PHENO');
