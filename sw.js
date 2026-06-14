@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v350 (PWA — detección de versión nueva más ágil)
+//  Síntoma: "tarda mucho en actualizar". Causa real: en una PWA siempre abierta y ENFOCADA,
+//  visibilitychange no dispara, así que la única detección era el intervalo de reg.update() cada 5 min →
+//  el banner "Actualizar" podía tardar hasta 5 min en aparecer tras un deploy. Fix: intervalo 5min→60s +
+//  reg.update() también al evento 'focus'. La APLICACIÓN (clic en el banner / badge de versión) ya era
+//  instantánea; el cuello era la DETECCIÓN. Se mantiene el patrón seguro (sin recarga sorpresa: el SW
+//  nuevo espera en 'waiting' y solo se activa al tocar "Actualizar" o el badge de versión). sw.js/index.html
+//  ya se sirven con no-cache (firebase.json).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v349 (Auditoría forense — cierre F-2 + robustez EHR)
 //  · F-2 [MEDIA] — eliminado el "modo directo" de la API key: la key sk-ant ya NO se carga al navegador
 //    (se quitó la lectura de anthropicKey en cargarApp) y llamarAnthropicSeguro ya NO cae a api.anthropic.com
@@ -845,7 +854,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v349';
+const CACHE = 'stewardmx-v350';
 const SHELL = [
   '/',
   '/index.html',

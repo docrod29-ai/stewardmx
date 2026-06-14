@@ -32588,12 +32588,16 @@ if('serviceWorker' in navigator){
         window.location.reload();
       });
 
-      // Buscar actualizaciones: inmediato al cargar + cada 5 min + al volver a la app
+      // Buscar actualizaciones: inmediato al cargar + cada 60 s + al volver/enfocar la app.
+      // (Antes 5 min: en una PWA siempre abierta y enfocada, visibilitychange no dispara, así que la
+      //  detección de una versión nueva podía tardar hasta 5 min en mostrar el banner. 60 s la hace
+      //  mucho más ágil; sw.js es no-cache y pequeño → el costo de red es trivial.)
       reg.update().catch(() => {});
-      setInterval(() => { reg.update().catch(() => {}); }, 5 * 60 * 1000);
+      setInterval(() => { reg.update().catch(() => {}); }, 60 * 1000);
       document.addEventListener('visibilitychange', () => {
         if(document.visibilityState === 'visible') reg.update().catch(() => {});
       });
+      window.addEventListener('focus', () => { reg.update().catch(() => {}); });
 
     }catch(e){ console.warn('[SW] Error al registrar:', e.message); }
   });
