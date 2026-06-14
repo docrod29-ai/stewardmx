@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v333 (Refactor clínico #2 — antibiograma acumulado consistente)
+//  P2: las dos rutas de captura de antibiograma (ficha p.abg vs subcolección antibiograms[]) podían
+//  sesgar los reportes acumulados. Verificado: la PRECEDENCIA ya existía (el Excel incluye p.abg legacy
+//  SOLO si el paciente no tiene subcolección → sin doble conteo entre fuentes). Lo que faltaba: el
+//  "Resumen epidemiológico por organismo" del Excel calculaba %S/%R sobre _allAislamientos SIN dedup
+//  M39 → un paciente con cultivos repetidos sesgaba las tasas. FIX: se deduplica con clsim39Deduplicate
+//  (1 por paciente+organismo+muestra) antes del resumen, igual que renderCumAbg (v323); el listado
+//  crudo se mantiene completo. Cada aislamiento ahora lleva patientId para deduplicar. +1 prueba (246).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v332 (Refactor clínico — el motor de TX lee el antibiograma estructurado)
 //  P2 clínico (el hueco más relevante que quedaba): elegirTX/detectarCombos dependían SOLO de los flags
 //  mec_* y de regex sobre el organismo → si nadie marcaba el mecanismo, el motor ignoraba la resistencia
@@ -666,7 +675,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v332';
+const CACHE = 'stewardmx-v333';
 const SHELL = [
   '/',
   '/index.html',

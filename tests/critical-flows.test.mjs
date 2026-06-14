@@ -1091,6 +1091,14 @@ test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama T
   assert.ok(/CRE_PHENO:\{title:'Carbapenemasa FENOTÍPICA/.test(_idx), 'falta la rama TX.CRE_PHENO');
 });
 
+/* ═══════════ P2 (auditoría v333): antibiograma acumulado del Excel — dedup M39 + precedencia ═══════════ */
+test('ANTIBIOG P2: el resumen epidemiológico del Excel deduplica M39 y respeta precedencia subcolección>legacy', () => {
+  assert.ok(/const _aisDedup=window\.clsim39Deduplicate\?window\.clsim39Deduplicate\(_allAislamientos\)/.test(_idx), 'el resumen por organismo no deduplica M39');
+  assert.ok(/_orgSet=\[\.\.\.new Set\(_aisDedup\.map/.test(_idx), 'el resumen sigue usando _allAislamientos sin dedup');
+  assert.ok(/_allAislamientos\.push\(\{\.\.\.a, patientId:p\.id/.test(_idx), 'los aislamientos de subcolección no llevan patientId para deduplicar');
+  assert.ok(/if\(\(!_allAbgMap\[p\.id\]\|\|!_allAbgMap\[p\.id\]\.length\)&&p\.abg/.test(_idx), 'falta la precedencia subcolección > p.abg legacy');
+});
+
 /* ═══════════ Cockcroft-Gault — Fase 4.8 ═══════════ */
 const _cg = cockcroftGault;   // función REAL importada de js/core/stats.js
 test('CG: existe cockcroftGault', () => assert.equal(typeof cockcroftGault, 'function'));

@@ -22018,21 +22018,25 @@ async function _buildGoogleSheet(token,pacs,mode){
         ..._abgKeys.flatMap(([key])=>[(a.abg||{})[key]||'', (a.mic||{})[key]||''])
       ];
       _abgRows.push(row);
-      _allAislamientos.push({...a, _pac:p});
+      _allAislamientos.push({...a, patientId:p.id, _pac:p});
     });
-    // También incluir p.abg legacy si existe y no hay subcolección
+    // También incluir p.abg legacy si existe y no hay subcolección (precedencia: subcolección > legacy)
     if((!_allAbgMap[p.id]||!_allAbgMap[p.id].length)&&p.abg&&Object.keys(p.abg).length){
       _abgRows.push([p.ingreso||'',p.nombre||'',p.exp||'',p.servicio||'',p.cama||'',p.organismo||'',p.fenotipo||'','','',
         ..._abgKeys.flatMap(([key])=>[(p.abg[key]||''), ''])]);
-      _allAislamientos.push({abg:p.abg,organismo:p.organismo,fenotipo:p.fenotipo,_pac:p});
+      _allAislamientos.push({abg:p.abg,organismo:p.organismo,fenotipo:p.fenotipo,muestra:'',fecha:p.ingreso||'',patientId:p.id,_pac:p});
     }
   });
-  // Resumen epidemiológico por organismo
-  const _orgSet=[...new Set(_allAislamientos.map(a=>a.organismo||'Sin identificar').filter(Boolean))];
-  const _sumHdr=['Organismo','Total aislamientos',..._abgKeys.map(([,l])=>l+' %S'),..._abgKeys.map(([,l])=>l+' %R')];
+  // Resumen epidemiológico por organismo — v333: de-duplicación CLSI M39 (1 aislamiento por
+  // paciente+organismo+muestra, el primero por fecha) para que el %S/%R acumulado no se sesgue por
+  // cultivos repetidos del mismo paciente. Mismo criterio que renderCumAbg (v323). El listado crudo
+  // (_abgRows) NO se deduplica — solo el resumen epidemiológico.
+  const _aisDedup=window.clsim39Deduplicate?window.clsim39Deduplicate(_allAislamientos):_allAislamientos;
+  const _orgSet=[...new Set(_aisDedup.map(a=>a.organismo||'Sin identificar').filter(Boolean))];
+  const _sumHdr=['Organismo','Total aislamientos (M39, sin duplicados)',..._abgKeys.map(([,l])=>l+' %S'),..._abgKeys.map(([,l])=>l+' %R')];
   const _sumRows=[_sumHdr];
   _orgSet.forEach(org=>{
-    const _oa=_allAislamientos.filter(a=>(a.organismo||'Sin identificar')===org);
+    const _oa=_aisDedup.filter(a=>(a.organismo||'Sin identificar')===org);
     const tot=_oa.length;
     const _pctS=_abgKeys.map(([k])=>{const t=_oa.filter(a=>(a.abg||{})[k]);return t.length?+(t.filter(a=>(a.abg||{})[k]==='S').length/t.length*100).toFixed(1):''});
     const _pctR=_abgKeys.map(([k])=>{const t=_oa.filter(a=>(a.abg||{})[k]);return t.length?+(t.filter(a=>(a.abg||{})[k]==='R').length/t.length*100).toFixed(1):''});
