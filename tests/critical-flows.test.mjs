@@ -1269,6 +1269,12 @@ test('ABGMOTOR v346: imipenem-relebactam como opción de la vía KPC (Lee/Hsueh 
   assert.ok(/NO fiable en Morganella\/Proteus\/Providencia/.test(_idx), 'no advierte que imi-relebactam no es fiable en Morganellaceae (imipenem-R intrínseco)');
   assert.ok(/Int J Antimicrob Agents 2022;59:106528/.test(_idx), 'falta la cita de Lee/Hsueh IJAA 2022');
 });
+test('ABGMOTOR v347: AmpC advierte que pip-tazo "S" no es fiable (Meini Infection 2019)', () => {
+  // Piperacilina es sustrato de AmpC y tazobactam es inductor débil (efecto inóculo) → pip-tazo puede fallar
+  // pese a sensibilidad in vitro en organismos AmpC. Preferir cefepime/carbapenémico.
+  assert.ok(/Pip-tazo "S" NO es fiable en AmpC/.test(_idx), 'el TX de AmpC no advierte sobre pip-tazo no fiable');
+  assert.ok(/Meini et al\., Infection 2019;47:363-75/.test(_idx), 'falta la cita de Meini Infection 2019');
+});
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
   assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)\{/.test(_idx), 'elegirTX no rutea CRE fenotípica a la rama CRE_PHENO');

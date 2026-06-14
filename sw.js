@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v347 (Antibiograma — AmpC: pip-tazo "S" no fiable)
+//  Leída a fondo "AMPC (INFECTION).pdf" = Meini/Tascini/Cei/Sozio/Rossolini, "AmpC β-lactamase-producing
+//  Enterobacterales: what a clinician should know", Infection 2019;47:363-375. CONFIRMATORIO del manejo de
+//  AmpC del motor — y con concordancia EXACTA: la lista de organismos AmpC del motor (enterobacter/aerogenes/
+//  freundii/serratia/hafnia/morganella/providencia) = el grupo cAmpC inducible de Meini. Confirma 3GC
+//  parece-S pero desreprime, cefepime carbapenem-sparing, ertapenem+porina. Único aditivo: pip-tazo "S" NO
+//  es fiable en AmpC (piperacilina es sustrato; tazobactam inductor débil → efecto inóculo) → trampa añadida
+//  a TX.AmpC (preferir cefepime/carbapenémico). +1 prueba (268).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v346 (Antibiograma — imipenem-relebactam en la vía KPC)
 //  Leída a fondo "CARBAPENEMASAS.pdf" = Lee/Chen/Hii/Hsueh, "Carbapenemase-producing Enterobacterales
 //  infections: recent advances in diagnosis and treatment", Int J Antimicrob Agents 2022;59:106528. El
@@ -814,7 +823,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v346';
+const CACHE = 'stewardmx-v347';
 const SHELL = [
   '/',
   '/index.html',
