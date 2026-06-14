@@ -1,4 +1,17 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v338 (Antibiograma — capa de SEGURIDAD EUCAST: intrínsecos + excepcionales)
+//  Releídas letra por letra las Tablas 1-7 de EUCAST Expert Rules (Leclercq/Cantón, CMI 2013;19:141-160).
+//  Nuevo módulo PURO js/core/abg-phenotype.js (citado, testeable, sin estado): (1) intrinsicConflicts =
+//  marca la "S engañosa" cuando el organismo es intrínsecamente R (Klebsiella→amp; Proteus/Providencia/
+//  Morganella→colistina/tigeciclina/nitrofurantoína; Serratia→colistina; Stenotrophomonas→carbapenémicos;
+//  enterococo→todas las cefalosporinas; PAE/Acinetobacter→intrínsecos; OJO: Acinetobacter NO marca
+//  amp-sulbactam porque el sulbactam SÍ es activo). (2) exceptionalPhenotypes = alerta probable error de
+//  ID/AST (S. aureus vanco/linezolid-R; neumococo carbapenem/glucopéptido-R; estrep β-hemolítico pen-R;
+//  E. faecalis amp-R→sospechar E. faecium; PAE/Acinetobacter colistina-R; Enterobacterales no-Proteae
+//  carbapenem-R→confirmar carbapenemasa). Se computa y persiste al guardar (campo safety) + alerta roja si
+//  hay fenotipo excepcional. NUEVO panel "🧠 Interpretación del motor": mecanismo inferido + confianza +
+//  alertas EUCAST, reactivo en la captura del antibiograma. Módulo añadido a SHELL. +3 pruebas (255).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v337 (Motor de antibiograma — carbapenem-R NO enzimático: porinas + eflujo)
 //  Tanda 3 leída letra por letra: BOMBAS DE FLUJO (Sun et al, BBRC 2014;453:254-267 — AcrAB-TolC
 //  enterobacterias → FQ/cloranfenicol/tetraciclina±β-lactámicos; MexAB-OprM/MexXY P. aeruginosa →
@@ -718,7 +731,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v337';
+const CACHE = 'stewardmx-v338';
 const SHELL = [
   '/',
   '/index.html',
@@ -729,6 +742,7 @@ const SHELL = [
   '/js/core/magiorakos.js',
   '/js/core/dx-cie10.js',
   '/js/core/medical-voice.js',
+  '/js/core/abg-phenotype.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',
   '/icons/icon-maskable.svg'

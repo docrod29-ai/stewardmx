@@ -761,6 +761,10 @@ window.categoriaPrincipalCode=categoriaPrincipalCode; window.DX_CIE10=DX_CIE10; 
 // verificación de Pseudomonas más abajo). Los window.* de CLSI/clasificar/_organism… siguen abajo.
 import { CLSI_CATEGORIES, _organismToSpeciesKey, _intrinsicResistanceKeys, clasificarMagiorakos } from './js/core/magiorakos.js';
 window._intrinsicResistanceKeys=_intrinsicResistanceKeys;
+// Capa de seguridad EUCAST (resistencia intrínseca + fenotipos excepcionales) — módulo PURO, citado.
+import { intrinsicConflicts, exceptionalPhenotypes } from './js/core/abg-phenotype.js';
+window.intrinsicConflicts=intrinsicConflicts;
+window.exceptionalPhenotypes=exceptionalPhenotypes;
 // ── Estandarización NHSN-style del SITIO DE ATENCIÓN ────────────────────
 // Devuelve: ICU / EME / INX / OUT / PED-ICU / NEO / OTHER
 function _normalizeWardNHSN(servicio){
@@ -4591,12 +4595,68 @@ window.setSIR=(btn,k)=>{
   const was=btn.classList.contains('active');
   document.querySelectorAll('.sir-btn[data-k="'+k+'"]').forEach(b=>b.classList.remove('active'));
   if(!was)btn.classList.add('active');
+  if(window._refreshAbgInterpret)window._refreshAbgInterpret();
 };
 
 window.setSIRByKey=(k,v)=>{
   document.querySelectorAll('.sir-btn[data-k="'+k+'"]').forEach(b=>b.classList.remove('active'));
   const btn=document.querySelector('.sir-btn[data-k="'+k+'"][data-v="'+v+'"]');
   if(btn)btn.classList.add('active');
+};
+
+// ── Interpretación del motor: mecanismo inferido + confianza + alertas de seguridad EUCAST ──
+// Etiqueta + confianza de cada flag de detectPhenotypes (fenotípico; un flag MOLECULAR sería confianza alta).
+window._abgFenoLabels={
+  ESBL:{n:'BLEE (β-lactamasa de espectro extendido)',c:'media-alta'},
+  AmpC:{n:'AmpC (cefalosporinasa)',c:'media'},
+  CRE:{n:'CRE — carbapenémico no-S',c:'alta'},
+  Carbapenemase:{n:'Carbapenemasa',c:'alta'},
+  PorinLoss:{n:'Pérdida de porina + β-lactamasa (no carbapenemasa)',c:'media'},
+  OprD_PA:{n:'Pérdida de OprD (imipenem-específica)',c:'media'},
+  MRSA:{n:'MRSA (mecA/PBP2a)',c:'alta'},
+  VRE:{n:'VRE (vancomicina-R)',c:'alta'},
+  VRSA:{n:'VRSA (vancomicina-R)',c:'alta'},
+  VISA:{n:'VISA (vancomicina-I)',c:'media'},
+  iMLSb:{n:'Clindamicina inducible (iMLSb) — requiere D-test',c:'media'},
+  MDR_PA:{n:'P. aeruginosa MDR',c:'alta'},
+  DTR_PA:{n:'P. aeruginosa DTR (difícil de tratar)',c:'alta'},
+  CRAB:{n:'Acinetobacter resistente a carbapenémicos (CRAB)',c:'alta'},
+};
+window._renderAbgInterpretacionHTML=function(abg,org){
+  if(!abg||!Object.keys(abg).length)return '';
+  let ph=null,ic=[],ex=[];
+  try{ph=window.detectPhenotypes?window.detectPhenotypes(abg,org||''):null;}catch(_){}
+  try{ic=window.intrinsicConflicts?window.intrinsicConflicts(abg,org||''):[];}catch(_){}
+  try{ex=window.exceptionalPhenotypes?window.exceptionalPhenotypes(abg,org||''):[];}catch(_){}
+  const flags=ph?Object.keys(ph).filter(k=>ph[k]&&window._abgFenoLabels[k]):[];
+  if(!flags.length&&!ic.length&&!ex.length)return '';
+  let h='<div style="border:1px solid var(--brd2);border-radius:8px;padding:12px;background:rgba(0,212,168,.04);">';
+  h+='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:8px;">🧠 Interpretación del motor (determinista · EUCAST/CLSI)</div>';
+  if(flags.length){
+    h+='<div style="font-size:11px;color:var(--t3);margin-bottom:4px;">Mecanismo(s) inferido(s):</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
+    flags.forEach(k=>{const L=window._abgFenoLabels[k];h+='<span style="font-size:11px;background:rgba(0,212,168,.12);border:1px solid rgba(0,212,168,.4);color:var(--teal);border-radius:12px;padding:3px 9px;">'+escHtml(L.n)+' <span style="opacity:.65;">· confianza '+L.c+'</span></span>';});
+    h+='</div>';
+  }
+  if(ic.length){
+    h+='<div style="border-left:3px solid var(--am);background:rgba(245,166,35,.07);border-radius:4px;padding:8px 10px;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--am);margin-bottom:3px;">⚠ Resultado "S" no fiable — resistencia intrínseca</div>';
+    ic.forEach(c=>{h+='<div style="font-size:11px;color:var(--t2);margin-top:2px;">• <b>'+escHtml(c.n)+'</b> reportado S, pero el organismo es intrínsecamente R → no usar. <span style="color:var(--t3);">'+escHtml(c.cita)+'</span></div>';});
+    h+='</div>';
+  }
+  if(ex.length){
+    h+='<div style="border-left:3px solid var(--red);background:rgba(255,77,109,.07);border-radius:4px;padding:8px 10px;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:3px;">⚠ Fenotipo excepcional → probable error de identificación/AST</div>';
+    ex.forEach(e=>{h+='<div style="font-size:11px;color:var(--t2);margin-top:2px;">• '+escHtml(e.msg)+' <span style="color:var(--t3);">'+escHtml(e.cita)+'</span></div>';});
+    h+='</div>';
+  }
+  h+='<div style="font-size:10px;color:var(--t3);margin-top:4px;">Apoyo decisional determinista (no sustituye el juicio del microbiólogo/infectólogo). El LLM solo extrae S/I/R; el mecanismo lo infiere este motor citado.</div></div>';
+  return h;
+};
+window._refreshAbgInterpret=function(){
+  const cont=document.getElementById('nabg-interpret');
+  if(!cont)return;
+  const abg={};
+  ABG_ATBS.forEach(g=>g.a.forEach(a=>{const btn=document.querySelector('#modal-bdy .sir-btn.active[data-k="'+a.k+'"]');if(btn)abg[a.k]=btn.dataset.v;}));
+  const org=(document.getElementById('nabg-org')?.value||'').trim();
+  cont.innerHTML=window._renderAbgInterpretacionHTML(abg,org);
 };
 
 
@@ -10022,7 +10082,7 @@ window.abrirNuevoAntibiograma=(pid)=>{
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
     <div class="fg" style="grid-column:1/-1;">
       <label>🦠 Organismo aislado <span style="font-size:9px;color:var(--teal);font-family:var(--mono);">↑ combobox — escribe para buscar</span></label>
-      <input id="nabg-org" list="nabg-org-list" autocomplete="off" placeholder="ej. Klebsiella pneumoniae, MRSA, Candida auris…" class="li-inp" style="border-radius:4px;" value="${p?.organismo?esc(p.organismo):''}">
+      <input id="nabg-org" list="nabg-org-list" autocomplete="off" placeholder="ej. Klebsiella pneumoniae, MRSA, Candida auris…" class="li-inp" style="border-radius:4px;" value="${p?.organismo?esc(p.organismo):''}" oninput="window._refreshAbgInterpret&&window._refreshAbgInterpret()">
     </div>
     <div class="fg" style="grid-column:1/-1;">
       <label>Tipo de muestra / cultivo</label>
@@ -10203,6 +10263,8 @@ window.abrirNuevoAntibiograma=(pid)=>{
     });
     html+='</div>';
   });
+  // Interpretación del motor (mecanismo inferido + confianza + alertas de seguridad EUCAST) — se llena reactivo
+  html+='<div id="nabg-interpret" style="margin-top:14px;"></div>';
   // ── MÓDULO 3: SECCIÓN DETECCIÓN MOLECULAR (PCR) — para vigilancia AMR ──
   html+=`<div style="margin-top:18px;border:1px solid rgba(167,139,250,.4);border-radius:8px;padding:14px;background:rgba(167,139,250,.05);">
     <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
@@ -10370,6 +10432,7 @@ window.analizarNabgConIA=async()=>{
     });
     const micCount=Object.keys(window._nabgMICs||{}).length;
     setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+'. '+(window._anthropicProxyURL?'🔒 Sin exponer la key. ':'')+' Revisa y ajusta si es necesario.','ok');
+    if(window._refreshAbgInterpret)window._refreshAbgInterpret();
   }catch(e){setStatus('🔴 Error: '+e.message,'err');}
 };
 
@@ -10408,10 +10471,15 @@ window.guardarAntibiograma=async(pid)=>{
   // MÓDULO 1: Auto-clasificar Magiorakos al guardar
   let magiorakosCls=null;
   let phenotypes=null;
+  let safety=null;
   if(isPos&&Object.keys(abg).length){
     try{
       magiorakosCls=window.clasificarMagiorakos?window.clasificarMagiorakos(abg,org||''):null;
       phenotypes=window.detectPhenotypes?window.detectPhenotypes(abg,org||''):null;
+      // Capa de seguridad EUCAST: "S" engañosa por R intrínseca + fenotipos excepcionales (error ID/AST).
+      const _ic=window.intrinsicConflicts?window.intrinsicConflicts(abg,org||''):[];
+      const _ex=window.exceptionalPhenotypes?window.exceptionalPhenotypes(abg,org||''):[];
+      if((_ic&&_ic.length)||(_ex&&_ex.length))safety={intrinsecos:_ic||[],excepcionales:_ex||[]};
     }catch(_){}
   }
   try{
@@ -10433,6 +10501,7 @@ window.guardarAntibiograma=async(pid)=>{
       breakpoints:breakpoints||null,
       magiorakos:magiorakosCls,
       phenotypes,
+      safety,
       _fuente:'proa',
       creadoAt:serverTimestamp(),creadoPor:U.uid,
       creadoNombre:window._userName||U.email,
@@ -10441,6 +10510,10 @@ window.guardarAntibiograma=async(pid)=>{
     window._nabgFoto64=null;window._nabgFotoMime='image/jpeg';
     if(_tooBig)toast('Aislamiento guardado. El archivo adjunto era muy grande y no se almacenó.','am');
     else toast('Aislamiento guardado ✓');
+    // Alerta de SEGURIDAD: fenotipo excepcional = probable error de ID/AST. El clínico DEBE verlo antes de confiar.
+    if(safety&&safety.excepcionales&&safety.excepcionales.length){
+      toast('⚠ Fenotipo excepcional (posible error de identificación/AST) — revisa la interpretación del motor','rd');
+    }
     // Check if de-escalation opportunity exists
     const pac=PACS.find(x=>x.id===pid);
     if(pac&&pac.atbList&&pac.atbList.length>0){

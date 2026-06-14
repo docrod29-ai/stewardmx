@@ -17,6 +17,7 @@ import { calcDiaATB, calcDia, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPe
 import { corregirTranscripcionMedica, fonetEs, levenshtein } from '../js/core/medical-voice.js';
 import { clasificarMagiorakos, _intrinsicResistanceKeys } from '../js/core/magiorakos.js';
 import { cie10DeDx, categorizarDx } from '../js/core/dx-cie10.js';
+import { intrinsicConflicts, exceptionalPhenotypes, INTRINSIC_RULES } from '../js/core/abg-phenotype.js';
 
 /* ─────────────── ESPEJOS de funciones puras (index.html v217) ─────────────── */
 
@@ -1135,6 +1136,49 @@ test('ABGMOTOR v337: carbapenem-R NO enzimático — pérdida de porina (Enterob
 test('ABGMOTOR v337: elegirTX matiza la rama CRE como porina+BLEE/AmpC cuando el patrón es ertapenem-aislado', () => {
   assert.ok(/_ph\.CRE&&_ph\.PorinLoss&&!_ph\.Carbapenemase/.test(_idx), 'elegirTX no distingue el patrón de pérdida de porina dentro de la rama CRE');
   assert.ok(/PATRÓN NO ENZIMÁTICO/.test(_idx), 'falta el mensaje de pérdida de porina en la rama CRE');
+});
+
+/* ═══════════ v338: capa de seguridad EUCAST — resistencia intrínseca + fenotipos excepcionales ═══════════ */
+/* Funciones REALES importadas de js/core/abg-phenotype.js (EUCAST Expert Rules, CMI 2013;19:141-160). */
+test('ABGSAFE v338: resistencia INTRÍNSECA marca la "S engañosa" (EUCAST Tablas 1-4)', () => {
+  // Klebsiella es SIEMPRE ampicilina-R (T1) → una S a ampicilina es no fiable.
+  assert.ok(intrinsicConflicts({ amp: 'S' }, 'Klebsiella pneumoniae').some(c => c.k === 'amp'), 'no marca amp-S engañosa en Klebsiella');
+  // Proteus/Providencia/Morganella: colistina, tigeciclina y nitrofurantoína intrínsecamente R (trampa clásica).
+  assert.ok(intrinsicConflicts({ col: 'S' }, 'Proteus mirabilis').some(c => c.k === 'col'), 'no marca colistina-S engañosa en Proteus');
+  assert.ok(intrinsicConflicts({ tig: 'S' }, 'Morganella morganii').some(c => c.k === 'tig'), 'no marca tigeciclina-S engañosa en Morganella');
+  // Stenotrophomonas maltophilia: carbapenémicos intrínsecamente R.
+  assert.ok(intrinsicConflicts({ mer: 'S' }, 'Stenotrophomonas maltophilia').some(c => c.k === 'mer'), 'no marca meropenem-S engañoso en S. maltophilia');
+  // Enterococo: TODAS las cefalosporinas intrínsecamente R.
+  assert.ok(intrinsicConflicts({ cro: 'S' }, 'Enterococcus faecium').some(c => c.k === 'cro'), 'no marca ceftriaxona-S engañosa en enterococo');
+  // Acinetobacter: NO marcar amp-sulbactam (el sulbactam SÍ es activo) — matiz crítico.
+  assert.equal(intrinsicConflicts({ amsul: 'S' }, 'Acinetobacter baumannii').some(c => c.k === 'amsul'), false, 'no debe marcar amp-sulbactam-S en Acinetobacter (sulbactam activo)');
+  // Solo marca la "S": un R intrínseco coincide con lo esperado y no se reporta como conflicto.
+  assert.equal(intrinsicConflicts({ amp: 'R' }, 'Klebsiella pneumoniae').length, 0, 'no debe marcar conflicto cuando el AST ya reporta R');
+  // E. coli no tiene R intrínseca de panel → sin conflictos.
+  assert.equal(intrinsicConflicts({ amp: 'S', cro: 'S' }, 'Escherichia coli').length, 0, 'E. coli no debe generar conflictos intrínsecos');
+});
+test('ABGSAFE v338: fenotipos EXCEPCIONALES = probable error de ID/AST (EUCAST Tablas 5-7)', () => {
+  // S. aureus vanco-R es rarísimo (T6 6.1).
+  assert.ok(exceptionalPhenotypes({ van: 'R' }, 'Staphylococcus aureus').length >= 1, 'no alerta S. aureus vanco-R');
+  // E. faecalis ampicilina-R → sospechar E. faecium (mala ID) (T6 6.7-6.8).
+  assert.ok(exceptionalPhenotypes({ amp: 'R' }, 'Enterococcus faecalis').some(e => /faecium/i.test(e.msg)), 'no sugiere E. faecium ante E. faecalis amp-R');
+  // P. aeruginosa colistina-R = excepcional/emergente (T5 5.3).
+  assert.ok(exceptionalPhenotypes({ col: 'R' }, 'Pseudomonas aeruginosa').length >= 1, 'no alerta colistina-R en P. aeruginosa');
+  // Enterobacterales (no Proteae) carbapenem-R → confirmar carbapenemasa (T5 5.1).
+  assert.ok(exceptionalPhenotypes({ mer: 'R' }, 'Klebsiella pneumoniae').some(e => /carbapenemasa/i.test(e.msg)), 'no pide confirmar carbapenemasa en Klebsiella mer-R');
+  // Proteae están EXCLUIDAS de 5.1 (su carbapenem-R no dispara la misma alerta).
+  assert.equal(exceptionalPhenotypes({ mer: 'R' }, 'Proteus mirabilis').some(e => /5\.1/.test(e.cita)), false, 'no debe aplicar 5.1 a Proteae');
+  // Sin patrón excepcional → sin alertas.
+  assert.equal(exceptionalPhenotypes({ cro: 'S' }, 'Escherichia coli').length, 0, 'no debe alertar un antibiograma normal');
+});
+test('ABGSAFE v338: cada regla intrínseca lleva su cita EUCAST + integración en index/sw', () => {
+  // Trazabilidad: toda regla codificada tiene tabla EUCAST.
+  assert.ok(INTRINSIC_RULES.length >= 10 && INTRINSIC_RULES.every(r => r.t && r.re && Array.isArray(r.ks)), 'reglas intrínsecas mal formadas');
+  assert.ok(intrinsicConflicts({ amp: 'S' }, 'Klebsiella pneumoniae')[0].cita.includes('EUCAST'), 'la cita no referencia EUCAST');
+  // index.html importa el módulo y lo persiste; sw.js lo precachea.
+  assert.ok(/import \{ intrinsicConflicts, exceptionalPhenotypes \} from '\.\/js\/core\/abg-phenotype\.js'/.test(_idx), 'index.html no importa abg-phenotype.js');
+  assert.ok(/safety=\{intrinsecos:_ic\|\|\[\],excepcionales:_ex\|\|\[\]\}/.test(_idx), 'no se computa/persiste la capa de seguridad al guardar');
+  assert.ok(/_renderAbgInterpretacionHTML/.test(_idx), 'falta el render de la interpretación del motor');
 });
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
