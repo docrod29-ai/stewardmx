@@ -1109,6 +1109,16 @@ test('ABGMOTOR v335: el panel ABG incluye cefoxitina (fox) y eritromicina (eri)'
   assert.ok(/\{k:'fox',n:'Cefoxitina'\}/.test(_idx), 'falta cefoxitina en el panel ABG_ATBS');
   assert.ok(/\{k:'eri',n:'Eritromicina'\}/.test(_idx), 'falta eritromicina en el panel ABG_ATBS');
 });
+test('ABGMOTOR v336: cefoxitina discrimina BLEE (fox-S) de AmpC (fox-R), incl. AmpC plasmídica', () => {
+  assert.ok(_detPheno, 'no se extrajo detectPhenotypes');
+  const e = _detPheno({ cro: 'R', fox: 'S', pitaz: 'S' }, 'E. coli');
+  assert.equal(e.ESBL, true, 'no detecta BLEE clásica (3GC-R + inhibidor-S + cefoxitina-S)');
+  assert.equal(e.AmpC, false, 'marca AmpC en una BLEE cefoxitina-S');
+  const a = _detPheno({ cro: 'R', fox: 'R' }, 'E. coli');
+  assert.equal(a.AmpC, true, 'no detecta AmpC plasmídica (cefoxitina-R) en E. coli');
+  assert.equal(a.ESBL, false, 'marca BLEE pese a cefoxitina-R (es AmpC, no BLEE)');
+  assert.equal(_detPheno({ cro: 'R', fox: 'R' }, 'Klebsiella pneumoniae').AmpC, true, 'no detecta AmpC plasmídica en K. pneumoniae (fox-R)');
+});
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
   assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)return TX\.CRE_PHENO;/.test(_idx), 'elegirTX no rutea CRE fenotípica a TX.CRE_PHENO');

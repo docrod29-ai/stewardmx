@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v336 (Motor de antibiograma — cefoxitina discrimina BLEE vs AmpC)
+//  Leídas Bush & Bradford "Interplay between β-lactamases and new BLI" (Nat Rev Microbiol 2019; matriz
+//  Ambler↔Bush-Jacoby + inhibidor→enzima: clavulánico/tazo solo BLEE; avibactam=BLEE+AmpC+KPC+OXA-48 no
+//  MBL; vaborbactam/relebactam=+KPC no OXA-48/MBL; MBL solo aztreonam-avibactam/cefiderocol) y la review
+//  de ESBL (Rahman 2018). Regla clave aprovechando la cefoxitina (añadida en v335): BLEE es cefoxitina-S;
+//  AmpC es cefoxitina-R y NO se restaura con clavulanato. detectPhenotypes AHORA: (1) BLEE exige
+//  cefoxitina NO-R (la separa de AmpC); (2) AmpC FENOTÍPICA por cefoxitina-R + 3GC no-S → capta AmpC
+//  PLASMÍDICA (CMY/DHA/ACT) en E. coli/Klebsiella, no solo la cromosómica por organismo. +1 prueba (250).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v335 (Motor de antibiograma — cefoxitina/eritromicina + MRSA-fox + iMLSb)
 //  Leídas letra por letra las 5 piezas que enseñan a leer el antibiograma: EUCAST Expert Rules (CMI
 //  2013), AmpC Primer (CID 2019) + las 3 lecturas interpretadas EIMC 2010 (cocos gram+ Torres/Cercenado;
@@ -696,7 +705,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v335';
+const CACHE = 'stewardmx-v336';
 const SHELL = [
   '/',
   '/index.html',

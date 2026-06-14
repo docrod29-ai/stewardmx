@@ -858,9 +858,16 @@ function detectPhenotypes(abg,organismo){
   // cefoxitina-R). v328: cefepime FUERA del cribado (BLEE suele ser cfp-S). Usar no-susceptible (R o I).
   if(/coli|klebsi|enterobacter|prote|serratia/.test(org)){
     const _3gcNoS=['cro','ctaz','azt'].some(k=>abg[k]==='R'||abg[k]==='I');
+    const _foxR=abg['fox']==='R';
     const _bliTested=['amcl','amsul','pitaz'].some(k=>abg[k]);
     const _bliS=['amcl','amsul','pitaz'].some(k=>abg[k]==='S');
-    if(_3gcNoS&&(_bliS||!_bliTested))phenos.ESBL=true;
+    // BLEE (v336): 3GC no-S + inhibidor-S (o no probado) + cefoxitina NO-R. La cefoxitina (cefamicina)
+    // la distingue de AmpC: BLEE es cefoxitina-S; AmpC es cefoxitina-R y NO se restaura con clavulanato
+    // (Bush & Bradford, Nat Rev Microbiol 2019; Rahman et al. 2018; EUCAST 9.1).
+    if(_3gcNoS&&(_bliS||!_bliTested)&&!_foxR)phenos.ESBL=true;
+    // AmpC FENOTÍPICA (v336): cefoxitina-R + 3GC no-S → capta también AmpC PLASMÍDICA (CMY/DHA/ACT) en
+    // E. coli/Klebsiella (sin AmpC cromosómica), además de la cromosómica por organismo (más abajo).
+    if(_foxR&&_3gcNoS)phenos.AmpC=true;
   }
   // CRE: R/I a cualquier carbapenémico en Enterobacterales
   if(/coli|klebsi|enterobacter|prote|serratia/.test(org)){
