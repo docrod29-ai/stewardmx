@@ -1119,9 +1119,27 @@ test('ABGMOTOR v336: cefoxitina discrimina BLEE (fox-S) de AmpC (fox-R), incl. A
   assert.equal(a.ESBL, false, 'marca BLEE pese a cefoxitina-R (es AmpC, no BLEE)');
   assert.equal(_detPheno({ cro: 'R', fox: 'R' }, 'Klebsiella pneumoniae').AmpC, true, 'no detecta AmpC plasmídica en K. pneumoniae (fox-R)');
 });
+test('ABGMOTOR v337: carbapenem-R NO enzimático — pérdida de porina (Enterobacterales) y OprD (P. aeruginosa)', () => {
+  assert.ok(_detPheno, 'no se extrajo detectPhenotypes');
+  // Mammeri & Skurnik, PLoS Pathog 2025: pérdida de porina sola NO eleva carbapenémicos; con BLEE/AmpC sí.
+  // El ertapenem es el carbapenémico más sensible a la impermeabilidad → ertapenem-R con imi/mer-S = porina.
+  const p = _detPheno({ ert: 'R', imi: 'S', mer: 'S' }, 'Klebsiella pneumoniae');
+  assert.equal(p.PorinLoss, true, 'no detecta pérdida de porina (ertapenem-R con imi/mer-S)');
+  assert.equal(p.CRE, true, 'ertapenem-R debe seguir cumpliendo cribado CRE');
+  assert.equal(_detPheno({ ert: 'R', imi: 'R', mer: 'S' }, 'E. coli').PorinLoss, false, 'imipenem-R no es pérdida de porina aislada (sugiere carbapenemasa)');
+  assert.equal(_detPheno({ mer: 'R' }, 'Klebsiella pneumoniae').PorinLoss, false, 'meropenem-R sin ertapenem no es el patrón de porina aislada');
+  // P. aeruginosa: pérdida de OprD → imipenem-R específico; meropenem-R sugiere eflujo (MexAB)/MBL.
+  assert.equal(_detPheno({ imi: 'R', mer: 'S' }, 'Pseudomonas aeruginosa').OprD_PA, true, 'no detecta pérdida de OprD (imipenem-R, meropenem-S)');
+  assert.equal(_detPheno({ imi: 'S', mer: 'R' }, 'Pseudomonas aeruginosa').OprD_PA, false, 'meropenem-R con imipenem-S no es OprD (sugiere eflujo)');
+});
+test('ABGMOTOR v337: elegirTX matiza la rama CRE como porina+BLEE/AmpC cuando el patrón es ertapenem-aislado', () => {
+  assert.ok(/_ph\.CRE&&_ph\.PorinLoss&&!_ph\.Carbapenemase/.test(_idx), 'elegirTX no distingue el patrón de pérdida de porina dentro de la rama CRE');
+  assert.ok(/PATRÓN NO ENZIMÁTICO/.test(_idx), 'falta el mensaje de pérdida de porina en la rama CRE');
+});
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
-  assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)return TX\.CRE_PHENO;/.test(_idx), 'elegirTX no rutea CRE fenotípica a TX.CRE_PHENO');
+  assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)\{/.test(_idx), 'elegirTX no rutea CRE fenotípica a la rama CRE_PHENO');
+  assert.ok(/return TX\.CRE_PHENO;/.test(_idx), 'elegirTX no devuelve TX.CRE_PHENO');
   assert.ok(/\(_ph&&_ph\.MRSA\)/.test(_idx) && /\(_ph&&_ph\.VRE\)/.test(_idx) && /\(_ph&&_ph\.ESBL\)/.test(_idx), 'elegirTX no usa MRSA/VRE/ESBL fenotípicos');
   assert.ok(/CRE_PHENO:\{title:'Carbapenemasa FENOTÍPICA/.test(_idx), 'falta la rama TX.CRE_PHENO');
 });

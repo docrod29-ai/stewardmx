@@ -849,7 +849,7 @@ function clsim39Deduplicate(isolates,opts){
 // ── Phenotype detection: ESBL, MRSA, VRE, CRE, etc. ─────────────────────
 // Aplica reglas CLSI sobre la matriz S/I/R
 function detectPhenotypes(abg,organismo){
-  const phenos={ESBL:false,AmpC:false,CRE:false,Carbapenemase:false,MRSA:false,VRE:false,VRSA:false,VISA:false,iMLSb:false,MDR_PA:false,CRAB:false,DTR_PA:false};
+  const phenos={ESBL:false,AmpC:false,CRE:false,Carbapenemase:false,PorinLoss:false,OprD_PA:false,MRSA:false,VRE:false,VRSA:false,VISA:false,iMLSb:false,MDR_PA:false,CRAB:false,DTR_PA:false};
   if(!abg||!Object.keys(abg).length)return phenos;
   const org=(organismo||'').toLowerCase();
   // ESBL (EUCAST regla 9.1, Leclercq/Cantón CMI 2013): Enterobacterales 3GC no-S (R/I a ceftriaxona/
@@ -872,6 +872,17 @@ function detectPhenotypes(abg,organismo){
   // CRE: R/I a cualquier carbapenémico en Enterobacterales
   if(/coli|klebsi|enterobacter|prote|serratia/.test(org)){
     if(['ert','imi','mer'].some(k=>abg[k]==='R'||abg[k]==='I'))phenos.CRE=true;
+  }
+  // Carbapenem-R NO ENZIMÁTICO — pérdida de porina ± BLEE/AmpC (NO carbapenemasa).
+  // Mammeri & Skurnik, PLoS Pathog 2025;21(2):e1012902 (Tablas 1-2): la pérdida de porina SOLA no eleva
+  // la MIC de carbapenémicos; combinada con BLEE/AmpC sí → carbapenem-R sin carbapenemasa. El ERTAPENEM
+  // es el carbapenémico más sensible a la impermeabilidad (mayor tamaño/carga negativa → penetra más
+  // lento por OmpK35/36–OmpF/OmpC). Patrón clave: ertapenem no-S con imipenem Y meropenem S = sugiere
+  // pérdida de porina + β-lactamasa, NO carbapenemasa (en una serie multicéntrica francesa este mecanismo
+  // fue MÁS frecuente que la carbapenemasa). Confirmar por método molecular antes de etiquetar carbapenemasa.
+  if(/coli|klebsi|enterobacter|prote|serratia/.test(org)){
+    const _ertNoS=abg['ert']==='R'||abg['ert']==='I';
+    if(_ertNoS&&abg['imi']==='S'&&abg['mer']==='S')phenos.PorinLoss=true;
   }
   // AmpC cromosómica inducible — por ORGANISMO de alto riesgo (no existe criterio fenotípico CLSI;
   // EUCAST regla 9.2 + AmpC Primer, Tamma/Doi/Bonomo CID 2019;69:1446-55): E. cloacae complex,
@@ -908,6 +919,11 @@ function detectPhenotypes(abg,organismo){
     if(nonS>=3)phenos.MDR_PA=true;
     // DTR-PA: R a TODOS los siguientes en P. aeruginosa
     if(['ctaz','cfp','imi','mer','cip','lev','azt','pitaz'].every(k=>abg[k]==='R'||abg[k]==='I'))phenos.DTR_PA=true;
+    // OprD (pérdida de porina) en P. aeruginosa: imipenem no-S con meropenem S → mecanismo NO enzimático
+    // imipenem-específico (OprD/OccD1 es la ruta principal del imipenem). El meropenem-R, en cambio,
+    // sugiere eflujo (MexAB-OprM) + AmpC desreprimida o carbapenemasa/MBL (Mammeri & Skurnik, PLoS Pathog
+    // 2025, Tabla 2; Sun et al. BBRC 2014;453:254-267). No equivale a carbapenemasa: confirmar antes de etiquetar.
+    if((abg['imi']==='R'||abg['imi']==='I')&&abg['mer']==='S')phenos.OprD_PA=true;
   }
   // CRAB: R a carbapenémicos en A. baumannii
   if(/baumannii|acinetobacter/.test(org)){
@@ -6271,7 +6287,14 @@ function elegirTX(p){
   if(p.mec_ges)return TX.KPC;
   // Carbapenemasa FENOTÍPICA (CRE en el antibiograma) sin flag molecular → rama que exige confirmar
   // el mecanismo (KPC/MBL/OXA no se distinguen del S/I/R). Va tras los flags moleculares (que ganan).
-  if(_ph&&(_ph.CRE||_ph.Carbapenemase))return TX.CRE_PHENO;
+  if(_ph&&(_ph.CRE||_ph.Carbapenemase)){
+    // v337: patrón ertapenem no-S con imipenem Y meropenem S (PorinLoss) sin carbapenemasa molecular →
+    // el mecanismo más probable es PÉRDIDA DE PORINA + BLEE/AmpC, no carbapenemasa. Aun así cumple cribado
+    // CRE → confirmar por método molecular y tratar la β-lactamasa subyacente (Mammeri & Skurnik, PLoS
+    // Pathog 2025;21:e1012902 — en series clínicas este mecanismo puede superar a la carbapenemasa).
+    if(_ph.CRE&&_ph.PorinLoss&&!_ph.Carbapenemase)return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ PATRÓN NO ENZIMÁTICO: ertapenem no-S con imipenem y meropenem S sugiere PÉRDIDA DE PORINA + BLEE/AmpC más que carbapenemasa (el ertapenem es el carbapenémico más sensible a la impermeabilidad). Cumple cribado CRE: confirmar mecanismo por método molecular antes de fijar el esquema — y tratar la BLEE/AmpC subyacente.'};
+    return TX.CRE_PHENO;
+  }
   if(p.mec_vrsa)return TX.VRSA;
   if(p.mec_visa)return TX.VISA;
   if(p.mec_mrsa||(_ph&&_ph.MRSA)||/MRSA/i.test(p.organismo||''))return TX.MRSA;

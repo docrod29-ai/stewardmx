@@ -1,4 +1,17 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v337 (Motor de antibiograma — carbapenem-R NO enzimático: porinas + eflujo)
+//  Tanda 3 leída letra por letra: BOMBAS DE FLUJO (Sun et al, BBRC 2014;453:254-267 — AcrAB-TolC
+//  enterobacterias → FQ/cloranfenicol/tetraciclina±β-lactámicos; MexAB-OprM/MexXY P. aeruginosa →
+//  FQ+meropenem+aminoglucósidos = patrón multidroga inespecífico) y PORINAS (Mammeri & Skurnik, PLoS
+//  Pathog 2025;21:e1012902). Hallazgo rector (Tablas 1-2): la PÉRDIDA DE PORINA SOLA no eleva la MIC de
+//  carbapenémicos; con BLEE/AmpC sí → carbapenem-R SIN carbapenemasa (en serie multicéntrica francesa,
+//  MÁS frecuente que la carbapenemasa). El ERTAPENEM es el carbapenémico más sensible a la impermeabilidad.
+//  detectPhenotypes AHORA: (1) PorinLoss (Enterobacterales) = ertapenem no-S con imipenem Y meropenem S →
+//  pérdida de porina + β-lactamasa, no carbapenemasa; (2) OprD_PA = imipenem no-S con meropenem S en
+//  P. aeruginosa → pérdida de OprD (imipenem-específica); meropenem-R sugiere eflujo/MBL. elegirTX matiza
+//  la rama CRE cuando el patrón es ertapenem-aislado (confirmar mecanismo, tratar BLEE/AmpC). MR4 leído
+//  (Ahmed 2023, terapias nuevas) — sin regla S/I/R nueva. +2 pruebas (252).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v336 (Motor de antibiograma — cefoxitina discrimina BLEE vs AmpC)
 //  Leídas Bush & Bradford "Interplay between β-lactamases and new BLI" (Nat Rev Microbiol 2019; matriz
 //  Ambler↔Bush-Jacoby + inhibidor→enzima: clavulánico/tazo solo BLEE; avibactam=BLEE+AmpC+KPC+OXA-48 no
@@ -705,7 +718,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v336';
+const CACHE = 'stewardmx-v337';
 const SHELL = [
   '/',
   '/index.html',
