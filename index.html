@@ -1265,16 +1265,12 @@ async function cargarApp(u,isAdmin){
   getDoc(doc(db,'config','global')).then(gs=>{
     if(gs.exists()){
       const d=gs.data();
-      if(d.anthropicKey)window._abgApiKey=d.anthropicKey;
-      // Cuando el super-admin despliega Cloud Function y configura la URL,
-      // todos los clientes del mundo cambian automáticamente al modo seguro.
+      // F-2 SEGURIDAD: ya NO se carga anthropicKey al cliente — la key sk-ant nunca debe vivir en el
+      //   navegador. La IA va SIEMPRE por el proxy Cloud Function, que lee la key desde Secret Manager.
       if(d.anthropicProxyURL){window._anthropicProxyURL=d.anthropicProxyURL;console.info('[StewardMX] Modo seguro activo: proxy Cloud Function');}
       if(d.waVentas)window._waVentas=d.waVentas;
     }
-    if(!window._abgApiKey){
-      getDoc(doc(db,'hospitals',HOSP,'config','main')).then(s=>{if(s.exists()&&s.data().anthropicKey)window._abgApiKey=s.data().anthropicKey;}).catch(()=>{});
-    }
-  }).catch(()=>{getDoc(doc(db,'hospitals',HOSP,'config','main')).then(s=>{if(s.exists()&&s.data().anthropicKey)window._abgApiKey=s.data().anthropicKey;}).catch(()=>{});});
+  }).catch(()=>{});
   try{suscribirSolicitudes();}catch(e){console.warn('Solicitudes no disponibles:',e);}
   try{suscribirBloqueosATB();}catch(e){console.warn('Bloqueos ATB no disponibles:',e);}
   try{window._initColaProa();}catch(e){console.warn('Cola PROA no disponible:',e);}
@@ -15126,21 +15122,11 @@ async function llamarAnthropicSeguro(messages,system,max_tokens=1500,model='clau
       // Cloud Function v2 (onCall) devuelve {result: ...}; v1 lo devuelve directo
       return j.result||j;
     } else {
-      // Modo legacy: API directa (key en cliente — temporal hasta deploy de Function)
-      if(!window._abgApiKey)throw new Error('API key no configurada');
-      const res=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{
-          'content-type':'application/json',
-          'x-api-key':window._abgApiKey,
-          'anthropic-version':'2023-06-01',
-          'anthropic-dangerous-direct-browser-access':'true',
-        },
-        body:JSON.stringify({model,max_tokens,system,messages}),
-        signal:_ctrl.signal,
-      });
-      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'API error '+res.status);}
-      return res.json();
+      // F-2 SEGURIDAD: modo directo ELIMINADO — la key sk-ant nunca debe viajar al navegador. Si el proxy
+      //   no está configurado, se aborta (antes caía a api.anthropic.com con la key en el cliente). El proxy
+      //   seguro (_PROXY_DEFAULT) siempre está disponible salvo que un superadmin lo vacíe en sesión, y la
+      //   Cloud Function lee la key desde Secret Manager (no desde el cliente ni Firestore).
+      throw new Error('IA no disponible: el proxy seguro no está configurado. Contacta al administrador.');
     }
   }catch(err){
     if(err.name==='AbortError')throw new Error('Tiempo de espera agotado (160 s) — red lenta o servidor no responde. Verifica tu conexión e intenta de nuevo.');

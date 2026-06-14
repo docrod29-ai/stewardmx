@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v349 (Auditoría forense — cierre F-2 + robustez EHR)
+//  · F-2 [MEDIA] — eliminado el "modo directo" de la API key: la key sk-ant ya NO se carga al navegador
+//    (se quitó la lectura de anthropicKey en cargarApp) y llamarAnthropicSeguro ya NO cae a api.anthropic.com
+//    con la key en el cliente — la IA va SIEMPRE por el proxy Cloud Function (que lee la key del Secret
+//    Manager). El proxy default siempre aplica → sin regresión. Cierra la exposición latente de la key.
+//  · Robustez — ehrWebhook acota la longitud de los campos de texto del EHR (anti-bloat; el render ya escapa).
+//  Nota: exportSheetSA SÍ se usa (export a Sheets) → requiere el secret SA_KEY (acción de infra del dueño).
+//  isHospMedico queda (warning benigno; documenta la taxonomía de roles).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v348 (Auditoría forense — seguridad + robustez)
 //  Barrido forense (rol auditor) sobre 33.6k líneas. 5 hallazgos reparados, verificados (268 pruebas):
 //  · F-7 [ALTA] — bypass de auth en webhooks (cdsHooks/ehrWebhook/lisSync): si ehr_config existía SIN
@@ -836,7 +845,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v348';
+const CACHE = 'stewardmx-v349';
 const SHELL = [
   '/',
   '/index.html',

@@ -677,6 +677,12 @@ exports.ehrWebhook = onRequest(
       peso  = body.peso  || body.weight      ? Number(body.peso || body.weight) : null;
     }
 
+    // Robustez: acotar la longitud de los campos de texto del EHR (anti-bloat del doc; el render ya escapa).
+    const _clamp = (s, n = 300) => (s == null ? s : String(s).slice(0, n));
+    patientName = _clamp(patientName, 200); medicationName = _clamp(medicationName, 200);
+    dosage = _clamp(dosage, 100); route = _clamp(route, 60); requester = _clamp(requester, 120);
+    service = _clamp(service, 120); dx = _clamp(dx, 300); cama = _clamp(cama, 40); exp = _clamp(exp, 60);
+
     // ── Guardar solicitud en ehr_requests y upsert al CENSO ───────────
     let docId;
     try {
