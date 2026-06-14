@@ -852,14 +852,25 @@ function detectPhenotypes(abg,organismo){
   const phenos={ESBL:false,AmpC:false,CRE:false,Carbapenemase:false,MRSA:false,VRE:false,VRSA:false,VISA:false,MDR_PA:false,CRAB:false,DTR_PA:false};
   if(!abg||!Object.keys(abg).length)return phenos;
   const org=(organismo||'').toLowerCase();
-  // ESBL screen (CLSI): R/I a ceftriaxona/cefotaxima/ceftazidima/aztreonam en Enterobacterales
+  // ESBL (EUCAST regla 9.1, Leclercq/Cantón CMI 2013): Enterobacterales 3GC no-S (R/I a ceftriaxona/
+  // cefotaxima/ceftazidima/aztreonam) + S a un INHIBIDOR de β-lactamasa (amox-clav/amp-sulbactam/
+  // pip-tazo) → BLEE. El requisito de inhibidor-S distingue BLEE de AmpC (que es inhibidor-R y
+  // cefoxitina-R). v328: cefepime FUERA del cribado (BLEE suele ser cfp-S). Usar no-susceptible (R o I).
   if(/coli|klebsi|enterobacter|prote|serratia/.test(org)){
-    if(['cro','ctaz','azt'].some(k=>abg[k]==='R'||abg[k]==='I'))phenos.ESBL=true;// v328: cefepime FUERA (BLEE suele ser cfp-S; cfp-R apunta a carbapenemasa/AmpC+porinas); usar no-susceptible (R o I) por CLSI
+    const _3gcNoS=['cro','ctaz','azt'].some(k=>abg[k]==='R'||abg[k]==='I');
+    const _bliTested=['amcl','amsul','pitaz'].some(k=>abg[k]);
+    const _bliS=['amcl','amsul','pitaz'].some(k=>abg[k]==='S');
+    if(_3gcNoS&&(_bliS||!_bliTested))phenos.ESBL=true;
   }
   // CRE: R/I a cualquier carbapenémico en Enterobacterales
   if(/coli|klebsi|enterobacter|prote|serratia/.test(org)){
     if(['ert','imi','mer'].some(k=>abg[k]==='R'||abg[k]==='I'))phenos.CRE=true;
   }
+  // AmpC cromosómica inducible — por ORGANISMO de alto riesgo (no existe criterio fenotípico CLSI;
+  // EUCAST regla 9.2 + AmpC Primer, Tamma/Doi/Bonomo CID 2019;69:1446-55): E. cloacae complex,
+  // K. aerogenes, C. freundii, S. marcescens (alto); Hafnia/Morganella/Providencia (menor). Riesgo de
+  // desrepresión con 3GC → preferir cefepime/carbapenémico en infección grave. (Antes: flag muerto.)
+  if(/enterobacter|aerogenes|freundii|serratia|hafnia|morganella|providencia/.test(org))phenos.AmpC=true;
   // MRSA: R a oxacilina o cefoxitina en S. aureus
   if(/aureus/.test(org)){
     if(abg['oxa']==='R'||abg['cefoxitin']==='R')phenos.MRSA=true;

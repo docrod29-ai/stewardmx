@@ -1034,7 +1034,8 @@ test('TXCRASH P2: Pre-TX/Profilaxis no crashean sin paciente seleccionado', () =
 
 /* ═══════════ P2 (auditoría v328): seguridad clínica — fenotipo ESBL + gate qSOFA desde la ficha ═══════════ */
 test('ESBL P2: el cribado de BLEE excluye cefepime y usa no-susceptible (R o I) por CLSI', () => {
-  assert.ok(/\['cro','ctaz','azt'\]\.some\(k=>abg\[k\]==='R'\|\|abg\[k\]==='I'\)\)phenos\.ESBL=true/.test(_idx), 'el cribado ESBL no se corrigió');
+  // v334: el cribado 3GC se movió a la variable _3gcNoS (sigue cro/ctaz/azt con R||I, sin cefepime).
+  assert.ok(/const _3gcNoS=\['cro','ctaz','azt'\]\.some\(k=>abg\[k\]==='R'\|\|abg\[k\]==='I'\)/.test(_idx), 'el cribado ESBL no usa cro/ctaz/azt con no-susceptible');
   assert.ok(!/\['cro','ctaz','cfp','azt'\]\.some\(k=>abg\[k\]==='R'\)/.test(_idx), 'el cribado ESBL aún incluye cefepime / solo R');
 });
 test('QSOFA P2: el gate de cultivo (qSOFA≥2) también aplica al solicitar desde la ficha', () => {
@@ -1083,6 +1084,18 @@ test('MOTOR P2: detectPhenotypes deriva CRE/ESBL/MRSA/VRE del antibiograma (S/I/
   assert.equal(_detPheno({ cfp: 'R' }, 'E. coli').ESBL, false, 'cefepime-R NO debe marcar ESBL (v328)');
   assert.equal(_detPheno({ oxa: 'R' }, 'S. aureus').MRSA, true, 'no detecta MRSA');
   assert.equal(_detPheno({ van: 'R' }, 'E. faecium').VRE, true, 'no detecta VRE');
+});
+test('ABGMOTOR v334: AmpC por organismo (EUCAST 9.2/AmpC Primer) + BLEE exige inhibidor-S (EUCAST 9.1)', () => {
+  assert.ok(_detPheno, 'no se extrajo detectPhenotypes');
+  // AmpC cromosómica = organismo de alto riesgo (no por cefoxitina, que no está en el panel).
+  assert.equal(_detPheno({ amp: 'R' }, 'Enterobacter cloacae').AmpC, true, 'no detecta AmpC en E. cloacae');
+  assert.equal(_detPheno({ amp: 'R' }, 'Serratia marcescens').AmpC, true, 'no detecta AmpC en S. marcescens');
+  assert.equal(_detPheno({ amp: 'R' }, 'Citrobacter koseri').AmpC, false, 'C. koseri NO es AmpC de alto riesgo');
+  assert.equal(_detPheno({ amp: 'R' }, 'E. coli').AmpC, false, 'E. coli no tiene AmpC cromosómica inducible');
+  // BLEE: con inhibidor probado, exige inhibidor-S (distingue de AmpC); sin inhibidor, cae al cribado 3GC.
+  assert.equal(_detPheno({ cro: 'R', pitaz: 'S' }, 'E. coli').ESBL, true, 'no marca BLEE con 3GC-R + pip-tazo-S');
+  assert.equal(_detPheno({ cro: 'R', amcl: 'R', pitaz: 'R' }, 'E. coli').ESBL, false, 'marca BLEE pese a inhibidor-R (sería AmpC/carbapenemasa)');
+  assert.equal(_detPheno({ cro: 'R' }, 'E. coli').ESBL, true, 'sin inhibidor probado, no cae al cribado 3GC solo');
 });
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');

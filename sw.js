@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v334 (Motor de antibiograma — AmpC + BLEE afinada, desde bibliografía)
+//  Misión "mejor IA de antibiogramas". Leídas LETRA POR LETRA las 2 piezas rectoras: EUCAST Expert
+//  Rules (Leclercq/Cantón CMI 2013;19:141-160) y AmpC Primer (Tamma/Doi/Bonomo CID 2019;69:1446-55).
+//  Prompt maestro rector: docs/PROMPT_MAESTRO_ANTIBIOGRAMA.md (LLM solo EXTRAE S/I/R; el mecanismo lo
+//  decide el motor determinista, citado, testeable). Primer upgrade a detectPhenotypes:
+//  (1) AmpC AHORA se detecta (flag estaba muerto — auditoría 421) por ORGANISMO de alto riesgo
+//      (E. cloacae complex, K. aerogenes, C. freundii, S. marcescens; Hafnia/Morganella/Providencia)
+//      — EUCAST 9.2 + AmpC Primer; no por cefoxitina (no está en el panel).
+//  (2) BLEE afinada (EUCAST 9.1): 3GC no-S + inhibidor-S (amox-clav/amp-sulbactam/pip-tazo) → distingue
+//      BLEE de AmpC (inhibidor-R). Sin inhibidor probado, cae al cribado 3GC. +1 prueba (247).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v333 (Refactor clínico #2 — antibiograma acumulado consistente)
 //  P2: las dos rutas de captura de antibiograma (ficha p.abg vs subcolección antibiograms[]) podían
 //  sesgar los reportes acumulados. Verificado: la PRECEDENCIA ya existía (el Excel incluye p.abg legacy
@@ -675,7 +686,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v333';
+const CACHE = 'stewardmx-v334';
 const SHELL = [
   '/',
   '/index.html',
