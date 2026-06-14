@@ -761,10 +761,12 @@ window.categoriaPrincipalCode=categoriaPrincipalCode; window.DX_CIE10=DX_CIE10; 
 // verificación de Pseudomonas más abajo). Los window.* de CLSI/clasificar/_organism… siguen abajo.
 import { CLSI_CATEGORIES, _organismToSpeciesKey, _intrinsicResistanceKeys, clasificarMagiorakos } from './js/core/magiorakos.js';
 window._intrinsicResistanceKeys=_intrinsicResistanceKeys;
-// Capa de seguridad EUCAST (resistencia intrínseca + fenotipos excepcionales) — módulo PURO, citado.
-import { intrinsicConflicts, exceptionalPhenotypes } from './js/core/abg-phenotype.js';
+// Capa de seguridad EUCAST (resistencia intrínseca + fenotipos excepcionales + cross-resistencia FQ + HLAR) — módulo PURO, citado.
+import { intrinsicConflicts, exceptionalPhenotypes, quinoloneCrossResistance, aminoglycosideSynergy } from './js/core/abg-phenotype.js';
 window.intrinsicConflicts=intrinsicConflicts;
 window.exceptionalPhenotypes=exceptionalPhenotypes;
+window.quinoloneCrossResistance=quinoloneCrossResistance;
+window.aminoglycosideSynergy=aminoglycosideSynergy;
 // ── Estandarización NHSN-style del SITIO DE ATENCIÓN ────────────────────
 // Devuelve: ICU / EME / INX / OUT / PED-ICU / NEO / OTHER
 function _normalizeWardNHSN(servicio){
@@ -4624,12 +4626,15 @@ window._abgFenoLabels={
 };
 window._renderAbgInterpretacionHTML=function(abg,org){
   if(!abg||!Object.keys(abg).length)return '';
-  let ph=null,ic=[],ex=[];
+  let ph=null,ic=[],ex=[],qx={edits:[],avisos:[]},ag=[];
   try{ph=window.detectPhenotypes?window.detectPhenotypes(abg,org||''):null;}catch(_){}
   try{ic=window.intrinsicConflicts?window.intrinsicConflicts(abg,org||''):[];}catch(_){}
   try{ex=window.exceptionalPhenotypes?window.exceptionalPhenotypes(abg,org||''):[];}catch(_){}
+  try{qx=window.quinoloneCrossResistance?window.quinoloneCrossResistance(abg,org||''):qx;}catch(_){}
+  try{ag=window.aminoglycosideSynergy?window.aminoglycosideSynergy(abg,org||''):[];}catch(_){}
+  const edits=qx.edits||[]; const avisos=[...(qx.avisos||[]),...(ag||[])];
   const flags=ph?Object.keys(ph).filter(k=>ph[k]&&window._abgFenoLabels[k]):[];
-  if(!flags.length&&!ic.length&&!ex.length)return '';
+  if(!flags.length&&!ic.length&&!ex.length&&!edits.length&&!avisos.length)return '';
   let h='<div style="border:1px solid var(--brd2);border-radius:8px;padding:12px;background:rgba(0,212,168,.04);">';
   h+='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:8px;">🧠 Interpretación del motor (determinista · EUCAST/CLSI)</div>';
   if(flags.length){
@@ -4645,6 +4650,16 @@ window._renderAbgInterpretacionHTML=function(abg,org){
   if(ex.length){
     h+='<div style="border-left:3px solid var(--red);background:rgba(255,77,109,.07);border-radius:4px;padding:8px 10px;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:3px;">⚠ Fenotipo excepcional → probable error de identificación/AST</div>';
     ex.forEach(e=>{h+='<div style="font-size:11px;color:var(--t2);margin-top:2px;">• '+escHtml(e.msg)+' <span style="color:var(--t3);">'+escHtml(e.cita)+'</span></div>';});
+    h+='</div>';
+  }
+  if(edits.length){
+    h+='<div style="border-left:3px solid var(--purple);background:rgba(167,139,250,.07);border-radius:4px;padding:8px 10px;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--purple);margin-bottom:3px;">✎ Edición interpretativa — reportar R por inferencia</div>';
+    edits.forEach(e=>{h+='<div style="font-size:11px;color:var(--t2);margin-top:2px;">• <b>'+escHtml(e.n)+'</b> reportado S → reportar <b>R</b> por cross-resistencia de fluoroquinolonas. <span style="color:var(--t3);">'+escHtml(e.cita)+'</span></div>';});
+    h+='</div>';
+  }
+  if(avisos.length){
+    h+='<div style="border-left:3px solid var(--blue);background:rgba(61,155,255,.07);border-radius:4px;padding:8px 10px;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px;">ℹ Aviso interpretativo</div>';
+    avisos.forEach(a=>{h+='<div style="font-size:11px;color:var(--t2);margin-top:2px;">• '+escHtml(a.msg)+' <span style="color:var(--t3);">'+escHtml(a.cita)+'</span></div>';});
     h+='</div>';
   }
   h+='<div style="font-size:10px;color:var(--t3);margin-top:4px;">Apoyo decisional determinista (no sustituye el juicio del microbiólogo/infectólogo). El LLM solo extrae S/I/R; el mecanismo lo infiere este motor citado.</div></div>';
@@ -10476,10 +10491,14 @@ window.guardarAntibiograma=async(pid)=>{
     try{
       magiorakosCls=window.clasificarMagiorakos?window.clasificarMagiorakos(abg,org||''):null;
       phenotypes=window.detectPhenotypes?window.detectPhenotypes(abg,org||''):null;
-      // Capa de seguridad EUCAST: "S" engañosa por R intrínseca + fenotipos excepcionales (error ID/AST).
+      // Capa de seguridad EUCAST: "S" engañosa por R intrínseca + fenotipos excepcionales (error ID/AST)
+      // + cross-resistencia de fluoroquinolonas (edición interpretativa) + HLAR enterococo (sinergia).
       const _ic=window.intrinsicConflicts?window.intrinsicConflicts(abg,org||''):[];
       const _ex=window.exceptionalPhenotypes?window.exceptionalPhenotypes(abg,org||''):[];
-      if((_ic&&_ic.length)||(_ex&&_ex.length))safety={intrinsecos:_ic||[],excepcionales:_ex||[]};
+      const _qx=window.quinoloneCrossResistance?window.quinoloneCrossResistance(abg,org||''):{edits:[],avisos:[]};
+      const _ag=window.aminoglycosideSynergy?window.aminoglycosideSynergy(abg,org||''):[];
+      const _edits=_qx.edits||[]; const _avisos=[...(_qx.avisos||[]),...(_ag||[])];
+      if(_ic.length||_ex.length||_edits.length||_avisos.length)safety={intrinsecos:_ic||[],excepcionales:_ex||[],interpretive:_edits,avisos:_avisos};
     }catch(_){}
   }
   try{

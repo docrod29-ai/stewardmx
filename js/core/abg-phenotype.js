@@ -88,4 +88,42 @@ function exceptionalPhenotypes(abg,organismo){
   return out;
 }
 
-export {INTRINSIC_RULES,ABG_PHENO_NOMBRES,intrinsicConflicts,exceptionalPhenotypes};
+// ── Cross-resistencia de FLUOROQUINOLONAS (EUCAST Tabla 13) → EDICIÓN interpretativa ──
+// Principio (EUCAST): la R a la FQ MÁS ACTIVA in vitro implica R a TODAS las fluoroquinolonas.
+//  • Gram-negativos: la más activa es ciprofloxacino → cipro-R ⇒ reportar levo/moxi como R (regla 13.5).
+//  • Gram-positivos (estafilococo/neumococo): las más activas son levo/moxi → levo-R o moxi-R ⇒ todas R
+//    (reglas 13.2/13.4); cipro-R con levo/moxi-S = mutación de PRIMER PASO → advertir selección de R
+//    durante el tratamiento (reglas 13.1/13.3).
+// Devuelve {edits:[{k,n,cita}], avisos:[{msg,cita}]}. Las ediciones solo marcan un fármaco reportado "S"
+// que debe reportarse R por inferencia (la trampa accionable); no inventa fármacos no probados.
+function quinoloneCrossResistance(abg,organismo){
+  const org=(organismo||'').toLowerCase(); const edits=[],avisos=[];
+  if(!abg||!org)return {edits,avisos};
+  const FQ=[['cip','Ciprofloxacino'],['lev','Levofloxacino'],['mox','Moxifloxacino']];
+  const isR=k=>abg[k]==='R'||abg[k]==='I';
+  const cita=r=>CITA+' T13 (regla '+r+')';
+  const editToR=(keys,c)=>keys.forEach(([k,n])=>{ if(abg[k]==='S')edits.push({k,n,cita:c}); });
+  const isGN=/coli|klebsiella|enterobacter|serratia|citrobacter|cloacae|aerogenes|freundii|koseri|hafnia|escherichia|proteus|providencia|morganella|aeruginosa|acinetobacter|baumannii|salmonella|shigella/.test(org);
+  const isStaph=/staphyloc|aureus/.test(org); const isPneumo=/pneumoniae/.test(org);
+  if(isGN){
+    if(isR('cip'))editToR(FQ.filter(([k])=>k!=='cip'),cita('13.5'));
+  }else if(isStaph||isPneumo){
+    if(isR('lev')||isR('mox'))editToR(FQ.filter(([k])=>abg[k]==='S'),isStaph?cita('13.2'):cita('13.4'));
+    else if(isR('cip')&&(abg['lev']||abg['mox']))avisos.push({msg:'Cipro/ofloxacino-R con levo/moxi-S: mutación de PRIMER PASO → riesgo de selección de R a todas las fluoroquinolonas durante el tratamiento.',cita:isStaph?cita('13.1'):cita('13.3')});
+  }
+  return {edits,avisos};
+}
+
+// ── HLAR (resistencia de alto nivel a aminoglucósidos) en enterococo (EUCAST Tabla 12, regla 12.6) ──
+// La R de ALTO NIVEL a gentamicina (screen específico, MIC>128) anula la SINERGIA β-lactámico+aminoglucósido
+// usada en la endocarditis enterocócica. El panel no incluye el screen de alto nivel, así que se emite un
+// AVISO (no un hecho) cuando la gentamicina sale no-S en enterococo → confirmar con el screen HLAR.
+function aminoglycosideSynergy(abg,organismo){
+  const org=(organismo||'').toLowerCase(); const avisos=[];
+  if(!abg||!org)return avisos;
+  if(/enterococ|faecium|faecalis/.test(org)&&(abg['gen']==='R'||abg['gen']==='I'))
+    avisos.push({msg:'Enterococo con gentamicina no-S: confirmar resistencia de ALTO nivel (HLAR, screen MIC>128). Si HLAR+, se PIERDE la sinergia β-lactámico+aminoglucósido (clave en endocarditis enterocócica).',cita:CITA+' T12 (regla 12.6)'});
+  return avisos;
+}
+
+export {INTRINSIC_RULES,ABG_PHENO_NOMBRES,intrinsicConflicts,exceptionalPhenotypes,quinoloneCrossResistance,aminoglycosideSynergy};

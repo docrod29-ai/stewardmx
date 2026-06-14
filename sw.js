@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v339 (Antibiograma — cross-resistencia FQ + HLAR enterococo, EUCAST T12/T13)
+//  Sigue la capa de seguridad: js/core/abg-phenotype.js suma 2 reglas interpretativas citadas (EUCAST
+//  Expert Rules T12/T13, CMI 2013). (1) quinoloneCrossResistance: la R a la fluoroquinolona MÁS ACTIVA
+//  implica R a TODAS — en Gram-negativos cipro-R ⇒ levo/moxi R (regla 13.5); en Gram-positivos levo/moxi-R
+//  ⇒ todas R (13.2/13.4), y cipro-R con levo/moxi-S = mutación de primer paso → aviso (13.1/13.3). Produce
+//  EDICIONES interpretativas (reportar R por inferencia) — solo sobre lo reportado "S" (la trampa). (2)
+//  aminoglycosideSynergy: enterococo con gentamicina no-S → aviso HLAR (confirmar screen MIC>128; si HLAR+
+//  se pierde la sinergia β-lactámico+aminoglucósido de la endocarditis enterocócica — regla 12.6). El panel
+//  "🧠 Interpretación del motor" añade secciones ✎ Edición interpretativa e ℹ Aviso; ambas se persisten en
+//  el campo safety (interpretive/avisos). +2 pruebas (257).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v338 (Antibiograma — capa de SEGURIDAD EUCAST: intrínsecos + excepcionales)
 //  Releídas letra por letra las Tablas 1-7 de EUCAST Expert Rules (Leclercq/Cantón, CMI 2013;19:141-160).
 //  Nuevo módulo PURO js/core/abg-phenotype.js (citado, testeable, sin estado): (1) intrinsicConflicts =
@@ -731,7 +742,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v338';
+const CACHE = 'stewardmx-v339';
 const SHELL = [
   '/',
   '/index.html',

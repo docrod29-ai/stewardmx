@@ -17,7 +17,7 @@ import { calcDiaATB, calcDia, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPe
 import { corregirTranscripcionMedica, fonetEs, levenshtein } from '../js/core/medical-voice.js';
 import { clasificarMagiorakos, _intrinsicResistanceKeys } from '../js/core/magiorakos.js';
 import { cie10DeDx, categorizarDx } from '../js/core/dx-cie10.js';
-import { intrinsicConflicts, exceptionalPhenotypes, INTRINSIC_RULES } from '../js/core/abg-phenotype.js';
+import { intrinsicConflicts, exceptionalPhenotypes, INTRINSIC_RULES, quinoloneCrossResistance, aminoglycosideSynergy } from '../js/core/abg-phenotype.js';
 
 /* ─────────────── ESPEJOS de funciones puras (index.html v217) ─────────────── */
 
@@ -1176,9 +1176,28 @@ test('ABGSAFE v338: cada regla intrínseca lleva su cita EUCAST + integración e
   assert.ok(INTRINSIC_RULES.length >= 10 && INTRINSIC_RULES.every(r => r.t && r.re && Array.isArray(r.ks)), 'reglas intrínsecas mal formadas');
   assert.ok(intrinsicConflicts({ amp: 'S' }, 'Klebsiella pneumoniae')[0].cita.includes('EUCAST'), 'la cita no referencia EUCAST');
   // index.html importa el módulo y lo persiste; sw.js lo precachea.
-  assert.ok(/import \{ intrinsicConflicts, exceptionalPhenotypes \} from '\.\/js\/core\/abg-phenotype\.js'/.test(_idx), 'index.html no importa abg-phenotype.js');
-  assert.ok(/safety=\{intrinsecos:_ic\|\|\[\],excepcionales:_ex\|\|\[\]\}/.test(_idx), 'no se computa/persiste la capa de seguridad al guardar');
+  assert.ok(/import \{[^}]*intrinsicConflicts[^}]*exceptionalPhenotypes[^}]*\} from '\.\/js\/core\/abg-phenotype\.js'/.test(_idx), 'index.html no importa abg-phenotype.js');
+  assert.ok(/safety=\{intrinsecos:_ic\|\|\[\],excepcionales:_ex\|\|\[\]/.test(_idx), 'no se computa/persiste la capa de seguridad al guardar');
   assert.ok(/_renderAbgInterpretacionHTML/.test(_idx), 'falta el render de la interpretación del motor');
+});
+test('ABGSAFE v339: cross-resistencia de fluoroquinolonas (EUCAST T13) — edición interpretativa', () => {
+  // GN: cipro-R → reportar levo/moxi como R (regla 13.5). Solo edita lo reportado "S".
+  const gn = quinoloneCrossResistance({ cip: 'R', lev: 'S', mox: 'S' }, 'Escherichia coli');
+  assert.ok(gn.edits.some(e => e.k === 'lev') && gn.edits.some(e => e.k === 'mox'), 'GN cipro-R no propaga R a levo/moxi');
+  assert.ok(gn.edits[0].cita.includes('13.5'), 'la cita no es 13.5');
+  // GP (S. aureus): levo-R → todas las FQ R (regla 13.2).
+  assert.ok(quinoloneCrossResistance({ lev: 'R', cip: 'S' }, 'Staphylococcus aureus').edits.some(e => e.k === 'cip'), 'staph levo-R no propaga R a cipro');
+  // GP cipro-R con levo/moxi-S = mutación de primer paso → AVISO, no edición (13.1).
+  const fp = quinoloneCrossResistance({ cip: 'R', lev: 'S' }, 'Staphylococcus aureus');
+  assert.equal(fp.edits.length, 0, 'no debe editar a R en mutación de primer paso');
+  assert.ok(fp.avisos.some(a => /primer paso/i.test(a.msg)), 'no avisa de mutación de primer paso');
+  // Sin cipro-R no hay edición.
+  assert.equal(quinoloneCrossResistance({ cip: 'S', lev: 'S' }, 'Klebsiella pneumoniae').edits.length, 0, 'no debe editar si cipro es S');
+});
+test('ABGSAFE v339: HLAR enterococo — aviso de pérdida de sinergia (EUCAST T12 12.6)', () => {
+  assert.ok(aminoglycosideSynergy({ gen: 'R' }, 'Enterococcus faecalis').some(a => /sinergia/i.test(a.msg)), 'no avisa pérdida de sinergia en enterococo gen-R');
+  assert.equal(aminoglycosideSynergy({ gen: 'S' }, 'Enterococcus faecalis').length, 0, 'no debe avisar con gentamicina S');
+  assert.equal(aminoglycosideSynergy({ gen: 'R' }, 'Escherichia coli').length, 0, 'HLAR-synergy es solo de enterococo');
 });
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
