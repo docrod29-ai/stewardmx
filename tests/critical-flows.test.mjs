@@ -1097,6 +1097,18 @@ test('ABGMOTOR v334: AmpC por organismo (EUCAST 9.2/AmpC Primer) + BLEE exige in
   assert.equal(_detPheno({ cro: 'R', amcl: 'R', pitaz: 'R' }, 'E. coli').ESBL, false, 'marca BLEE pese a inhibidor-R (sería AmpC/carbapenemasa)');
   assert.equal(_detPheno({ cro: 'R' }, 'E. coli').ESBL, true, 'sin inhibidor probado, no cae al cribado 3GC solo');
 });
+test('ABGMOTOR v335: MRSA por cefoxitina (fox) + clindamicina inducible (iMLSb)', () => {
+  assert.ok(_detPheno, 'no se extrajo detectPhenotypes');
+  assert.equal(_detPheno({ fox: 'R' }, 'Staphylococcus aureus').MRSA, true, 'no detecta MRSA por cefoxitina');
+  assert.equal(_detPheno({ oxa: 'R' }, 'S. aureus').MRSA, true, 'no detecta MRSA por oxacilina');
+  assert.equal(_detPheno({ eri: 'R', cli: 'S' }, 'S. aureus').iMLSb, true, 'no detecta clindamicina inducible (D-test)');
+  assert.equal(_detPheno({ eri: 'R', cli: 'R' }, 'S. aureus').iMLSb, false, 'cMLSb (cli-R) no es inducible');
+  assert.equal(_detPheno({ eri: 'S', cli: 'S' }, 'S. aureus').iMLSb, false, 'sin eritromicina-R no hay iMLSb');
+});
+test('ABGMOTOR v335: el panel ABG incluye cefoxitina (fox) y eritromicina (eri)', () => {
+  assert.ok(/\{k:'fox',n:'Cefoxitina'\}/.test(_idx), 'falta cefoxitina en el panel ABG_ATBS');
+  assert.ok(/\{k:'eri',n:'Eritromicina'\}/.test(_idx), 'falta eritromicina en el panel ABG_ATBS');
+});
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
   assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)return TX\.CRE_PHENO;/.test(_idx), 'elegirTX no rutea CRE fenotípica a TX.CRE_PHENO');

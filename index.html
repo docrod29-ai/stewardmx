@@ -849,7 +849,7 @@ function clsim39Deduplicate(isolates,opts){
 // ── Phenotype detection: ESBL, MRSA, VRE, CRE, etc. ─────────────────────
 // Aplica reglas CLSI sobre la matriz S/I/R
 function detectPhenotypes(abg,organismo){
-  const phenos={ESBL:false,AmpC:false,CRE:false,Carbapenemase:false,MRSA:false,VRE:false,VRSA:false,VISA:false,MDR_PA:false,CRAB:false,DTR_PA:false};
+  const phenos={ESBL:false,AmpC:false,CRE:false,Carbapenemase:false,MRSA:false,VRE:false,VRSA:false,VISA:false,iMLSb:false,MDR_PA:false,CRAB:false,DTR_PA:false};
   if(!abg||!Object.keys(abg).length)return phenos;
   const org=(organismo||'').toLowerCase();
   // ESBL (EUCAST regla 9.1, Leclercq/Cantón CMI 2013): Enterobacterales 3GC no-S (R/I a ceftriaxona/
@@ -871,9 +871,16 @@ function detectPhenotypes(abg,organismo){
   // K. aerogenes, C. freundii, S. marcescens (alto); Hafnia/Morganella/Providencia (menor). Riesgo de
   // desrepresión con 3GC → preferir cefepime/carbapenémico en infección grave. (Antes: flag muerto.)
   if(/enterobacter|aerogenes|freundii|serratia|hafnia|morganella|providencia/.test(org))phenos.AmpC=true;
-  // MRSA: R a oxacilina o cefoxitina en S. aureus
+  // MRSA (EUCAST 8.1; Torres/Cercenado EIMC 2010): R a oxacilina o CEFOXITINA (el mejor marcador
+  // fenotípico de mecA/PBP2a) en S. aureus → R a todos los β-lactámicos salvo ceftarolina/ceftobiprol.
+  // v335: usa la clave 'fox' del panel (antes buscaba 'cefoxitin', inexistente → no disparaba).
   if(/aureus/.test(org)){
-    if(abg['oxa']==='R'||abg['cefoxitin']==='R')phenos.MRSA=true;
+    if(abg['oxa']==='R'||abg['fox']==='R')phenos.MRSA=true;
+  }
+  // Clindamicina inducible (iMLSb): eritromicina-R + clindamicina-S en estafilococo/estreptococo →
+  // requiere D-test; si es inducible, reportar CLINDAMICINA como R (EUCAST 11.2; Torres/Cercenado 2010).
+  if(/aureus|staph|estafiloc|strep|estrept|pneumoniae|pyogenes|agalactiae/.test(org)){
+    if(abg['eri']==='R'&&abg['cli']==='S')phenos.iMLSb=true;
   }
   // VISA/VRSA
   if(/aureus/.test(org)){
@@ -4540,13 +4547,13 @@ window.calcDiasEstancia=calcDiasEstancia; window.calcDiasPaciente=calcDiasPacien
 
 const ABG_ATBS=[
   {g:'Penicilinas',a:[{k:'amp',n:'Ampicilina'},{k:'amsul',n:'Amp-Sulbactam'},{k:'amcl',n:'Amox-Clav'},{k:'oxa',n:'Oxacilina'},{k:'pitaz',n:'Pip-Tazobactam'}]},
-  {g:'Cefalosporinas',a:[{k:'cefa',n:'Cefazolina'},{k:'cfx',n:'Cefuroxima'},{k:'cro',n:'Ceftriaxona'},{k:'ctaz',n:'Ceftazidima'},{k:'cfp',n:'Cefepime'},{k:'cfol',n:'Ceftoloz-Tazo'}]},
+  {g:'Cefalosporinas',a:[{k:'cefa',n:'Cefazolina'},{k:'cfx',n:'Cefuroxima'},{k:'fox',n:'Cefoxitina'},{k:'cro',n:'Ceftriaxona'},{k:'ctaz',n:'Ceftazidima'},{k:'cfp',n:'Cefepime'},{k:'cfol',n:'Ceftoloz-Tazo'}]},
   {g:'Carbapenémicos',a:[{k:'imi',n:'Imipenem'},{k:'mer',n:'Meropenem'},{k:'ert',n:'Ertapenem'}]},
   {g:'β-Lact. Nuevos',a:[{k:'cazavi',n:'Cef-Avibactam'},{k:'azt',n:'Aztreonam'},{k:'cfid',n:'Cefiderocol'},{k:'imrel',n:'Imi-Relebactam'}]},
   {g:'Aminoglucósidos',a:[{k:'gen',n:'Gentamicina'},{k:'ami',n:'Amikacina'},{k:'tob',n:'Tobramicina'}]},
   {g:'Quinolonas',a:[{k:'cip',n:'Ciprofloxacino'},{k:'lev',n:'Levofloxacino'},{k:'mox',n:'Moxifloxacino'}]},
   {g:'Glucopéptidos / Lipopéptidos',a:[{k:'van',n:'Vancomicina'},{k:'tei',n:'Teicoplanina'},{k:'lin',n:'Linezolid'},{k:'dap',n:'Daptomicina'}]},
-  {g:'Otros',a:[{k:'tmp',n:'TMP-SMX'},{k:'nit',n:'Nitrofurantoína'},{k:'fos',n:'Fosfomicina'},{k:'col',n:'Colistina/PolB'},{k:'tig',n:'Tigeciclina'},{k:'cli',n:'Clindamicina'},{k:'mino',n:'Minociclina'}]},
+  {g:'Otros',a:[{k:'tmp',n:'TMP-SMX'},{k:'nit',n:'Nitrofurantoína'},{k:'fos',n:'Fosfomicina'},{k:'col',n:'Colistina/PolB'},{k:'tig',n:'Tigeciclina'},{k:'eri',n:'Eritromicina'},{k:'cli',n:'Clindamicina'},{k:'mino',n:'Minociclina'}]},
 ];
 
 function getAbg(){

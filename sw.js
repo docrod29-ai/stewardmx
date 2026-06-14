@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v335 (Motor de antibiograma — cefoxitina/eritromicina + MRSA-fox + iMLSb)
+//  Leídas letra por letra las 5 piezas que enseñan a leer el antibiograma: EUCAST Expert Rules (CMI
+//  2013), AmpC Primer (CID 2019) + las 3 lecturas interpretadas EIMC 2010 (cocos gram+ Torres/Cercenado;
+//  enterobacterias Navarro/Miró; no fermentadores Vila/Marco). Paso C del prompt maestro: COMPLETAR el
+//  panel. AHORA ABG_ATBS incluye Cefoxitina (fox) y Eritromicina (eri) — antes faltaban y bloqueaban 2
+//  reglas. Con ellas: (1) MRSA por CEFOXITINA (el mejor marcador fenotípico de mecA — Torres; antes el
+//  código buscaba 'cefoxitin', clave inexistente → no disparaba); (2) nuevo flag iMLSb (clindamicina
+//  inducible: eritromicina-R + clindamicina-S → D-test → reportar CLI-R; EUCAST 11.2). El panel es la
+//  fuente única → fox/eri se propagan a UI de captura, Vision, Excel y getAbg. +2 pruebas (249).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v334 (Motor de antibiograma — AmpC + BLEE afinada, desde bibliografía)
 //  Misión "mejor IA de antibiogramas". Leídas LETRA POR LETRA las 2 piezas rectoras: EUCAST Expert
 //  Rules (Leclercq/Cantón CMI 2013;19:141-160) y AmpC Primer (Tamma/Doi/Bonomo CID 2019;69:1446-55).
@@ -686,7 +696,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v334';
+const CACHE = 'stewardmx-v335';
 const SHELL = [
   '/',
   '/index.html',
