@@ -1,4 +1,16 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v344 (Antibiograma — aztreonam-sparing → orienta a metalo-β-lactamasa)
+//  Cerrada la bibliografía pendiente, leída letra por letra: (1) "Pared Celular" = Silhavy/Kahne/Walker,
+//  "The Bacterial Cell Envelope", Cold Spring Harb Perspect Biol 2010;2:a000414 → base mecanística (porinas
+//  OmpF/OmpC >700 Da, eflujo AcrAB-TolC, PBP2A pentaglicina del MRSA, ausencia de MO en Gram+), SIN regla
+//  S/I/R nueva (ya cubierto por PorinLoss/OprD/MRSA/intrínsecos). (2) "betalactamasas" = Agarwal/Tiwari/
+//  Varadwaj, "An Extensive Review on β-lactamase Enzymes and Their Inhibitors", Curr Med Chem 2022 (DOI
+//  10.2174/0929867329666220620165429) → confirma clases A/B/C/D y la matriz de inhibidores (ya en el motor)
+//  y aporta UNA regla nueva: las MBL (NDM/VIM/IMP) hidrolizan TODOS los β-lactámicos EXCEPTO los
+//  monobactámicos → en CRE fenotípica sin flag molecular, AZTREONAM-S orienta a MBL pura (KPC hidroliza
+//  aztreonam; OXA-48 co-porta BLEE). elegirTX ahora emite esquema dirigido aztreonam + CAZ-AVI (IDSA AMR
+//  2024) y advierte que CAZ-AVI sola es inactiva contra MBL y que aztreonam-R no excluye MBL. +1 prueba (264).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v343 (Antibiograma — carbapenemasas: Proteae sin imipenem + diferencial OXA-48)
 //  Leída letra por letra la pieza rectora de carbapenemasas (Simner, Pitout & Dingle, Clin Microbiol Rev
 //  2024;37(4) — "Laboratory detection of carbapenemases"). Dos refinamientos de SEGURIDAD citados:
@@ -780,7 +792,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v343';
+const CACHE = 'stewardmx-v344';
 const SHELL = [
   '/',
   '/index.html',

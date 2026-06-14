@@ -1240,6 +1240,15 @@ test('ABGMOTOR v343: el patrón ertapenem-aislado incluye OXA-48-like en el dife
   assert.ok(/PATRÓN ERTAPENEM-AISLADO/.test(_idx), 'falta el mensaje refinado del patrón ertapenem-aislado');
   assert.ok(/OXA-48-like/.test(_idx) && /CONFIRMAR SIEMPRE por método molecular/.test(_idx), 'el diferencial no incluye OXA-48 ni exige confirmación molecular');
 });
+test('ABGMOTOR v344: aztreonam conservado (S) en CRE fenotípica → orienta a MBL (Agarwal Curr Med Chem 2022)', () => {
+  // Las MBL (NDM/VIM/IMP) hidrolizan todos los β-lactámicos EXCEPTO los monobactámicos: aztreonam-S es la
+  // firma de MBL pura (KPC hidroliza aztreonam → R; OXA-48 suele co-portar BLEE → R). Esquema dirigido IDSA
+  // AMR 2024: aztreonam + ceftazidima-avibactam; la CAZ-AVI sola es inactiva contra MBL.
+  assert.ok(/if\(p\.abg&&p\.abg\['azt'\]==='S'&&!_ph\.PorinLoss\)return/.test(_idx), 'elegirTX no usa aztreonam-S como pista de MBL en la rama CRE fenotípica');
+  assert.ok(/AZTREONAM CONSERVADO \(S\)/.test(_idx) && /METALO-β-LACTAMASA/.test(_idx), 'falta el mensaje de orientación a MBL por aztreonam conservado');
+  assert.ok(/ceftazidima-avibactam SOLA es INACTIVA contra MBL/i.test(_idx), 'no advierte que CAZ-AVI sola no cubre MBL');
+  assert.ok(/Aztreonam-R NO excluye MBL/i.test(_idx), 'no advierte que aztreonam-R no excluye MBL (BLEE/AmpC coexistente)');
+});
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
   assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)\{/.test(_idx), 'elegirTX no rutea CRE fenotípica a la rama CRE_PHENO');

@@ -6389,6 +6389,15 @@ function elegirTX(p){
     // CRE → confirmar por método molecular y tratar la β-lactamasa subyacente (Mammeri & Skurnik, PLoS
     // Pathog 2025;21:e1012902 — en series clínicas este mecanismo puede superar a la carbapenemasa).
     if(_ph.CRE&&_ph.PorinLoss&&!_ph.Carbapenemase)return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ PATRÓN ERTAPENEM-AISLADO (ertapenem no-S con imipenem y meropenem S): diferencial = (1) pérdida de porina + BLEE/AmpC, o (2) carbapenemasa de BAJO nivel tipo OXA-48-like, que típicamente solo eleva el ertapenem (el ertapenem es el carbapenémico más sensible tanto a la impermeabilidad como a OXA-48). CONFIRMAR SIEMPRE por método molecular (incluido OXA-48) antes de fijar el esquema; si es OXA-48 → ceftazidima-avibactam (NO mero-vaborbactam). Cita: Simner/Pitout, Clin Microbiol Rev 2024;37(4); IDSA AMR 2024.'};
+    // v344: AZTREONAM CONSERVADO (S) con carbapenémicos no-S → orienta a METALO-β-LACTAMASA (MBL: NDM/VIM/IMP,
+    // clase B de Ambler). Las MBL hidrolizan TODOS los β-lactámicos EXCEPTO los monobactámicos: el aztreonam
+    // no es sustrato (se une al puente entre los dos Zn²⁺ desplazando el agua catalítica). En una CRE fenotípica
+    // SIN flag molecular, aztreonam-S es la firma de MBL pura — KPC SÍ hidroliza aztreonam (→ R) y OXA-48 suele
+    // co-portar BLEE (→ aztreonam-R). Esquema dirigido (IDSA AMR 2024): aztreonam + ceftazidima-avibactam, donde
+    // la CAZ-AVI protege al aztreonam de BLEE/AmpC acompañantes; la CAZ-AVI SOLA es inactiva contra MBL. No se
+    // excluye MBL si aztreonam-R (BLEE/AmpC coexistente lo enmascara). Cita: Agarwal/Tiwari/Varadwaj, Curr Med
+    // Chem 2022 (DOI 10.2174/0929867329666220620165429); IDSA AMR Guidance 2024.
+    if(p.abg&&p.abg['azt']==='S'&&!_ph.PorinLoss)return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ AZTREONAM CONSERVADO (S) con carbapenémicos no-S → orienta a METALO-β-LACTAMASA (MBL: NDM/VIM/IMP): las MBL hidrolizan todos los β-lactámicos EXCEPTO los monobactámicos. Esquema dirigido: AZTREONAM + CEFTAZIDIMA-AVIBACTAM (la CAZ-AVI protege al aztreonam de la BLEE/AmpC acompañante) o aztreonam-avibactam. ⚠ La ceftazidima-avibactam SOLA es INACTIVA contra MBL. Aztreonam-R NO excluye MBL (BLEE/AmpC coexistente). Confirmar SIEMPRE por método molecular (NDM/VIM/IMP). Cita: Agarwal et al., Curr Med Chem 2022 (DOI 10.2174/0929867329666220620165429); IDSA AMR 2024.'};
     return TX.CRE_PHENO;
   }
   if(p.mec_vrsa)return TX.VRSA;
