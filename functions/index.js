@@ -488,7 +488,9 @@ exports.cdsHooks = onRequest(
       const cfgSnap = await db.doc(`hospitals/${hospId}/ehr_config/main`).get();
       if (cfgSnap.exists) {
         cdsHooksCfgData = cfgSnap.data();
-        validToken = cdsHooksCfgData.webhookToken === token;
+        // F-7 SEGURIDAD: exigir webhookToken configurado y NO vacío (antes, si el doc existía sin
+        //   webhookToken, `undefined === undefined` daba validToken=true → bypass de autenticación).
+        validToken = !!cdsHooksCfgData.webhookToken && cdsHooksCfgData.webhookToken === token;
       }
     } catch (e) {
       console.error('[cdsHooks] error validating token:', e.message);
@@ -623,7 +625,9 @@ exports.ehrWebhook = onRequest(
       const cfgSnap = await db.doc(`hospitals/${hospId}/ehr_config/main`).get();
       if (cfgSnap.exists) {
         ehrCfgData = cfgSnap.data();
-        validToken = ehrCfgData.webhookToken === token;
+        // F-7 SEGURIDAD: exigir webhookToken configurado y NO vacío (antes, si el doc existía sin
+        //   webhookToken, `undefined === undefined` daba validToken=true → bypass de autenticación).
+        validToken = !!ehrCfgData.webhookToken && ehrCfgData.webhookToken === token;
       }
     } catch (e) {
       console.error('[ehrWebhook] error validating token:', e.message);
@@ -992,7 +996,10 @@ exports.lisSync = onRequest(
     try {
       const cfgSnap = await db.doc(`hospitals/${hospId}/ehr_config/main`).get();
       if (cfgSnap.exists) {
-        validToken = cfgSnap.data().webhookToken === token;
+        // F-7 SEGURIDAD: exigir webhookToken configurado y NO vacío (antes, si el doc existía sin
+        //   webhookToken, `undefined === undefined` daba validToken=true → bypass de autenticación).
+        const _wt = cfgSnap.data().webhookToken;
+        validToken = !!_wt && _wt === token;
       }
     } catch (e) {
       console.error('[lisSync] error validando token:', e.message);

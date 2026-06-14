@@ -3718,6 +3718,14 @@ window.logout=async()=>{
   try{if(unsubP){unsubP();unsubP=null;}}catch(_){}
   try{if(unsubS){unsubS();unsubS=null;}}catch(_){}
   try{if(unsubB){unsubB();unsubB=null;}}catch(_){}
+  // F-6: desuscribir TODOS los listeners en vivo al cerrar sesión. Antes quedaban zombis (_cultUnsub,
+  //   _icNotifUnsub, _clinicaUnsub, _colaUnsub y los del resumen live) → errores permission-denied y
+  //   leak tras signOut. Espejo del cleanup de cargarApp (init).
+  try{if(_cultUnsub){_cultUnsub();_cultUnsub=null;}}catch(_){}
+  try{if(_icNotifUnsub){_icNotifUnsub();_icNotifUnsub=null;}}catch(_){}
+  try{if(_clinicaUnsub){_clinicaUnsub();_clinicaUnsub=null;}}catch(_){}
+  try{if(_colaUnsub){_colaUnsub();_colaUnsub=null;}}catch(_){}
+  try{if(window._stopResumenLive)window._stopResumenLive();}catch(_){}
   try{if(typeof _labsChart!=='undefined'&&_labsChart){_labsChart.destroy();_labsChart=null;}}catch(_){}
   // Reset de estado en memoria para prevenir leaks de datos al siguiente login
   PACS=[];CONTS=[];SOLICITUDES=[];BLOQUEOS=[];CAMAS={};HInfo={nombre:'Mi Hospital',camas:100};
@@ -9485,8 +9493,8 @@ window.cargarExpediente=async(pid)=>{
       const accionesEdit=editable
         ? `<button onclick="event.stopPropagation();editarNota('${pid}','${v.id}','${editId}')" class="ic-btn" title="Editar (ventana 6h)">✏</button>
            <button onclick="event.stopPropagation();eliminarNota('${pid}','${v.id}')" class="ic-btn del" title="Eliminar (ventana 6h)">🗑</button>` : '';
-      const motivoChip=v.motivo?`<span style="font-size:9px;font-family:var(--mono);background:rgba(61,155,255,.12);color:var(--blue);border-radius:10px;padding:1px 7px;margin-right:4px;">${motivos[v.motivo]||v.motivo}</span>`:'';
-      const pronosticoChip=v.pronostico?`<span style="font-size:9px;font-family:var(--mono);background:rgba(255,255,255,.06);border:1px solid var(--brd2);border-radius:10px;padding:1px 7px;">${pronosticos[v.pronostico]||v.pronostico}</span>`:'';
+      const motivoChip=v.motivo?`<span style="font-size:9px;font-family:var(--mono);background:rgba(61,155,255,.12);color:var(--blue);border-radius:10px;padding:1px 7px;margin-right:4px;">${escHtml(motivos[v.motivo]||v.motivo)}</span>`:'';
+      const pronosticoChip=v.pronostico?`<span style="font-size:9px;font-family:var(--mono);background:rgba(255,255,255,.06);border:1px solid var(--brd2);border-radius:10px;padding:1px 7px;">${escHtml(pronosticos[v.pronostico]||v.pronostico)}</span>`:'';
       const borderColor=numNota>=5?'#ff4d6d':numNota>=3?'#f5a623':'var(--teal)';
       return`<div style="position:relative;margin-bottom:10px;"><div style="position:absolute;left:-18px;top:13px;width:10px;height:10px;border-radius:50%;background:${borderColor};border:2px solid var(--s1);box-shadow:0 0 0 3px ${borderColor}22;z-index:2;"></div><div style="border-left:3px solid ${borderColor};border-radius:0 8px 8px 0;background:var(--s2);overflow:hidden;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 12px;cursor:pointer;user-select:none;flex-wrap:wrap;gap:4px;"
@@ -9878,7 +9886,7 @@ window.cargarAntibiogramas=async(pid)=>{
       const _resBadge=a.resultado&&a.resultado!=='positivo'
         ?(a.resultado==='positivo_preliminar'
           ?`<button onclick="abrirReporteMicro('${pid}')" title="Clic para completar el resultado" style="font-size:9px;font-family:var(--mono);font-weight:700;color:${_resCol[a.resultado]||'var(--t3)'};background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.35);border-radius:3px;padding:2px 7px;cursor:pointer;">🟡 PRELIMINAR — clic para completar</button>`
-          :`<span style="font-size:9px;font-family:var(--mono);font-weight:700;color:${_resCol[a.resultado]||'var(--t3)'};background:rgba(0,0,0,.08);border-radius:3px;padding:1px 6px;">${_resLabel[a.resultado]||a.resultado.toUpperCase()}</span>`)
+          :`<span style="font-size:9px;font-family:var(--mono);font-weight:700;color:${_resCol[a.resultado]||'var(--t3)'};background:rgba(0,0,0,.08);border-radius:3px;padding:1px 6px;">${escHtml(_resLabel[a.resultado]||a.resultado.toUpperCase())}</span>`)
         :'';
       const _fuenteBadge=a._fuente==='micro'?`<span style="font-size:9px;font-family:var(--mono);color:var(--blue);background:rgba(61,155,255,.1);border-radius:3px;padding:1px 6px;">🔬 Micro</span>`:'';
       return`<div style="border:1px solid ${a.fenotipo&&a.fenotipo!=='SENSIBLE'?'rgba(255,77,109,.3)':a.resultado==='negativo'?'rgba(0,212,168,.25)':a.resultado==='pendiente'?'rgba(120,120,140,.25)':'var(--brd)'};border-radius:8px;padding:12px;margin-bottom:10px;background:var(--s2);">
@@ -16791,7 +16799,7 @@ window.renderBloqueosATB=function(){
     }
     // Severity badge
     const _sev=b.severidad||'parcial';
-    const sevBadge=`<span style="font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(167,139,250,.12);color:${_sevColor[_sev]||'var(--purple)'};">${_sevMap[_sev]||_sev}</span>`;
+    const sevBadge=`<span style="font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(167,139,250,.12);color:${_sevColor[_sev]||'var(--purple)'};">${escHtml(_sevMap[_sev]||_sev)}</span>`;
     // Pending solicitudes for this ATB
     const solPend=SOLICITUDES.filter(s=>
       (s.antibiotico||'').toLowerCase().trim()===(b.atb||'').toLowerCase().trim()&&
@@ -27828,7 +27836,7 @@ function _clinicaLabsTable(labs){
   const filled=campos.filter(c=>labs.some(l=>l[c]!=null));
   if(!filled.length)return`<div style="color:var(--t3);font-size:12px;">Sin valores registrados.</div>`;
   return`<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
-  <thead><tr><th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--brd2);color:var(--t3);font-weight:600;">Fecha</th>${filled.map(c=>`<th style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--brd2);color:var(--t3);font-weight:600;">${labels[c]||c}</th>`).join('')}<th style="padding:6px 10px;border-bottom:1px solid var(--brd2);"></th></tr></thead>
+  <thead><tr><th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--brd2);color:var(--t3);font-weight:600;">Fecha</th>${filled.map(c=>`<th style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--brd2);color:var(--t3);font-weight:600;">${escHtml(labels[c]||c)}</th>`).join('')}<th style="padding:6px 10px;border-bottom:1px solid var(--brd2);"></th></tr></thead>
   <tbody>${labs.map(l=>`<tr style="border-bottom:1px solid var(--brd2);">
     <td style="padding:7px 10px;color:var(--t2);white-space:nowrap;">${escHtml(l.fechaLab||'—')}</td>
     ${filled.map(c=>{const v=l[c];const meta=LAB_KEY_MAP[c];const isHi=meta?.ahi&&v>parseFloat(meta.ahi.replace('>',''));const isLo=meta?.alo&&v<parseFloat(meta.alo.replace('<',''));return`<td style="padding:7px 10px;text-align:right;color:${isHi||isLo?'var(--red)':'var(--t1)'};">${v!=null?v:'—'}</td>`;}).join('')}

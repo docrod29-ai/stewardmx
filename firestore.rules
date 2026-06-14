@@ -182,11 +182,18 @@ service cloud.firestore {
         allow create:         if isAuth();
         allow update, delete: if isSuperAdmin() || isHospAdmin(hospId) || isHospLider(hospId);
       }
-      // config del hospital: solo admin lo escribe; miembros pueden leer
-      // (contiene configuración no-sensible: nombre, camas, WA, etc.)
+      // config del hospital: solo admin escribe; SOLO admin lee (NO miembros).
+      // ⚠ SEGURIDAD: este doc PUEDE contener la Anthropic API key (sk-ant). guardarApiKey() en
+      //   index.html escribe anthropicKey en hospitals/{hospId}/config/main. Por eso read está
+      //   restringido a admin. NUNCA abrir read a isHospMember: filtraría la key a todo el hospital.
+      //   (El default de la app es el proxy Cloud Function anthropicProxy, que no expone la key.)
       match /config/{docId} {
         allow read:           if isSuperAdmin() || isHospAdmin(hospId);
-        allow create:         if isAuth();
+        // SEGURIDAD (F-4): create restringido a admin/líder. Antes `if isAuth()` permitía a CUALQUIER
+        //   usuario autenticado crear docs config en CUALQUIER hospital (gap de aislamiento). El alta
+        //   (crearHospital) solo crea info/main, NUNCA config → esto no rompe el bootstrap; la config
+        //   siempre la escriben admins/líderes existentes (guardarApiKey, config/guardias).
+        allow create:         if isSuperAdmin() || isHospAdmin(hospId) || isHospLider(hospId);
         allow update, delete: if isSuperAdmin() || isHospAdmin(hospId) || isHospLider(hospId);
       }
 

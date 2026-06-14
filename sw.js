@@ -1,4 +1,17 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v348 (Auditoría forense — seguridad + robustez)
+//  Barrido forense (rol auditor) sobre 33.6k líneas. 5 hallazgos reparados, verificados (268 pruebas):
+//  · F-7 [ALTA] — bypass de auth en webhooks (cdsHooks/ehrWebhook/lisSync): si ehr_config existía SIN
+//    webhookToken, `undefined===undefined` daba validToken=true. Guard `!!webhookToken` en functions/index.js.
+//  · F-4 [MEDIA] — firestore.rules: `config create: if isAuth()` permitía crear docs config cross-tenant;
+//    restringido a admin/líder (verificado: crearHospital solo crea info/main, no config).
+//  · F-1 [MEDIA] — firestore.rules: comentario engañoso ("config no-sensible") ocultaba que guarda la API key.
+//  · F-5 [BAJA-MEDIA] — stored-XSS por escape inconsistente: v.motivo/v.pronostico (+a.resultado/_sev/labels[c])
+//    ahora con escHtml (los campos de texto libre ya estaban escapados).
+//  · F-6 [BAJA] — logout dejaba listeners onSnapshot zombis; cleanup completo.
+//  Verificado SIN bug: CKD-EPI/Cockcroft/SOFA/Charlson, ops destructivas (doble confirmación), onclick.
+//  Pendiente (no reparado): F-2 (modo directo de la key — decisión), authz de onCall, barrido XSS completo.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v347 (Antibiograma — AmpC: pip-tazo "S" no fiable)
 //  Leída a fondo "AMPC (INFECTION).pdf" = Meini/Tascini/Cei/Sozio/Rossolini, "AmpC β-lactamase-producing
 //  Enterobacterales: what a clinician should know", Infection 2019;47:363-375. CONFIRMATORIO del manejo de
@@ -823,7 +836,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v347';
+const CACHE = 'stewardmx-v348';
 const SHELL = [
   '/',
   '/index.html',
