@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v341 (Antibiograma — el panel del motor también al VER aislamientos guardados)
+//  El panel "🧠 Interpretación del motor" (mecanismo inferido + alertas EUCAST + recomendación dirigida)
+//  antes solo aparecía al CAPTURAR el antibiograma. Ahora también se muestra al VER cada aislamiento
+//  guardado: (1) en la lista de aislamientos (subcolección antibiograms) y (2) en el antibiograma legacy
+//  de la ficha (p.abg). Se RECOMPUTA en vivo desde a.abg/p.abg + organismo (no del campo safety persistido)
+//  → se beneficia automáticamente de mejoras del motor. Así el equipo (no solo quien capturó) ve mecanismo
+//  → alertas → qué dar en cualquier momento. +1 prueba (259).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v340 (Antibiograma — recomendación DIRIGIDA en el panel: mecanismo→qué dar)
 //  Cierra el círculo del panel "🧠 Interpretación del motor": tras mecanismo inferido + alertas EUCAST,
 //  ahora muestra la RECOMENDACIÓN DIRIGIDA (IDSA AMR 2024 / EUCAST) reusando elegirTX/TX — la misma fuente
@@ -750,7 +758,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v340';
+const CACHE = 'stewardmx-v341';
 const SHELL = [
   '/',
   '/index.html',

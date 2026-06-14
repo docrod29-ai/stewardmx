@@ -1205,6 +1205,12 @@ test('ABGSAFE v340: el panel muestra la recomendación DIRIGIDA (elegirTX/TX) de
   assert.ok(/flags\.length&&typeof elegirTX==='function'/.test(_idx), 'la recomendación no está gated al mecanismo inferido (evita ruido en sensibles)');
   assert.ok(/!\/Empírico\/i\.test\(tx\.title\)/.test(_idx), 'no excluye el fallback empírico del panel dirigido');
 });
+test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
+  // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
+  assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');
+  // En el antibiograma legacy de la ficha (p.abg).
+  assert.ok(/window\._renderAbgInterpretacionHTML\(p\.abg,p\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en el antibiograma legacy de la ficha');
+});
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
   assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)\{/.test(_idx), 'elegirTX no rutea CRE fenotípica a la rama CRE_PHENO');
