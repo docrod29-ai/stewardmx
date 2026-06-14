@@ -162,6 +162,14 @@ exports.sendPROANotification = onCall(
     const { hospitalId, title, body, targetRole = 'PROA' } = req.data;
     if (!hospitalId) throw new HttpsError('invalid-argument', 'hospitalId requerido');
 
+    // F-8 SEGURIDAD: el llamante debe ser miembro APROBADO del hospital. Antes solo se exigía login,
+    //   así que cualquier usuario autenticado podía enviar push (title/body arbitrarios) a los usuarios
+    //   de CUALQUIER hospital → spoofing de alertas clínicas. Espejo del gate de anthropicProxy.
+    const _caller = (await db.doc(`hospitals/${hospitalId}/users/${req.auth.uid}`).get()).data() || {};
+    if (_caller.status !== 'aprobado' && _caller.status !== 'admin') {
+      throw new HttpsError('permission-denied', 'No eres miembro aprobado de este hospital');
+    }
+
     const usersSnap = await db.collection(`hospitals/${hospitalId}/users`).get();
     const tokens = [];
     usersSnap.forEach(d => {
