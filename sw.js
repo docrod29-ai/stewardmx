@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v346 (Antibiograma — imipenem-relebactam en la vía KPC)
+//  Leída a fondo "CARBAPENEMASAS.pdf" = Lee/Chen/Hii/Hsueh, "Carbapenemase-producing Enterobacterales
+//  infections: recent advances in diagnosis and treatment", Int J Antimicrob Agents 2022;59:106528. El
+//  review es CONFIRMATORIO de la lógica de tratamiento ya codificada (CAZ-AVI = KPC/OXA-48 no MBL;
+//  cefiderocol cubre las 3 clases; mero-vabor solo KPC; ceftoloz-tazo no para CRE; Hodge obsoleto). Único
+//  elemento aditivo: IMIPENEM-RELEBACTAM como opción de la vía KPC (inhibidor de serina A/C como vaborbactam;
+//  cubre KPC, NO OXA-48/MBL; sortea el eflujo de P. aeruginosa; NO fiable en Morganellaceae por imipenem-R
+//  intrínseco). Añadido al op KPC de TX.CRE_PHENO. +1 prueba (267).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v345 (Antibiograma — motor alineado a las 7 Reglas de Oro del Dr.)
 //  Leídos los materiales docentes del Dr. Rodríguez Luna (guion del orador, 79k chars, 67 slides). De sus
 //  "7 reglas de oro" se alinean al motor las 2 de mayor impacto fenotípico:
@@ -805,7 +814,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v345';
+const CACHE = 'stewardmx-v346';
 const SHELL = [
   '/',
   '/index.html',

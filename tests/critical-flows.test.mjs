@@ -1262,6 +1262,13 @@ test('ABGMOTOR v345: prior mexicano NDM (Red INVIFAR) + métodos confirmatorios 
   assert.ok(/sospecharse MBL PRIMERO/.test(_idx), 'no instruye sospechar MBL primero en el contexto mexicano');
   assert.ok(/mCIM\/eCIM/.test(_idx) && /Hodge está obsoleto/.test(_idx), 'no actualiza los métodos confirmatorios (Hodge jubilado → mCIM/eCIM/Carba 5/Xpert)');
 });
+test('ABGMOTOR v346: imipenem-relebactam como opción de la vía KPC (Lee/Hsueh IJAA 2022)', () => {
+  // Imipenem/relebactam cubre KPC (serina A/C) pero NO OXA-48 ni MBL — opción paralela a mero-vaborbactam.
+  // No es fiable en Morganellaceae (imipenem-R intrínseco).
+  assert.ok(/Imipenem-relebactam.*solo si KPC|Meropenem-vaborbactam o Imipenem-relebactam/.test(_idx), 'CRE_PHENO no ofrece imipenem-relebactam en la vía KPC');
+  assert.ok(/NO fiable en Morganella\/Proteus\/Providencia/.test(_idx), 'no advierte que imi-relebactam no es fiable en Morganellaceae (imipenem-R intrínseco)');
+  assert.ok(/Int J Antimicrob Agents 2022;59:106528/.test(_idx), 'falta la cita de Lee/Hsueh IJAA 2022');
+});
 test('MOTOR P2: elegirTX consume el fenotipo del antibiograma + existe la rama TX.CRE_PHENO', () => {
   assert.ok(/const _ph=\(p\.abg&&Object\.keys\(p\.abg\)\.length&&typeof detectPhenotypes==='function'\)\?detectPhenotypes\(p\.abg,p\.organismo\|\|''\):null;/.test(_idx), 'elegirTX no deriva el fenotipo del antibiograma');
   assert.ok(/if\(_ph&&\(_ph\.CRE\|\|_ph\.Carbapenemase\)\)\{/.test(_idx), 'elegirTX no rutea CRE fenotípica a la rama CRE_PHENO');
