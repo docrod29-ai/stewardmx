@@ -43,7 +43,7 @@ const INTRINSIC_RULES=[
   {re:/stenotrophomonas|maltophilia/,     ks:['imi','mer','ert','amp','amcl','cefa','cro','gen','ami','tob','fos'], t:'T2'}, // carbapenémicos intrínsecamente R → TMP-SMX 1ª línea
   // ── Gram-positivos (Tabla 4 + cabecera: GP también R a aztreonam y colistina/PolB) ──
   {re:/enterococ|faecium|faecalis/,       ks:['cefa','cfx','fox','cro','ctaz','cfp','azt','col'], t:'T4'}, // enterococo R a TODAS las cefalosporinas
-  {re:/staphyloc|aureus|streptoc|pneumoniae|pyogenes|agalactiae/, ks:['azt','col'],     t:'T4'},
+  {re:/staphyloc|aureus|streptoc|neumococo|pneumococ|pyogenes|agalactiae/, ks:['azt','col'], t:'T4'}, // NO usar /pneumoniae/ suelto: colisiona con Klebsiella pneumoniae (Gram-negativa)
 ];
 
 // Devuelve los fármacos del panel a los que el organismo es intrínsecamente R PERO el AST reportó "S"
@@ -70,7 +70,8 @@ function exceptionalPhenotypes(abg,organismo){
   if(/aureus|staphylococcus/.test(org)&&anyR('van','tei','lin','dap','tig'))
     out.push({msg:'S. aureus R a vancomicina/teicoplanina/linezolid/daptomicina/tigeciclina es EXCEPCIONAL → confirmar ID/AST y enviar a laboratorio de referencia.',cita:CITA+' T6 (regla 6.1)'});
   // 6.4 — S. pneumoniae R a carbapenémico/glucopéptido/linezolid
-  if(/pneumoniae/.test(org)&&anyR('imi','mer','van','tei','lin'))
+  // OJO: /pneumoniae/ suelto colisiona con Klebsiella pneumoniae (Gram-negativa) → usar matcher de neumococo.
+  if(/streptococc|neumococo|pneumococ|s\.?\s*pneumoniae/.test(org)&&anyR('imi','mer','van','tei','lin'))
     out.push({msg:'S. pneumoniae R a imipenem/meropenem/vancomicina/teicoplanina/linezolid es EXCEPCIONAL → confirmar ID/AST.',cita:CITA+' T6 (regla 6.4)'});
   // 6.5 — estreptococo β-hemolítico R a penicilina (proxy del panel: ampicilina)
   if(/pyogenes|agalactiae|hemol[ií]tic|grupo a|grupo b/.test(org)&&abg['amp']==='R')
@@ -104,7 +105,7 @@ function quinoloneCrossResistance(abg,organismo){
   const cita=r=>CITA+' T13 (regla '+r+')';
   const editToR=(keys,c)=>keys.forEach(([k,n])=>{ if(abg[k]==='S')edits.push({k,n,cita:c}); });
   const isGN=/coli|klebsiella|enterobacter|serratia|citrobacter|cloacae|aerogenes|freundii|koseri|hafnia|escherichia|proteus|providencia|morganella|aeruginosa|acinetobacter|baumannii|salmonella|shigella/.test(org);
-  const isStaph=/staphyloc|aureus/.test(org); const isPneumo=/pneumoniae/.test(org);
+  const isStaph=/staphyloc|aureus/.test(org); const isPneumo=/streptococc|neumococo|pneumococ|s\.?\s*pneumoniae/.test(org); // no /pneumoniae/ suelto (colisiona con Klebsiella)
   if(isGN){
     if(isR('cip'))editToR(FQ.filter(([k])=>k!=='cip'),cita('13.5'));
   }else if(isStaph||isPneumo){

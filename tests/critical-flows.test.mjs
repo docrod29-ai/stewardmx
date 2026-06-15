@@ -1171,6 +1171,18 @@ test('ABGSAFE v338: fenotipos EXCEPCIONALES = probable error de ID/AST (EUCAST T
   // Sin patrón excepcional → sin alertas.
   assert.equal(exceptionalPhenotypes({ cro: 'S' }, 'Escherichia coli').length, 0, 'no debe alertar un antibiograma normal');
 });
+test('ABGSAFE v354: "pneumoniae" NO colisiona — Klebsiella pneumoniae ≠ Streptococcus pneumoniae', () => {
+  // BUG hallado al generar ejemplos: las reglas de S. pneumoniae (Gram+) con /pneumoniae/ matcheaban
+  // Klebsiella pneumoniae (Gram-negativa) → marcaba colistina/aztreonam como R intrínseca (¡la colistina
+  // es última línea para CRE Klebsiella!) y disparaba el fenotipo excepcional de neumococo.
+  const icK = intrinsicConflicts({ col: 'S', azt: 'S' }, 'Klebsiella pneumoniae');
+  assert.ok(!icK.some(c => c.k === 'col' || c.k === 'azt'), 'Klebsiella pneumoniae NO debe marcar colistina/aztreonam como intrínseca (colisión con S. pneumoniae)');
+  const exK = exceptionalPhenotypes({ imi: 'R' }, 'Klebsiella pneumoniae');
+  assert.ok(!exK.some(e => /S\. pneumoniae/.test(e.msg)), 'Klebsiella pneumoniae NO debe disparar la alerta de S. pneumoniae');
+  // Streptococcus pneumoniae REAL: sus reglas deben seguir intactas (sin regresión).
+  assert.ok(intrinsicConflicts({ col: 'S', azt: 'S' }, 'Streptococcus pneumoniae').some(c => c.k === 'col'), 'S. pneumoniae real ya no marca colistina intrínseca (regresión)');
+  assert.ok(exceptionalPhenotypes({ imi: 'R' }, 'Streptococcus pneumoniae').some(e => /S\. pneumoniae/.test(e.msg)), 'S. pneumoniae real ya no dispara el fenotipo excepcional (regresión)');
+});
 test('ABGSAFE v338: cada regla intrínseca lleva su cita EUCAST + integración en index/sw', () => {
   // Trazabilidad: toda regla codificada tiene tabla EUCAST.
   assert.ok(INTRINSIC_RULES.length >= 10 && INTRINSIC_RULES.every(r => r.t && r.re && Array.isArray(r.ks)), 'reglas intrínsecas mal formadas');

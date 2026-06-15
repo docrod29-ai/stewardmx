@@ -908,7 +908,7 @@ function detectPhenotypes(abg,organismo){
   }
   // Clindamicina inducible (iMLSb): eritromicina-R + clindamicina-S en estafilococo/estreptococo →
   // requiere D-test; si es inducible, reportar CLINDAMICINA como R (EUCAST 11.2; Torres/Cercenado 2010).
-  if(/aureus|staph|estafiloc|strep|estrept|pneumoniae|pyogenes|agalactiae/.test(org)){
+  if(/aureus|staph|estafiloc|strep|estrept|pyogenes|agalactiae/.test(org)){ // sin /pneumoniae/ suelto (colisiona con Klebsiella pneumoniae); strep/estrept ya cubre S. pneumoniae
     if(abg['eri']==='R'&&abg['cli']==='S')phenos.iMLSb=true;
   }
   // VISA/VRSA

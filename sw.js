@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v354 (Antibiograma — FIX colisión "pneumoniae" Klebsiella vs S. pneumoniae)
+//  BUG (hallado al generar ejemplos por bacteria, ejecutando el motor real): las reglas de S. pneumoniae
+//  (Gram+) con /pneumoniae/ suelto matcheaban Klebsiella pneumoniae (Gram-negativa) → (1) intrinsicConflicts
+//  marcaba colistina/aztreonam como R intrínseca en Klebsiella — PELIGROSO: la colistina es última línea
+//  para CRE Klebsiella; (2) exceptionalPhenotypes disparaba la alerta de neumococo; (3) detectPhenotypes
+//  iMLSb (index.html) podía dispararse en Klebsiella si se probaban eri/cli. Fix: matcher de neumococo
+//  (streptococc|neumococo|pneumococ|s. pneumoniae) en abg-phenotype.js (3 sitios) y se quitó /pneumoniae/
+//  suelto del iMLSb en index.html (strep/estrept ya cubre S. pneumoniae). Verificado ejecutando el motor:
+//  Klebsiella ya no marca colistina; el neumococo real conserva todas sus reglas. +1 prueba (270).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v353 (Antibiograma — texto de estado IA más claro)
 //  El status tras analizar con IA decía "🔒 Sin exponer la key Revisa y ajusta" (pegado, jerga) → se leía
 //  como "revisa la key". Reescrito a "🔒 Análisis seguro (la clave de IA no se expone). Revisa y corrige los
@@ -874,7 +884,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v353';
+const CACHE = 'stewardmx-v354';
 const SHELL = [
   '/',
   '/index.html',
