@@ -1,4 +1,16 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v355 (Antibiograma — epidemiología corregida a las fuentes REALES)
+//  El Dr. aportó las 2 publicaciones primarias y pidió no inventar cifras. Corregido:
+//  · MÉXICO (INVIFAR): la cifra "~80% NDM" era una diapositiva / el reporte 2023 (84%). El dato REAL del
+//    reporte 2024 (Colín-Castro et al., PLoS One 2025;20(4):e0319441) es 59.2% NDM en E. coli no-S a
+//    carbapenémicos; K. pneumoniae genotipo MIXTO (KPC/VIM/OXA-48); A. baumannii OXA-24 89.4%.
+//  · CLÍNICO CRÍTICO del mismo paper: el AZTREONAM NO está disponible en México → para MBL la opción
+//    práctica es CEFIDEROCOL (no aztreonam+CAZ-AVI). Corregido en CRE_PHENO, TX.MBL y los mensajes de
+//    elegirTX (v344/v345).
+//  · MUNDO (WHO GLASS 2025, ISBN 978-92-4-011633-7): E. coli 3GC-R 44.8%, K. pneumoniae 3GC-R 55.2%,
+//    Acinetobacter carbapenem-R 54.3%, MRSA 27.1% (hemocultivos, 2023) — referencia para el contexto global.
+//  Test v345 reemplazado por v355 (asegura 59.2% y la cita real, no "~80%"). 270 pruebas.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v354 (Antibiograma — FIX colisión "pneumoniae" Klebsiella vs S. pneumoniae)
 //  BUG (hallado al generar ejemplos por bacteria, ejecutando el motor real): las reglas de S. pneumoniae
 //  (Gram+) con /pneumoniae/ suelto matcheaban Klebsiella pneumoniae (Gram-negativa) → (1) intrinsicConflicts
@@ -884,7 +896,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v354';
+const CACHE = 'stewardmx-v355';
 const SHELL = [
   '/',
   '/index.html',

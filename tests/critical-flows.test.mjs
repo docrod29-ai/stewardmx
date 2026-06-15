@@ -1275,10 +1275,15 @@ test('ABGMOTOR v345: CAZ-AVI no-S en CRE → excluye KPC/OXA-48 → MBL (Regla 4
   assert.ok(/EXCLUYE KPC y OXA-48/.test(_idx) && /orienta a METALO-β-LACTAMASA/.test(_idx), 'falta el mensaje del discriminador por CAZ-AVI');
   assert.ok(/serino-β-lactamasa COPRODUCIDA/.test(_idx) && /son dos/.test(_idx), 'no contempla la serina coproducida cuando aztreonam también es no-S');
 });
-test('ABGMOTOR v345: prior mexicano NDM (Red INVIFAR) + métodos confirmatorios (Reglas 5-6 del Dr.)', () => {
-  assert.ok(/Red INVIFAR.{0,40}80%/s.test(_idx) || /~80% de las carbapenemasas en Enterobacterales son NDM/.test(_idx), 'CRE_PHENO no refleja el prior mexicano NDM-dominante (INVIFAR)');
-  assert.ok(/sospecharse MBL PRIMERO/.test(_idx), 'no instruye sospechar MBL primero en el contexto mexicano');
-  assert.ok(/mCIM\/eCIM/.test(_idx) && /Hodge está obsoleto/.test(_idx), 'no actualiza los métodos confirmatorios (Hodge jubilado → mCIM/eCIM/Carba 5/Xpert)');
+test('ABGMOTOR v355: epidemiología mexicana REAL del INVIFAR 2024 (59.2% NDM, no ~80%) + aztreonam no disponible', () => {
+  // Cifra corregida contra la publicación real: Colín-Castro et al., PLoS One 2025;20(4):e0319441.
+  // El 84%/~80% era el reporte 2023; el de 2024 es 59.2% NDM en E. coli no-S a carbapenémicos.
+  assert.ok(/59\.2% portan NDM/.test(_idx), 'CRE_PHENO no usa la cifra real INVIFAR 2024 (59.2% NDM)');
+  assert.ok(!/~80% de las carbapenemasas en Enterobacterales son NDM/.test(_idx), 'persiste la cifra vieja "~80%" (no respaldada por el artículo)');
+  assert.ok(/Colín-Castro et al\., PLoS One 2025;20\(4\):e0319441/.test(_idx), 'falta la cita real del INVIFAR (PLoS One 2025)');
+  assert.ok(/AZTREONAM NO está disponible en México/.test(_idx), 'no refleja que el aztreonam no está disponible en México (INVIFAR) → cefiderocol práctico');
+  assert.ok(/sospechar MBL primero/.test(_idx), 'no instruye sospechar MBL primero en el contexto mexicano');
+  assert.ok(/mCIM\/eCIM/.test(_idx) && /Hodge está obsoleto/.test(_idx), 'no conserva los métodos confirmatorios (mCIM/eCIM/Carba 5/Xpert; Hodge obsoleto)');
 });
 test('ABGMOTOR v346: imipenem-relebactam como opción de la vía KPC (Lee/Hsueh IJAA 2022)', () => {
   // Imipenem/relebactam cubre KPC (serina A/C) pero NO OXA-48 ni MBL — opción paralela a mero-vaborbactam.

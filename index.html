@@ -6141,10 +6141,10 @@ function alertas(){
 // BASE DE CONOCIMIENTO MICROBIOLÓGICO
 // ══════════════════════════════════════════
 const TX={
-CRE_PHENO:{title:'Carbapenemasa FENOTÍPICA — mecanismo NO confirmado',nivel:'high',desc:'El antibiograma muestra resistencia a carbapenémicos (CRE) pero NO hay flag molecular del mecanismo. El esquema difiere radicalmente según sea serina-carbapenemasa (KPC/OXA-48) o metalo-β-lactamasa (NDM/VIM/IMP) — CONFIRMAR por método molecular antes de fijar el tratamiento. ⚠ EPIDEMIOLOGÍA LOCAL (México): la Red INVIFAR reporta que ~80% de las carbapenemasas en Enterobacterales son NDM (metalo-β-lactamasa) — la probabilidad pre-test de MBL supera a la de KPC; empíricamente debe sospecharse MBL PRIMERO (no trasladar el esquema KPC-céntrico de guías de otras regiones). Confirmar con mCIM/eCIM, inmunocromatografía (Carba 5 / RESIST-5) o PCR (Xpert Carba-R); el test de Hodge está obsoleto. Recomendación inferida del antibiograma estructurado.',
+CRE_PHENO:{title:'Carbapenemasa FENOTÍPICA — mecanismo NO confirmado',nivel:'high',desc:'El antibiograma muestra resistencia a carbapenémicos (CRE) pero NO hay flag molecular del mecanismo. El esquema difiere radicalmente según sea serina-carbapenemasa (KPC/OXA-48) o metalo-β-lactamasa (NDM/VIM/IMP) — CONFIRMAR por método molecular antes de fijar el tratamiento. ⚠ EPIDEMIOLOGÍA LOCAL (México, INVIFAR 2024): entre E. coli no-susceptibles a carbapenémicos, 59.2% portan NDM (era 84% en el reporte 2023) — NDM sigue siendo la carbapenemasa más frecuente en Enterobacterales → empíricamente sospechar MBL primero; en K. pneumoniae el genotipo es MIXTO (KPC/VIM/OXA-48 en proporciones similares). ⚠ El AZTREONAM NO está disponible en México → para MBL la opción práctica es CEFIDEROCOL (la combinación aztreonam+CAZ-AVI requiere aztreonam). Confirmar con mCIM/eCIM, inmunocromatografía (Carba 5/RESIST-5) o PCR (Xpert Carba-R); el test de Hodge está obsoleto. Cita: Colín-Castro et al., PLoS One 2025;20(4):e0319441 (Red INVIFAR). Recomendación inferida del antibiograma estructurado.',
   trampas:[
     {t:'⚠ Confirmar el mecanismo ANTES de elegir',b:'Ceftazidima-avibactam cubre KPC y OXA-48 pero NO metalo-β-lactamasas (NDM/VIM/IMP). Elegir sin confirmar puede dejar al paciente sin cobertura efectiva.'},
-    {t:'⚠ No asumir KPC en México/Latam',b:'Circula NDM (MBL). Si la cepa es ceftazidima-avibactam-R, sospechar MBL → cefiderocol o aztreonam + ceftazidima-avibactam. Involucrar a Infectología.'}
+    {t:'⚠ No asumir KPC en México/Latam',b:'Circula NDM (MBL). Si la cepa es ceftazidima-avibactam-R, sospechar MBL → en México CEFIDEROCOL (el aztreonam NO está disponible en el país, INVIFAR; aztreonam+CAZ-AVI sería la combinación donde sí lo haya). Involucrar a Infectología.'}
   ],
   ops:[
     {r:'first',n:'Serina-carbapenemasa probable (KPC/OXA-48) mientras se confirma',ev:'A',d:'Ceftazidima-avibactam 2.5g c/8h IV (infusión extendida 3h)',rat:'Cubre KPC y OXA-48 (IDSA 2024). NO cubre metalo-β-lactamasas.',nota:'Si CAZ-AVI resulta resistente, sospechar MBL y cambiar.',renal:true},
@@ -6240,14 +6240,14 @@ KPC:{title:'CRE productor de KPC',nivel:'critical',desc:'KPC hidroliza todos los
     {r:'rescue',n:'Colistina + Meropenem + Tigeciclina',ev:'C',d:'Triple terapia',rat:'Cuando CAZ-AVI no disponible.',nota:'Nefrotoxicidad alta. Nunca polimixina sola.'},
   ]},
 
-MBL:{title:'CRE Metalo-β-lactamasa (NDM/VIM/IMP)',nivel:'critical',desc:'Hidroliza TODOS los beta-lactámicos. NO inhibida por avibactam. Aztreonam+CAZ-AVI es la opción más eficaz actual.',
+MBL:{title:'CRE Metalo-β-lactamasa (NDM/VIM/IMP)',nivel:'critical',desc:'Hidroliza TODOS los beta-lactámicos salvo monobactámicos. NO inhibida por avibactam. ⚠ En México el AZTREONAM NO está disponible (INVIFAR, Colín-Castro PLoS One 2025) → CEFIDEROCOL es la opción práctica; aztreonam+CAZ-AVI donde sí haya aztreonam.',
   trampas:[
-    {t:'🔴 CAZ-AVI es INACTIVA contra MBL puras',b:'Usar aztreonam+CAZ-AVI o cefiderocol.'},
+    {t:'🔴 CAZ-AVI es INACTIVA contra MBL puras',b:'En México: cefiderocol (el aztreonam no está disponible); aztreonam+CAZ-AVI donde sí lo haya.'},
     {t:'⚠ Aztreonam frecuentemente co-resistente por BLEE coexistente',b:'CAZ-AVI protege aztreonam de la BLEE.'},
   ],
   ops:[
-    {r:'first',n:'Aztreonam + Ceftazidima-avibactam',ev:'B',d:'Aztreonam 2g c/6h + CAZ-AVI 2.5g c/8h IV',rat:'Aztreonam no hidrolizado por MBL. CAZ-AVI protege de BLEE coexistente.',nota:'Ajuste renal complejo.',renal:true},
-    {r:'first',n:'Cefiderocol',ev:'B',d:'2g c/8h IV (inf 3h)',rat:'Activa vs NDM, VIM, IMP, KPC, OXA-48.',nota:'Disponibilidad limitada MX.',renal:true},
+    {r:'first',n:'Cefiderocol (1ª opción práctica en México)',ev:'B',d:'2g c/8h IV (inf 3h)',rat:'Activa vs NDM, VIM, IMP, KPC, OXA-48. En México es la opción realista porque el aztreonam no está disponible (INVIFAR).',nota:'',renal:true},
+    {r:'first',n:'Aztreonam + Ceftazidima-avibactam (donde haya aztreonam)',ev:'B',d:'Aztreonam 2g c/6h + CAZ-AVI 2.5g c/8h IV',rat:'Aztreonam no hidrolizado por MBL. CAZ-AVI protege de BLEE coexistente.',nota:'⚠ Aztreonam NO disponible en México (INVIFAR) → usar cefiderocol localmente. Ajuste renal complejo.',renal:true},
     {r:'rescue',n:'Colistina + Tigeciclina + Fosfomicina',ev:'C',d:'Triple terapia de último recurso',rat:'Solo si nada más disponible.',nota:'Toxicidad acumulativa.'},
   ]},
 
@@ -6420,9 +6420,9 @@ function elegirTX(p){
     // la clase con más fuerza (cubre A/C/D, no B). Cita: IDSA AMR 2024; Simner CMR 2024.
     if(p.abg&&(p.abg['cazavi']==='R'||p.abg['cazavi']==='I')){
       const _aztNoS=p.abg['azt']==='R'||p.abg['azt']==='I';
-      return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ CEFTAZIDIMA-AVIBACTAM no-S en CRE: EXCLUYE KPC y OXA-48 (la CAZ-AVI cubre ambas) → orienta a METALO-β-LACTAMASA (NDM/VIM/IMP).'+(_aztNoS?' Aztreonam TAMBIÉN no-S → además hay una serino-β-lactamasa COPRODUCIDA (BLEE/AmpC): "no es una carbapenemasa, son dos" — el escenario que define el uso de aztreonam + CAZ-AVI.':'')+' Esquema dirigido: AZTREONAM + CEFTAZIDIMA-AVIBACTAM (infusión 3h) o CEFIDEROCOL; la CAZ-AVI SOLA es INACTIVA contra MBL. Confirmar por método molecular (NDM/VIM/IMP). Cita: IDSA AMR 2024; Simner/Pitout, Clin Microbiol Rev 2024;37(4).'};
+      return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ CEFTAZIDIMA-AVIBACTAM no-S en CRE: EXCLUYE KPC y OXA-48 (la CAZ-AVI cubre ambas) → orienta a METALO-β-LACTAMASA (NDM/VIM/IMP).'+(_aztNoS?' Aztreonam TAMBIÉN no-S → además hay una serino-β-lactamasa COPRODUCIDA (BLEE/AmpC): "no es una carbapenemasa, son dos" — el escenario que define el uso de aztreonam + CAZ-AVI.':'')+' Esquema dirigido: en México CEFIDEROCOL (el aztreonam NO está disponible en el país — INVIFAR); donde haya aztreonam, aztreonam + ceftazidima-avibactam (infusión 3h). La CAZ-AVI SOLA es INACTIVA contra MBL. Confirmar por método molecular (NDM/VIM/IMP). Cita: IDSA AMR 2024; Simner/Pitout, Clin Microbiol Rev 2024;37(4); Colín-Castro et al., PLoS One 2025;20(4):e0319441 (INVIFAR).'};
     }
-    if(p.abg&&p.abg['azt']==='S'&&!_ph.PorinLoss)return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ AZTREONAM CONSERVADO (S) con carbapenémicos no-S → orienta a METALO-β-LACTAMASA (MBL: NDM/VIM/IMP): las MBL hidrolizan todos los β-lactámicos EXCEPTO los monobactámicos. Esquema dirigido: AZTREONAM + CEFTAZIDIMA-AVIBACTAM (la CAZ-AVI protege al aztreonam de la BLEE/AmpC acompañante) o aztreonam-avibactam. ⚠ La ceftazidima-avibactam SOLA es INACTIVA contra MBL. Aztreonam-R NO excluye MBL (BLEE/AmpC coexistente). Confirmar SIEMPRE por método molecular (NDM/VIM/IMP). Cita: Agarwal et al., Curr Med Chem 2022 (DOI 10.2174/0929867329666220620165429); IDSA AMR 2024.'};
+    if(p.abg&&p.abg['azt']==='S'&&!_ph.PorinLoss)return {...TX.CRE_PHENO,desc:TX.CRE_PHENO.desc+' ⚠ AZTREONAM CONSERVADO (S) con carbapenémicos no-S → orienta a METALO-β-LACTAMASA (MBL: NDM/VIM/IMP): las MBL hidrolizan todos los β-lactámicos EXCEPTO los monobactámicos. Esquema dirigido: en México CEFIDEROCOL (el aztreonam NO está disponible en el país — INVIFAR); donde haya aztreonam, aztreonam + ceftazidima-avibactam (la CAZ-AVI protege al aztreonam de la BLEE/AmpC acompañante). ⚠ La ceftazidima-avibactam SOLA es INACTIVA contra MBL. Aztreonam-R NO excluye MBL (BLEE/AmpC coexistente). Confirmar SIEMPRE por método molecular (NDM/VIM/IMP). Cita: Agarwal et al., Curr Med Chem 2022; Colín-Castro et al., PLoS One 2025;20(4):e0319441 (INVIFAR); IDSA AMR 2024.'};
     return TX.CRE_PHENO;
   }
   if(p.mec_vrsa)return TX.VRSA;
