@@ -1223,6 +1223,16 @@ test('ABGSAFE v352: aislamiento sensible muestra panel afirmativo (no vacío) co
   assert.ok(/Sin mecanismo de resistencia detectado/.test(_idx), 'el panel no afirma el caso sensible (sin mecanismo)');
   assert.ok(/espectro más <b>estrecho<\/b> efectivo.*desescala|desescala.*estrecho/s.test(_idx), 'falta el mensaje PROA (espectro estrecho + desescalada) para el aislamiento sensible');
 });
+test('ABGSAFE v361: el panel de interpretación existe en los DOS formularios de antibiograma', () => {
+  // BUG raíz: el panel solo estaba en abrirNuevoAntibiograma (#nabg-interpret). El formulario que usa el
+  // médico, abrirFormPaciente ("Nuevo Paciente"), tiene su PROPIA sección de antibiograma (analizarAbgConIA,
+  // #abg-ia-status) y NUNCA tuvo panel → "no me sale". Ahora ambos lo tienen y _refreshAbgInterpret sirve a
+  // los dos contenedores.
+  assert.ok(/id="abg-interpret"/.test(_idx), 'abrirFormPaciente ("Nuevo Paciente") no tiene el panel #abg-interpret');
+  assert.ok(/id="nabg-interpret"/.test(_idx), 'abrirNuevoAntibiograma no tiene el panel #nabg-interpret');
+  assert.ok(/getElementById\('nabg-interpret'\)\|\|document\.getElementById\('abg-interpret'\)/.test(_idx), '_refreshAbgInterpret no sirve a los dos contenedores');
+  assert.ok(/document\.getElementById\('abg-interpret'\)\?\.scrollIntoView/.test(_idx), 'analizarAbgConIA no lleva la vista al panel del form "Nuevo Paciente"');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');

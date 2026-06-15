@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v361 (Antibiograma — RAÍZ del "no me sale": panel faltaba en el form real)
+//  Causa raíz (mi error, tardé en verla): hay DOS formularios con antibiograma. El panel 🧠 Interpretación
+//  vivía SOLO en abrirNuevoAntibiograma ("Resultado de cultivo"/"+Agregar aislamiento"). Pero el médico usa
+//  abrirFormPaciente ("Nuevo Paciente", botón analizarAbgConIA, status #abg-ia-status) — que NUNCA tuvo el
+//  panel ni llamaba _refreshAbgInterpret. Por eso, hiciera lo que hiciera (v352/v358/v360), al usuario no le
+//  salía. Fix: (A) _refreshAbgInterpret ahora sirve a #nabg-interpret O #abg-interpret y al organismo #nabg-org
+//  O #f-org; (B) añadido #abg-interpret a abrirFormPaciente (debajo del análisis IA); (C) analizarAbgConIA
+//  llama refresh + scrollIntoView; (D) #f-org onchange refresca. +1 prueba (271). Lección: verificar EN QUÉ
+//  formulario está el usuario antes de "arreglar".
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v360 (Antibiograma — panel de interpretación ARRIBA, visible)
 //  El Dr.: la interpretación "sigue apareciendo así" (no la veía). El panel #nabg-interpret estaba al FONDO
 //  del formulario (después de toda la rejilla S/I/R de 8 grupos), así que tras "Analizar con IA" había que
@@ -938,7 +948,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v360';
+const CACHE = 'stewardmx-v361';
 const SHELL = [
   '/',
   '/index.html',

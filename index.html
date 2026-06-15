@@ -4701,11 +4701,15 @@ window._renderAbgInterpretacionHTML=function(abg,org){
   return h;
 };
 window._refreshAbgInterpret=function(){
-  const cont=document.getElementById('nabg-interpret');
+  // Sirve a los DOS formularios con antibiograma: abrirFormPaciente (#abg-interpret, organismo #f-org) y
+  // abrirNuevoAntibiograma (#nabg-interpret, organismo #nabg-org). Antes solo apuntaba a #nabg-interpret,
+  // por lo que en el form "Nuevo Paciente" NUNCA salía la interpretación.
+  const cont=document.getElementById('nabg-interpret')||document.getElementById('abg-interpret');
   if(!cont)return;
   const abg={};
   ABG_ATBS.forEach(g=>g.a.forEach(a=>{const btn=document.querySelector('#modal-bdy .sir-btn.active[data-k="'+a.k+'"]');if(btn)abg[a.k]=btn.dataset.v;}));
-  const org=(document.getElementById('nabg-org')?.value||'').trim();
+  let org=(document.getElementById('nabg-org')?.value||'').trim();
+  if(!org){org=(document.getElementById('f-org')?.value||'').trim(); if(/otro/i.test(org))org=(document.getElementById('f-org-otro')?.value||'').trim();}
   cont.innerHTML=window._renderAbgInterpretacionHTML(abg,org);
 };
 
@@ -6999,7 +7003,7 @@ function abrirFormPaciente(p){
     'Legionella pneumophila','Toxoplasma gondii','CMV (Cytomegalovirus)',
     'Otro (escribir abajo)'
   ];
-  html+='<div class="fg" style="grid-column:1/-1;"><label>Microorganismo aislado</label><select id="f-org" onchange="inferirFenotipo();mostrarResistenciasIntrinsecas(this.value)">';
+  html+='<div class="fg" style="grid-column:1/-1;"><label>Microorganismo aislado</label><select id="f-org" onchange="inferirFenotipo();mostrarResistenciasIntrinsecas(this.value);window._refreshAbgInterpret&&window._refreshAbgInterpret();">';
   orgList.forEach(o=>{html+='<option value="'+o+'"'+(p.organismo===o?' selected':'')+'>'+( o||'— Seleccionar organismo —')+'</option>';});
   html+='</select></div>';
   html+='<div class="fg" style="grid-column:1/-1;" id="f-org-otro-wrap" style="display:none;"><label>Otro organismo (escribir)</label><input id="f-org-otro" value="'+escHtml(orgList.includes(p.organismo)?'':p.organismo||'')+'" placeholder="Escribir nombre del organismo"></div>';
@@ -7088,6 +7092,9 @@ function abrirFormPaciente(p){
   html+='<div id="abg-preview" style="display:none;margin-top:8px;"><img id="abg-img" src="" style="max-width:100%;max-height:160px;border-radius:4px;border:1px solid var(--brd2);"></div>';
   html+='<div id="abg-ia-status" style="display:none;margin-top:8px;font-family:var(--mono);font-size:10px;padding:8px 12px;border-radius:3px;"></div>';
   html+='</div>';
+  // Interpretación del motor (mecanismo + alertas EUCAST + recomendación, o "✅ sin mecanismo" en sensibles).
+  // Va AQUÍ, justo bajo el análisis IA, para que se vea al instante. Se llena reactivo (_refreshAbgInterpret).
+  html+='<div id="abg-interpret" style="margin:6px 0 16px;"></div>';
   ABG_ATBS.forEach(grp=>{
     html+='<div style="margin-bottom:14px;">';
     html+='<div class="abg-grp-title">'+grp.g+'</div>';
@@ -11540,6 +11547,9 @@ window.analizarAbgConIA=async()=>{
     });
     const micCount=Object.keys(window._abgMICs||{}).length;
     setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+'. '+(window._anthropicProxyURL?'🔒 Análisis seguro (la clave de IA no se expone). ':'')+'Revisa y corrige los valores S/I/R si hace falta.','ok');
+    if(window._refreshAbgInterpret)window._refreshAbgInterpret();
+    // Mostrar la interpretación del motor justo tras analizar (form "Nuevo Paciente" → panel #abg-interpret).
+    setTimeout(()=>{try{document.getElementById('abg-interpret')?.scrollIntoView({behavior:'smooth',block:'center'});}catch(_){}},120);
   }catch(e){setStatus('🔴 Error: '+e.message,'err');}
 };
 
