@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v360 (Antibiograma — panel de interpretación ARRIBA, visible)
+//  El Dr.: la interpretación "sigue apareciendo así" (no la veía). El panel #nabg-interpret estaba al FONDO
+//  del formulario (después de toda la rejilla S/I/R de 8 grupos), así que tras "Analizar con IA" había que
+//  bajar mucho. Movido a JUSTO debajo del bloque de análisis IA, ANTES de "Resultados S/I/R" → la
+//  interpretación del motor (mecanismo + alertas EUCAST + recomendación, o "✅ sin mecanismo" en sensibles)
+//  aparece inmediatamente al analizar, sin scroll. (id único; _refreshAbgInterpret/scrollIntoView intactos.)
+//  270 pruebas.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v359 (PWA — fin del banner "Actualizar" molesto cada minuto)
 //  El Dr.: "cada que abro me sale Actualizar / se actualiza cada minuto". Causa: v350 bajó el chequeo a 60s
 //  + focus (demasiado agresivo) y el banner aparecía en cada apertura al haber versión nueva. Fix:
@@ -930,7 +938,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v359';
+const CACHE = 'stewardmx-v360';
 const SHELL = [
   '/',
   '/index.html',
