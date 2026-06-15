@@ -32624,11 +32624,14 @@ function _mostrarBannerActualizacion(){
 window._aplicarActualizacionSW = () => {
   const btn = document.getElementById('_sw-update-btn');
   if(btn){ btn.textContent = 'Actualizando…'; btn.disabled = true; }
-  if(window._pendingSW){
-    window._pendingSW.postMessage({ type: 'SKIP_WAITING' });
-  } else {
-    window.location.reload();
-  }
+  // RED DE SEGURIDAD: el flujo normal es postMessage(SKIP_WAITING) → controllerchange → reload, pero
+  //   controllerchange NO siempre dispara (iOS/PWA standalone, multi-pestaña) → el banner se quedaba
+  //   colgado en "Actualizando…". Forzamos la recarga igual tras un breve margen: index.html es
+  //   network-first + no-cache, así que recargar SIEMPRE trae la versión nueva, active o no el SW.
+  let _done = false;
+  const _force = () => { if(_done) return; _done = true; try{ window.location.reload(); }catch(_){ location.reload(); } };
+  try{ if(window._pendingSW) window._pendingSW.postMessage({ type: 'SKIP_WAITING' }); }catch(_){}
+  setTimeout(_force, 1200);
 };
 
 // Forzar actualización manual — toca el badge "v77" en la barra superior
@@ -32642,12 +32645,14 @@ window.forzarActualizacion = async () => {
         // Si ya hay SW esperando → activarlo de inmediato
         if(reg.waiting){
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          setTimeout(() => { try{ window.location.reload(true); }catch(_){ location.reload(); } }, 1200);
           return;
         }
         // Sino → buscar nueva versión en el servidor
         await reg.update();
         if(reg.waiting){
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          setTimeout(() => { try{ window.location.reload(true); }catch(_){ location.reload(); } }, 1200);
           return;
         }
       }

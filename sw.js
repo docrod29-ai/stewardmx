@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v351 (PWA — FIX banner colgado en "Actualizando…")
+//  Bug: al tocar "Actualizar", el botón quedaba en "Actualizando…" y la app NO recargaba. Causa: el flujo
+//  dependía de controllerchange tras skipWaiting(), y ese evento NO siempre dispara (iOS/PWA standalone,
+//  multi-pestaña). Fix: red de seguridad — _aplicarActualizacionSW y forzarActualizacion fuerzan
+//  location.reload() tras 1.2 s pase lo que pase. index.html es network-first + no-cache → recargar SIEMPRE
+//  trae la versión nueva, active o no el SW. (Un cliente ya colgado debe cerrar/reabrir la PWA una vez
+//  para recibir este fix.)
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v350 (PWA — detección de versión nueva más ágil)
 //  Síntoma: "tarda mucho en actualizar". Causa real: en una PWA siempre abierta y ENFOCADA,
 //  visibilitychange no dispara, así que la única detección era el intervalo de reg.update() cada 5 min →
@@ -854,7 +862,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v350';
+const CACHE = 'stewardmx-v351';
 const SHELL = [
   '/',
   '/index.html',
