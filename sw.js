@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v357 (Antibiograma — esquemas MBL/NDM reales de México del Dr.)
+//  El Dr. dio su práctica real para NDM/MBL sin aztreonam ni cefiderocol. Codificado en TX.MBL como
+//  opciones guiadas por susceptibilidad: (1) colistina + meropenem (dosis alta/inf. extendida);
+//  (2) amikacina (si S) + colistina; (3) colistina + tigeciclina + fosfomicina (tigeciclina NO en foco
+//  urinario/bacteriémico). Se MANTIENEN aztreonam+CAZ-AVI y cefiderocol como "elección DONDE estén
+//  disponibles" (1ª línea mundial), y TODAS las opciones dicen "CONSULTAR INFECTOLOGÍA". Los mensajes
+//  v344/v345 de elegirTX y CRE_PHENO listan las 3 combinaciones. 270 pruebas.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v356 (Antibiograma — MBL en México: ni aztreonam NI cefiderocol)
 //  El Dr. (acceso real local) corrigió: en México tampoco hay cefiderocol. v355 había puesto cefiderocol
 //  como "opción práctica" → también incorrecto. Corregido en CRE_PHENO, TX.MBL y mensajes v344/v345 de
@@ -905,7 +913,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v356';
+const CACHE = 'stewardmx-v357';
 const SHELL = [
   '/',
   '/index.html',
