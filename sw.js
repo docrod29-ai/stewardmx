@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v359 (PWA — fin del banner "Actualizar" molesto cada minuto)
+//  El Dr.: "cada que abro me sale Actualizar / se actualiza cada minuto". Causa: v350 bajó el chequeo a 60s
+//  + focus (demasiado agresivo) y el banner aparecía en cada apertura al haber versión nueva. Fix:
+//  (1) en apertura FRESCA, si hay SW en waiting, AUTO-APLICAR en silencio (skipWaiting + reload) — sin
+//      banner; guarda anti-bucle por sessionStorage (si reintentó hace <12s y sigue waiting → banner, no loop).
+//  (2) intervalo de chequeo 60s → 30 min; se quitó el chequeo al evento 'focus'. Queda visibilitychange.
+//  El banner SOLO aparece para actualizaciones detectadas MIENTRAS se trabaja (no recargar a media consulta).
+//  NOTA: el usuario debe actualizar UNA vez más (a v359) para recibir esta lógica; de ahí en adelante, en
+//  silencio. 270 pruebas.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v358 (Antibiograma — auto-scroll a la interpretación tras analizar)
 //  El Dr. reportó "solo me aparece eso / dónde está el razonamiento": el panel 🧠 Interpretación del motor
 //  (#nabg-interpret) vive al FONDO del formulario (tras la rejilla de 8 grupos S/I/R), así que tras
@@ -920,7 +930,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v358';
+const CACHE = 'stewardmx-v359';
 const SHELL = [
   '/',
   '/index.html',

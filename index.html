@@ -32575,10 +32575,18 @@ if('serviceWorker' in navigator){
     try{
       const reg = await navigator.serviceWorker.register('/sw.js');
 
-      // ── FIX CRÍTICO: SW ya en "waiting" al cargar ──────────────
-      // updatefound NO vuelve a disparar si el SW nuevo ya instaló
-      // en segundo plano (caso más común). Lo detectamos aquí.
+      // ── SW ya en "waiting" al cargar: AUTO-APLICAR en silencio ──
+      // En una apertura fresca no hay trabajo que perder → aplicar la versión nueva sin banner (antes
+      // salía "Actualizar" en CADA apertura, molesto). Guarda anti-bucle: si ya lo intentamos hace <12 s
+      // y SIGUE en waiting (iOS a veces no activa skipWaiting), ofrecer el banner en vez de recargar en loop.
       if(reg.waiting && navigator.serviceWorker.controller){
+        let _last=0; try{_last=+(sessionStorage.getItem('_swAutoApply')||0);}catch(_){}
+        if(Date.now()-_last > 12000){
+          try{sessionStorage.setItem('_swAutoApply',String(Date.now()));}catch(_){}
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          setTimeout(()=>{try{location.reload();}catch(_){}}, 1500);
+          return;
+        }
         window._pendingSW = reg.waiting;
         _mostrarBannerActualizacion();
       }
@@ -32603,16 +32611,14 @@ if('serviceWorker' in navigator){
         window.location.reload();
       });
 
-      // Buscar actualizaciones: inmediato al cargar + cada 60 s + al volver/enfocar la app.
-      // (Antes 5 min: en una PWA siempre abierta y enfocada, visibilitychange no dispara, así que la
-      //  detección de una versión nueva podía tardar hasta 5 min en mostrar el banner. 60 s la hace
-      //  mucho más ágil; sw.js es no-cache y pequeño → el costo de red es trivial.)
+      // Buscar actualizaciones: al cargar + cada 30 min + al volver a la pestaña (visibilitychange).
+      // (v358 lo bajó a 60s + focus y resultó MOLESTO — banner casi cada minuto. La auto-aplicación en
+      //  apertura fresca ya mantiene al usuario al día; el intervalo solo cubre sesiones largas sin recargar.)
       reg.update().catch(() => {});
-      setInterval(() => { reg.update().catch(() => {}); }, 60 * 1000);
+      setInterval(() => { reg.update().catch(() => {}); }, 30 * 60 * 1000);
       document.addEventListener('visibilitychange', () => {
         if(document.visibilityState === 'visible') reg.update().catch(() => {});
       });
-      window.addEventListener('focus', () => { reg.update().catch(() => {}); });
 
     }catch(e){ console.warn('[SW] Error al registrar:', e.message); }
   });
