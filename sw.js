@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v356 (Antibiograma — MBL en México: ni aztreonam NI cefiderocol)
+//  El Dr. (acceso real local) corrigió: en México tampoco hay cefiderocol. v355 había puesto cefiderocol
+//  como "opción práctica" → también incorrecto. Corregido en CRE_PHENO, TX.MBL y mensajes v344/v345 de
+//  elegirTX: para MBL/NDM en México, frecuentemente NO hay aztreonam NI cefiderocol (los agentes de
+//  elección) → tratamiento INDIVIDUALIZADO por susceptibilidad (amikacina/colistina/fosfomicina/tigeciclina
+//  según el antibiograma y el foco, en combinación) + interconsulta a Infectología OBLIGATORIA. Aztreonam+
+//  CAZ-AVI / cefiderocol quedan como "elección donde estén disponibles". Pendiente: confirmar con el Dr. su
+//  esquema real de NDM para codificarlo con precisión. 270 pruebas.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v355 (Antibiograma — epidemiología corregida a las fuentes REALES)
 //  El Dr. aportó las 2 publicaciones primarias y pidió no inventar cifras. Corregido:
 //  · MÉXICO (INVIFAR): la cifra "~80% NDM" era una diapositiva / el reporte 2023 (84%). El dato REAL del
@@ -896,7 +905,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v355';
+const CACHE = 'stewardmx-v356';
 const SHELL = [
   '/',
   '/index.html',
