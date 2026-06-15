@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v362 (Camas — ocultar controles de editar mapa a los no-admin)
+//  Reporte real (capturas): a un Médico interconsultante le salía "Solo el administrador puede editar el
+//  mapa de camas" en cascada. Causa: el ✕ de cama libre (delCama, ~5519) y la fila "Nueva cama +" (addCama,
+//  ~5524) se renderizaban para TODOS — los controles de servicio sí usaban _isAdmin, pero a estos por-cama
+//  se les escapó. El no-admin los tocaba y cada clic disparaba el toast de bloqueo. Fix: gatear ambos por
+//  window._isAdmin (igual que renombrar/eliminar/+Servicio). El admin de cada hospital (status==='admin' →
+//  isHospAdmin) ya pasa el guard cliente Y la regla Firestore info/{doc} (update: isHospAdmin||isHospLider),
+//  así que edita el mapa end-to-end. Los no-admin solo VEN el mapa, sin controles ni errores. +1 prueba (272).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v361 (Antibiograma — RAÍZ del "no me sale": panel faltaba en el form real)
 //  Causa raíz (mi error, tardé en verla): hay DOS formularios con antibiograma. El panel 🧠 Interpretación
 //  vivía SOLO en abrirNuevoAntibiograma ("Resultado de cultivo"/"+Agregar aislamiento"). Pero el médico usa
@@ -948,7 +957,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v361';
+const CACHE = 'stewardmx-v362';
 const SHELL = [
   '/',
   '/index.html',

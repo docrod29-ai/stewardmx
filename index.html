@@ -5516,12 +5516,12 @@ function renderCamas(){
       }else{
         html+='<div class="cama-row libre" style="cursor:default;">';
         html+='<div><div class="cama-num">'+escHtml(c)+'</div><div class="cama-pt" style="color:var(--t3)">Libre</div></div>';
-        html+='<div style="display:flex;align-items:center;gap:6px;"><span class="cama-badge cama-libre">—</span><button class="ic-btn del" style="font-size:9px;padding:2px 5px;" onclick="event.stopPropagation();delCama(\''+svcJs+'\',\''+cJs+'\')">✕</button></div>';
+        html+='<div style="display:flex;align-items:center;gap:6px;"><span class="cama-badge cama-libre">—</span>'+(window._isAdmin?'<button class="ic-btn del" style="font-size:9px;padding:2px 5px;" onclick="event.stopPropagation();delCama(\''+svcJs+'\',\''+cJs+'\')">✕</button>':'')+'</div>';
         html+='</div>';
       }
     });
     html+='</div>';
-    html+='<div class="add-cama-row"><input id="nc-'+svc.replace(/\W/g,'_')+'" class="add-cama-inp" placeholder="Nueva cama…" onkeydown="if(event.key===\'Enter\')addCama(\''+svcJs+'\')"><button class="add-cama-btn" onclick="addCama(\''+svcJs+'\')">+</button></div>';
+    if(window._isAdmin)html+='<div class="add-cama-row"><input id="nc-'+svc.replace(/\W/g,'_')+'" class="add-cama-inp" placeholder="Nueva cama…" onkeydown="if(event.key===\'Enter\')addCama(\''+svcJs+'\')"><button class="add-cama-btn" onclick="addCama(\''+svcJs+'\')">+</button></div>';
     html+='</div>';
   });
   // ── FIX BUG 4: Pacientes en servicios NO configurados (ej. "Piso 5" sin mapa de camas) ──

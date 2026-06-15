@@ -1233,6 +1233,14 @@ test('ABGSAFE v361: el panel de interpretación existe en los DOS formularios de
   assert.ok(/getElementById\('nabg-interpret'\)\|\|document\.getElementById\('abg-interpret'\)/.test(_idx), '_refreshAbgInterpret no sirve a los dos contenedores');
   assert.ok(/document\.getElementById\('abg-interpret'\)\?\.scrollIntoView/.test(_idx), 'analizarAbgConIA no lleva la vista al panel del form "Nuevo Paciente"');
 });
+test('CAMAS v362: los controles de editar el mapa de camas (±cama) solo se renderizan para admin', () => {
+  // BUG: el ✕ de cama libre (delCama) y la fila "Nueva cama +" (addCama) se MOSTRABAN a todos. Un no-admin
+  // (p.ej. Interconsultante) los tocaba y recibía "Solo el administrador puede editar el mapa de camas" en
+  // cascada. Los controles de servicio (renombrar/eliminar/+Servicio) ya usaban _isAdmin; a estos por-cama
+  // se les escapó. Fix: gatearlos igual. El admin de cada hospital (status==='admin' → isHospAdmin) sí edita.
+  assert.ok(/window\._isAdmin\?'<button class="ic-btn del"[^]*?delCama/.test(_idx), 'el ✕ de cama libre (delCama) no está gateado por _isAdmin');
+  assert.ok(/if\(window\._isAdmin\)html\+='<div class="add-cama-row"/.test(_idx), 'la fila "Nueva cama +" (addCama) no está gateada por _isAdmin');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');
