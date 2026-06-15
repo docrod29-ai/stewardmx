@@ -10511,6 +10511,9 @@ window.analizarNabgConIA=async()=>{
     const _rev=revisar.length?' ⚠ '+revisar.length+' de baja confianza — VERIFICA: '+revisar.join(', '):'';
     setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+_rev+'. '+(window._anthropicProxyURL?'🔒 Análisis seguro (la clave de IA no se expone). ':'')+'Revisa y corrige los valores S/I/R si hace falta.',revisar.length?'info':'ok');
     if(window._refreshAbgInterpret)window._refreshAbgInterpret();
+    // Llevar la vista a la "🧠 Interpretación del motor" — vive al fondo del formulario (tras la rejilla),
+    // así que tras analizar con IA el usuario no la veía ("solo me aparece eso"). La traemos a la vista.
+    setTimeout(()=>{try{document.getElementById('nabg-interpret')?.scrollIntoView({behavior:'smooth',block:'center'});}catch(_){}},120);
   }catch(e){setStatus('🔴 Error: '+e.message,'err');}
 };
 

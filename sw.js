@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v358 (Antibiograma — auto-scroll a la interpretación tras analizar)
+//  El Dr. reportó "solo me aparece eso / dónde está el razonamiento": el panel 🧠 Interpretación del motor
+//  (#nabg-interpret) vive al FONDO del formulario (tras la rejilla de 8 grupos S/I/R), así que tras
+//  "Analizar con IA" no se veía sin bajar. VERIFICADO que el panel SÍ se llena (el form vive en #modal-bdy,
+//  el selector de _refreshAbgInterpret coincide) — era solo descubribilidad. Fix: tras analizar, hacer
+//  scrollIntoView del panel para llevar la vista a la interpretación. 270 pruebas.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v357 (Antibiograma — esquemas MBL/NDM reales de México del Dr.)
 //  El Dr. dio su práctica real para NDM/MBL sin aztreonam ni cefiderocol. Codificado en TX.MBL como
 //  opciones guiadas por susceptibilidad: (1) colistina + meropenem (dosis alta/inf. extendida);
@@ -913,7 +920,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v357';
+const CACHE = 'stewardmx-v358';
 const SHELL = [
   '/',
   '/index.html',
