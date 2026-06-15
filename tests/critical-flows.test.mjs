@@ -1205,6 +1205,12 @@ test('ABGSAFE v340: el panel muestra la recomendación DIRIGIDA (elegirTX/TX) de
   assert.ok(/flags\.length&&typeof elegirTX==='function'/.test(_idx), 'la recomendación no está gated al mecanismo inferido (evita ruido en sensibles)');
   assert.ok(/!\/Empírico\/i\.test\(tx\.title\)/.test(_idx), 'no excluye el fallback empírico del panel dirigido');
 });
+test('ABGSAFE v352: aislamiento sensible muestra panel afirmativo (no vacío) con mensaje PROA', () => {
+  // Antes, sin mecanismo el panel devolvía '' → el usuario veía la rejilla llena pero ninguna
+  // interpretación ("nomas sale eso"). Ahora afirma "sin mecanismo" + espectro estrecho + desescala.
+  assert.ok(/Sin mecanismo de resistencia detectado/.test(_idx), 'el panel no afirma el caso sensible (sin mecanismo)');
+  assert.ok(/espectro más <b>estrecho<\/b> efectivo.*desescala|desescala.*estrecho/s.test(_idx), 'falta el mensaje PROA (espectro estrecho + desescalada) para el aislamiento sensible');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');

@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v352 (Antibiograma — panel afirmativo en aislamiento sensible)
+//  Reporte: tras analizar un antibiograma sensible (E. coli 3GC-S, carbapenémicos S) "nomas sale eso" —
+//  la rejilla S/I/R se llenaba pero NO aparecía interpretación. Causa: _renderAbgInterpretacionHTML
+//  devolvía '' cuando no había mecanismo/conflicto/alerta. Fix: en ese caso ahora muestra un panel
+//  afirmativo "✅ Sin mecanismo de resistencia detectado" + mensaje PROA (espectro más estrecho efectivo +
+//  desescalada). Confirma que el motor corrió y da la guía correcta para un sensible. +1 prueba (269).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v351 (PWA — FIX banner colgado en "Actualizando…")
 //  Bug: al tocar "Actualizar", el botón quedaba en "Actualizando…" y la app NO recargaba. Causa: el flujo
 //  dependía de controllerchange tras skipWaiting(), y ese evento NO siempre dispara (iOS/PWA standalone,
@@ -862,7 +869,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v351';
+const CACHE = 'stewardmx-v352';
 const SHELL = [
   '/',
   '/index.html',

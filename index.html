@@ -4643,7 +4643,17 @@ window._renderAbgInterpretacionHTML=function(abg,org){
   try{ag=window.aminoglycosideSynergy?window.aminoglycosideSynergy(abg,org||''):[];}catch(_){}
   const edits=qx.edits||[]; const avisos=[...(qx.avisos||[]),...(ag||[])];
   const flags=ph?Object.keys(ph).filter(k=>ph[k]&&window._abgFenoLabels[k]):[];
-  if(!flags.length&&!ic.length&&!ex.length&&!edits.length&&!avisos.length)return '';
+  if(!flags.length&&!ic.length&&!ex.length&&!edits.length&&!avisos.length){
+    // Sin mecanismo de resistencia detectable: en vez de panel VACÍO (que parece "no pasó nada"),
+    // afirmar el resultado y dar el mensaje PROA correcto (espectro estrecho + desescalada). Confirma
+    // además que el motor SÍ corrió sobre el antibiograma. (Antes devolvía '' → el usuario veía la rejilla
+    // llena pero ninguna interpretación.)
+    return '<div style="border:1px solid var(--brd2);border-radius:8px;padding:12px;background:rgba(0,212,168,.04);">'
+      +'<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:8px;">🧠 Interpretación del motor (determinista · EUCAST/CLSI)</div>'
+      +'<div style="border-left:3px solid var(--teal);background:rgba(0,212,168,.06);border-radius:4px;padding:8px 10px;"><div style="font-size:11px;font-weight:700;color:var(--teal);margin-bottom:3px;">✅ Sin mecanismo de resistencia detectado</div>'
+      +'<div style="font-size:11px;color:var(--t2);line-height:1.5;">El antibiograma no dispara ningún fenotipo de resistencia (BLEE, AmpC, carbapenemasa, MRSA, etc.) ni conflicto intrínseco. <b>PROA:</b> elige el antimicrobiano de espectro más <b>estrecho</b> efectivo según el foco y <b>desescala</b> en cuanto el cultivo lo permita. No procede amplio espectro empírico.</div></div>'
+      +'<div style="font-size:10px;color:var(--t3);margin-top:8px;">Apoyo decisional determinista (no sustituye el juicio del microbiólogo/infectólogo). El LLM solo extrae S/I/R; el mecanismo lo infiere este motor citado.</div></div>';
+  }
   // Recomendación DIRIGIDA (IDSA AMR 2024 / EUCAST) derivada del mecanismo inferido — reusa elegirTX/TX.
   // Solo cuando hay un mecanismo inferido (flags): en un aislamiento sensible no procede un esquema MDR.
   let recoHTML='';
