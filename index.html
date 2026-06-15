@@ -10507,7 +10507,7 @@ window.analizarNabgConIA=async()=>{
     });
     const micCount=Object.keys(window._nabgMICs||{}).length;
     const _rev=revisar.length?' ⚠ '+revisar.length+' de baja confianza — VERIFICA: '+revisar.join(', '):'';
-    setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+_rev+'. '+(window._anthropicProxyURL?'🔒 Sin exponer la key. ':'')+' Revisa y ajusta si es necesario.',revisar.length?'info':'ok');
+    setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+_rev+'. '+(window._anthropicProxyURL?'🔒 Análisis seguro (la clave de IA no se expone). ':'')+'Revisa y corrige los valores S/I/R si hace falta.',revisar.length?'info':'ok');
     if(window._refreshAbgInterpret)window._refreshAbgInterpret();
   }catch(e){setStatus('🔴 Error: '+e.message,'err');}
 };
@@ -11532,7 +11532,7 @@ window.analizarAbgConIA=async()=>{
       }
     });
     const micCount=Object.keys(window._abgMICs||{}).length;
-    setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+'. '+(window._anthropicProxyURL?'🔒 Sin exponer la key':'')+' Revisa y ajusta si es necesario.','ok');
+    setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+'. '+(window._anthropicProxyURL?'🔒 Análisis seguro (la clave de IA no se expone). ':'')+'Revisa y corrige los valores S/I/R si hace falta.','ok');
   }catch(e){setStatus('🔴 Error: '+e.message,'err');}
 };
 

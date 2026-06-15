@@ -1,4 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v353 (Antibiograma — texto de estado IA más claro)
+//  El status tras analizar con IA decía "🔒 Sin exponer la key Revisa y ajusta" (pegado, jerga) → se leía
+//  como "revisa la key". Reescrito a "🔒 Análisis seguro (la clave de IA no se expone). Revisa y corrige los
+//  valores S/I/R si hace falta." en ambos manejadores (analizarNabgConIA / analizarAbgConIA). Solo copy.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v352 (Antibiograma — panel afirmativo en aislamiento sensible)
 //  Reporte: tras analizar un antibiograma sensible (E. coli 3GC-S, carbapenémicos S) "nomas sale eso" —
 //  la rejilla S/I/R se llenaba pero NO aparecía interpretación. Causa: _renderAbgInterpretacionHTML
@@ -869,7 +874,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v352';
+const CACHE = 'stewardmx-v353';
 const SHELL = [
   '/',
   '/index.html',
