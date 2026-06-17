@@ -25908,17 +25908,49 @@ window.renderTrasplantePac=function(pid){
   _execScripts(cont); // re-run scripts blocked by innerHTML assignment
 };
 
-// v307: crear un paciente directamente desde el módulo de Trasplante. Abre el formulario del censo
-// con Inmunosupresión = 'trasplante' preseleccionada → al guardar cae en el dropdown del módulo, y
-// el guardado lo exime del requisito de ATB (evaluación pre-TX sin antimicrobiano todavía).
+// v364: alta SIMPLE de paciente de trasplante — SOLO datos generales + la enfermedad (diagnóstico).
+// El médico pidió una "manera diferente" de agregar al paciente en este apartado, sin el formulario
+// COMPLETO (ATB, antibiograma, interconsulta, PROA…). Reusa guardar() → mismo esquema del censo; los
+// campos ausentes quedan por defecto (sin ATB → sin gates). f-inmuno='trasplante' lo hace aparecer de
+// inmediato en el selector del módulo. El #f-atb oculto evita que syncAtbField escriba a un campo ausente.
 window._txNuevoPaciente=function(){
   editId=null;
-  abrirFormPaciente(null);
-  setTimeout(function(){
-    var s=document.getElementById('f-inmuno');
-    if(s){s.value='trasplante';try{if(typeof autoCalcRiesgo==='function')autoCalcRiesgo();}catch(_){}}
-    var nom=document.getElementById('f-nom');if(nom)nom.focus();
-  },60);
+  const svcOpts=['<option value="">— Sin asignar —</option>']
+    .concat(Object.keys(CAMAS||{}).map(s=>'<option value="'+escHtml(s)+'">'+escHtml(s)+'</option>')).join('');
+  let html='';
+  html+='<input type="hidden" id="f-inmuno" value="trasplante">';
+  html+='<input type="hidden" id="f-tipo-visita" value="seguimiento">';
+  html+='<input type="hidden" id="f-atb" value="">';
+  html+='<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.5;">Alta rápida del módulo de Trasplante: <b>datos generales</b> + la <b>enfermedad</b>. El antibiótico, antibiograma y lo demás se agregan después si hacen falta — aquí <b>no</b> son obligatorios.</div>';
+  html+='<div class="fsec-t">🫀 Datos generales</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;">';
+  html+='<div class="fg" style="grid-column:1/-1;"><label>Nombre *</label><input id="f-nom" placeholder="Nombre completo del paciente"></div>';
+  html+='<div class="fg"><label>Expediente</label><input id="f-exp" placeholder="No. de expediente"></div>';
+  html+='<div class="fg"><label>Edad</label><input id="f-edad" type="number" min="0" max="120" placeholder="años"></div>';
+  html+='<div class="fg"><label>Sexo</label><select id="f-sexo"><option value="M">M</option><option value="F">F</option><option value="Otro">Otro</option></select></div>';
+  html+='<div class="fg"><label>Peso (kg)</label><input id="f-peso" type="number" min="1" max="300" step="0.1" placeholder="opcional"></div>';
+  html+='<div class="fg"><label>Creatinina (mg/dL)</label><input id="f-creat" type="number" step="0.1" placeholder="opcional"></div>';
+  html+='<div class="fg"><label>Servicio</label><select id="f-svc">'+svcOpts+'</select></div>';
+  html+='<div class="fg"><label>Cama <span style="color:var(--t3);font-size:9px;">(opcional)</span></label><input id="f-cama" placeholder="—"></div>';
+  html+='</div>';
+  html+='<div class="fsec-t" style="margin-top:16px;">🩺 La enfermedad</div>';
+  html+='<div class="fg" style="margin-top:6px;"><label>Diagnóstico principal / motivo</label>'+buildCombobox('f-dx',DX_LIST,'')+'</div>';
+  html+='<div style="display:flex;gap:8px;margin-top:18px;padding-top:12px;border-top:1px solid var(--brd2);">';
+  html+='<button class="btn-main btn-teal" onclick="_txGuardarSimple()" style="flex:1;">💾 Guardar paciente de trasplante</button>';
+  html+='<button class="btn-main" onclick="cerrarModal()" style="background:transparent;border:1px solid var(--brd2);color:var(--t2);flex-shrink:0;">Cancelar</button>';
+  html+='</div>';
+  abrirContenido('➕ Nuevo paciente de trasplante',html);
+  setTimeout(function(){var n=document.getElementById('f-nom');if(n)n.focus();},60);
+};
+// Guarda con el MISMO guardar() del censo (esquema idéntico, sin ATB) y refresca el módulo de Trasplante.
+window._txGuardarSimple=async function(){
+  if(!(document.getElementById('f-nom')?.value||'').trim()){
+    toast('⚠ El nombre del paciente es obligatorio','rd');
+    var n=document.getElementById('f-nom');if(n)n.focus();return;
+  }
+  try{ await window.guardar(); }catch(e){ toast('Error: '+(e&&e.message||e),'rd'); return; }
+  // guardar() ya cerró el modal y sincronizó; refrescar el selector de Trasplante cuando PACS llegue.
+  setTimeout(function(){ try{ if(typeof renderTrasplante==='function') renderTrasplante(); }catch(_){} },700);
 };
 
 // v309: PERSISTENCIA de la evaluación Pre-Trasplante en el expediente del paciente.

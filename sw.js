@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v364 (Trasplante — alta SIMPLE: solo datos generales + la enfermedad)
+//  El médico pidió una manera DISTINTA de agregar al paciente en el módulo de Trasplante: sin el formulario
+//  completo (ATB, antibiograma, interconsulta, PROA). _txNuevoPaciente ahora abre un modal reducido —
+//  Nombre*, Expediente, Edad, Sexo, Peso, Creatinina, Servicio, Cama + Diagnóstico (la enfermedad) — con
+//  f-inmuno='trasplante' oculto (aparece de inmediato en el selector del módulo). Guarda reusando el MISMO
+//  guardar() del censo (esquema idéntico): sin ATB no se disparan gates; el #f-atb oculto evita el crash de
+//  syncAtbField. Tras guardar, refresca el selector de Trasplante. +1 prueba (274).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v363 (PWA — actualización SILENCIOSA: fin de "me reinicia la pantalla")
 //  Reporte real, repetido: "me sale la ventana de actualizar SIEMPRE que entro, le pico y me reinicia la
 //  pantalla". Mis intentos previos (v350/v351/v359) NO lo resolvieron. Causa raíz: 3 conductas intrusivas en
@@ -967,7 +975,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v363';
+const CACHE = 'stewardmx-v364';
 const SHELL = [
   '/',
   '/index.html',

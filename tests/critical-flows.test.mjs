@@ -1250,6 +1250,17 @@ test('PWA v363: actualización silenciosa — sin recarga automática que reinic
   assert.ok(/_activarSilencioso/.test(_idx), 'falta la activación silenciosa del SW nuevo (skipWaiting sin recarga)');
   assert.ok(/window\.forzarActualizacion\s*=/.test(_idx), 'se perdió la actualización manual por el badge de versión');
 });
+test('TX v364: alta de trasplante usa formulario simple (datos generales + enfermedad), no el form completo', () => {
+  // El médico pidió una manera DISTINTA de agregar paciente en Trasplante: solo datos generales + la
+  // enfermedad. Antes _txNuevoPaciente abría el formulario COMPLETO (abrirFormPaciente). Ahora abre un
+  // modal reducido y reusa guardar() (mismo esquema, sin ATB).
+  assert.ok(/abrirContenido\('➕ Nuevo paciente de trasplante'/.test(_idx), 'el alta de trasplante no abre el modal simple');
+  assert.ok(/id="f-inmuno" value="trasplante"/.test(_idx), 'el alta simple no marca inmuno=trasplante (no aparecería en el módulo)');
+  assert.ok(/window\._txNuevoPaciente=function[\s\S]*?buildCombobox\('f-dx'[\s\S]*?abrirContenido\('➕ Nuevo paciente de trasplante'/.test(_idx), 'el alta simple no incluye el diagnóstico (la enfermedad) dentro de _txNuevoPaciente');
+  assert.ok(/id="f-atb" value=""/.test(_idx), 'falta el hidden f-atb (evita crash de syncAtbField sin sección ATB)');
+  assert.ok(/window\._txGuardarSimple\s*=\s*async/.test(_idx), 'falta _txGuardarSimple');
+  assert.ok(/_txGuardarSimple[\s\S]{0,400}await window\.guardar\(\)/.test(_idx), '_txGuardarSimple no reusa guardar() (esquema del censo)');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');
@@ -1611,7 +1622,7 @@ test('ALTA: dar de alta NO exige antimicrobiano (el candado de ATB se eliminó)'
 });
 test('TXALTA: hay función + botón para crear paciente desde el módulo (preselecciona trasplante)', () => {
   assert.ok(_idx.includes('window._txNuevoPaciente=function()'), 'falta _txNuevoPaciente');
-  assert.ok(_idx.includes("s.value='trasplante'"), 'no preselecciona Inmunosupresión=trasplante');
+  assert.ok(_idx.includes('id="f-inmuno" value="trasplante"'), 'el alta no marca Inmunosupresión=trasplante (v364: hidden f-inmuno)');
   assert.ok(_idx.includes('window._txNuevoPaciente&&window._txNuevoPaciente()'), 'falta el botón en el módulo');
 });
 test('TXPERSIST: la evaluación Pre-TX se guarda al expediente y se pre-carga (v309)', () => {
