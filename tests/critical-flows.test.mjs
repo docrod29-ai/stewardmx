@@ -1261,6 +1261,13 @@ test('TX v364: alta de trasplante usa formulario simple (datos generales + enfer
   assert.ok(/window\._txGuardarSimple\s*=\s*async/.test(_idx), 'falta _txGuardarSimple');
   assert.ok(/_txGuardarSimple[\s\S]{0,400}await window\.guardar\(\)/.test(_idx), '_txGuardarSimple no reusa guardar() (esquema del censo)');
 });
+test('VER v365: el badge muestra la versión REAL del SW (leída de stewardmx-vXXX), no "v77" fijo', () => {
+  // El badge decía "v77" a mano y _APP_VER "v309" — ninguno coincidía con la versión real (stewardmx-v364+),
+  // causando confusión sobre qué versión corría. Ahora se lee de sw.js en runtime.
+  assert.ok(!_idx.includes('>v77</span>'), 'el badge sigue con el número fijo viejo v77');
+  assert.ok(_idx.includes('match(/stewardmx-v(\\d+)/)'), 'no parsea la versión real del SW desde sw.js');
+  assert.ok(_idx.includes("getElementById('app-ver-badge')") && _idx.includes('b.textContent = v'), 'no actualiza el badge con la versión real');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');

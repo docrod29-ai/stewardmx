@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v365 (Versión visible REAL — fin de la confusión del badge "v77")
+//  El médico vio "v77" en el badge y preguntó por qué, si la versión real era v364. Causa: el badge estaba
+//  ESCRITO A MANO ("v77", nunca se actualizaba) y _APP_VER (sello del Excel) quedó en "v309" — tres números
+//  distintos, ninguno = la versión real (stewardmx-vXXX). Fix: al cargar se LEE stewardmx-v(\d+) de sw.js
+//  (con cache-buster para ver el valor del servidor, no el cacheado) y se pinta en el badge + _APP_VER. Así
+//  el badge SIEMPRE refleja la versión desplegada de verdad, sin sincronizar a mano. +1 prueba (275).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v364 (Trasplante — alta SIMPLE: solo datos generales + la enfermedad)
 //  El médico pidió una manera DISTINTA de agregar al paciente en el módulo de Trasplante: sin el formulario
 //  completo (ATB, antibiograma, interconsulta, PROA). _txNuevoPaciente ahora abre un modal reducido —
@@ -975,7 +982,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v364';
+const CACHE = 'stewardmx-v365';
 const SHELL = [
   '/',
   '/index.html',

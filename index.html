@@ -21594,7 +21594,7 @@ window.exportarGoogleSheets=async(mode)=>{
 //  SheetJS, así que NO se pierde ninguna hoja/columna. Verificado en Node (datos intactos + XML
 //  con pane/autoFilter/dataValidation/conditionalFormatting/colorScale/dataBar/hyperlinks).
 // ═══════════════════════════════════════════════════════════════════════════════════════
-window._APP_VER='v309'; // versión visible (sello del Excel); sincronizar con CACHE de sw.js
+window._APP_VER='v365'; // valor inicial; en runtime se sobre-escribe con la versión REAL leída de sw.js (stewardmx-vXXX)
 // Renderiza una config de Chart.js a PNG base64 (alta resolución) para incrustar en el .xlsx.
 // Browser-only: si Chart/document no existen, devuelve null y el Excel se genera sin la imagen.
 function _chartToPNG(config, w, h){
@@ -31444,7 +31444,7 @@ input:focus,select:focus,textarea:focus{
           <div class="brand-name" id="top-hosp">—</div><span id="_sheets-sync-ind" style="font-size:10px;font-family:var(--mono);color:var(--teal);margin-left:8px;"></span>
           <div class="brand-sub" style="display:flex;align-items:center;gap:6px;">
             <span>StewardMX · PROA</span>
-            <span id="app-ver-badge" style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.5px;cursor:pointer;" onclick="forzarActualizacion()" title="Toca para buscar actualizaciones">v77</span>
+            <span id="app-ver-badge" style="font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.5px;cursor:pointer;" onclick="forzarActualizacion()" title="Toca para buscar actualizaciones">v365</span>
           </div>
         </div>
       </div>
@@ -32647,6 +32647,18 @@ if('serviceWorker' in navigator){
       document.addEventListener('visibilitychange', () => {
         if(document.visibilityState === 'visible') reg.update().catch(() => {});
       });
+
+      // ── v365: mostrar la versión REAL en el badge y el sello de Excel ──
+      // Antes el badge decía "v77" a mano (nunca se actualizaba) → confusión sobre qué versión corría.
+      // Ahora se LEE de stewardmx-vXXX en sw.js (con cache-buster para saltar el SW y ver el valor del
+      // servidor), así SIEMPRE refleja la versión realmente desplegada — sin sincronizar a mano nunca más.
+      fetch('/sw.js?ts=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.text())
+        .then(t => {
+          const m = t.match(/stewardmx-v(\d+)/);
+          if(m){ const v = 'v' + m[1]; window._APP_VER = v; const b = document.getElementById('app-ver-badge'); if(b) b.textContent = v; }
+        })
+        .catch(() => {});
 
     }catch(e){ console.warn('[SW] Error al registrar:', e.message); }
   });
