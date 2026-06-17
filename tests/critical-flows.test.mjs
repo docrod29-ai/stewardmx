@@ -1241,6 +1241,15 @@ test('CAMAS v362: los controles de editar el mapa de camas (±cama) solo se rend
   assert.ok(/window\._isAdmin\?'<button class="ic-btn del"[^]*?delCama/.test(_idx), 'el ✕ de cama libre (delCama) no está gateado por _isAdmin');
   assert.ok(/if\(window\._isAdmin\)html\+='<div class="add-cama-row"/.test(_idx), 'la fila "Nueva cama +" (addCama) no está gateada por _isAdmin');
 });
+test('PWA v363: actualización silenciosa — sin recarga automática que reinicie la pantalla', () => {
+  // Reportado varias veces: "me sale la ventana de actualizar SIEMPRE que entro y me reinicia la pantalla".
+  // Causa: 3 conductas intrusivas (auto-aplicar+reload al abrir, banner en updatefound, controllerchange→reload).
+  // Ahora el SW nuevo se activa EN SILENCIO (skipWaiting) y toma efecto en la próxima apertura, sin recargar.
+  assert.ok(!/addEventListener\('controllerchange'/.test(_idx), 'sigue el listener controllerchange→reload (reiniciaba la pantalla)');
+  assert.ok(!/_swAutoApply/.test(_idx), 'sigue el auto-aplicar+reload en cada apertura');
+  assert.ok(/_activarSilencioso/.test(_idx), 'falta la activación silenciosa del SW nuevo (skipWaiting sin recarga)');
+  assert.ok(/window\.forzarActualizacion\s*=/.test(_idx), 'se perdió la actualización manual por el badge de versión');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');

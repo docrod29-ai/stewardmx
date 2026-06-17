@@ -32575,9 +32575,11 @@ input:focus,select:focus,textarea:focus{
 
 <div class="toast" id="toast"></div>
 <script>
-// ── PWA: registro de Service Worker — actualización controlada por el médico ──
-// Bug 1 corregido: el confirm() fue reemplazado por un banner no-intrusivo.
-// El médico decide cuándo actualizar — nunca se interrumpe una consulta en curso.
+// ── PWA: registro de Service Worker — actualización SILENCIOSA (v363) ──
+// El SW nuevo se instala y activa en segundo plano (skipWaiting) y toma efecto en la PRÓXIMA apertura.
+// NUNCA se muestra banner ni se recarga la pantalla automáticamente (eso molestaba en CADA apertura y
+// "reiniciaba la pantalla"). Única vía manual para forzar la actualización ya: tocar el badge de versión
+// (window.forzarActualizacion).
 
 // Bug 3 corregido: _vaInit se inicializa SIEMPRE, independientemente de SW
 try{window._vaInit();}catch(_){}
@@ -32587,41 +32589,23 @@ if('serviceWorker' in navigator){
     try{
       const reg = await navigator.serviceWorker.register('/sw.js');
 
-      // ── SW ya en "waiting" al cargar: AUTO-APLICAR en silencio ──
-      // En una apertura fresca no hay trabajo que perder → aplicar la versión nueva sin banner (antes
-      // salía "Actualizar" en CADA apertura, molesto). Guarda anti-bucle: si ya lo intentamos hace <12 s
-      // y SIGUE en waiting (iOS a veces no activa skipWaiting), ofrecer el banner en vez de recargar en loop.
-      if(reg.waiting && navigator.serviceWorker.controller){
-        let _last=0; try{_last=+(sessionStorage.getItem('_swAutoApply')||0);}catch(_){}
-        if(Date.now()-_last > 12000){
-          try{sessionStorage.setItem('_swAutoApply',String(Date.now()));}catch(_){}
-          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-          setTimeout(()=>{try{location.reload();}catch(_){}}, 1500);
-          return;
-        }
-        window._pendingSW = reg.waiting;
-        _mostrarBannerActualizacion();
-      }
+      // ── SW ya en "waiting" al cargar: activarlo EN SILENCIO (sin recargar) ──
+      // Solo le decimos al SW nuevo que tome el control en segundo plano; NO recargamos la pantalla. La
+      // versión nueva queda lista para la próxima apertura. Esto elimina el "auto-aplicar + reload" que
+      // reiniciaba la app en cada entrada.
+      const _activarSilencioso = (sw) => { try{ if(sw) sw.postMessage({ type: 'SKIP_WAITING' }); }catch(_){} };
+      if(reg.waiting) _activarSilencioso(reg.waiting);
 
-      // ── Detectar actualización mientras la página está abierta ──
+      // ── Versión nueva detectada con la página abierta: activarla EN SILENCIO (sin banner, sin recarga) ──
       reg.addEventListener('updatefound', () => {
         const nw = reg.installing;
         if(!nw) return;
         nw.addEventListener('statechange', () => {
-          if(nw.state === 'installed' && navigator.serviceWorker.controller){
-            window._pendingSW = nw;
-            _mostrarBannerActualizacion();
-          }
+          if(nw.state === 'installed' && navigator.serviceWorker.controller) _activarSilencioso(nw);
         });
       });
-
-      // Cuando el SW nuevo activa (SKIP_WAITING) → recargar
-      let _swRefreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if(_swRefreshing) return;
-        _swRefreshing = true;
-        window.location.reload();
-      });
+      // IMPORTANTE: NO se escucha 'controllerchange' para recargar — ESO reiniciaba la pantalla. El SW nuevo
+      // queda activo en segundo plano y sirve los assets frescos en la siguiente carga natural de la app.
 
       // Buscar actualizaciones: al cargar + cada 30 min + al volver a la pestaña (visibilitychange).
       // (v358 lo bajó a 60s + focus y resultó MOLESTO — banner casi cada minuto. La auto-aplicación en

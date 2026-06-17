@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v363 (PWA — actualización SILENCIOSA: fin de "me reinicia la pantalla")
+//  Reporte real, repetido: "me sale la ventana de actualizar SIEMPRE que entro, le pico y me reinicia la
+//  pantalla". Mis intentos previos (v350/v351/v359) NO lo resolvieron. Causa raíz: 3 conductas intrusivas en
+//  el registro del SW (index.html) — (1) auto-aplicar+location.reload() al abrir si había SW en waiting,
+//  (2) banner "Actualizar" en updatefound, (3) addEventListener('controllerchange')→location.reload(). Como
+//  además yo desplegaba seguido, CADA apertura encontraba versión nueva → recarga/banner. Fix: el SW nuevo se
+//  activa EN SILENCIO (postMessage SKIP_WAITING, sin recargar) y toma efecto en la PRÓXIMA apertura natural.
+//  Se eliminó el listener controllerchange→reload y el auto-aplicar. El banner ya no se invoca. Única vía
+//  manual: tocar el badge de versión (forzarActualizacion, intacto). +1 prueba (273).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v362 (Camas — ocultar controles de editar mapa a los no-admin)
 //  Reporte real (capturas): a un Médico interconsultante le salía "Solo el administrador puede editar el
 //  mapa de camas" en cascada. Causa: el ✕ de cama libre (delCama, ~5519) y la fila "Nueva cama +" (addCama,
@@ -957,7 +967,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v362';
+const CACHE = 'stewardmx-v363';
 const SHELL = [
   '/',
   '/index.html',
