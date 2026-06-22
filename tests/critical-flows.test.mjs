@@ -1290,6 +1290,17 @@ test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizada
   assert.ok(_idx.includes('Asplenia / hipoesplenia') && _idx.includes('ENCAPSULADOS'), 'falta la recomendación de asplenia (encapsulados)');
   assert.ok(_idx.includes('Biológicos — tamizaje dirigido') && _idx.includes('anti-CD20'), 'falta el tamizaje dirigido de biológicos (anti-CD20/anti-TNF/JAK)');
 });
+test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
+  // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas
+  // se colapsan en la Valoración; su contenido se vuelve secciones colapsables (lazy) que reusan los motores.
+  const m=_idx.match(/const _TX_SUBTABS=\[[\s\S]*?\];/);
+  assert.ok(m, 'no se encontró _TX_SUBTABS');
+  assert.ok(m[0].includes("{id:'tx-valoracion'"), 'falta la sub-pestaña Valoración');
+  assert.ok(!m[0].includes("{id:'tx-pretx'") && !m[0].includes("{id:'tx-profilaxis'") && !m[0].includes("{id:'tx-cmv'"), 'las sub-pestañas viejas siguen como tabs (redundancia no eliminada)');
+  assert.ok(_idx.includes('function _txValDeepSectionsHTML') && /window\._txValDeep=function/.test(_idx), 'faltan las secciones "A detalle" embebidas');
+  assert.ok(/map=\{tipo:_renderTxTipo[\s\S]{0,300}p24:_renderTxProtocolo24h\}/.test(_idx), '_txValDeep no reusa los motores existentes (sin pérdida de funcionalidad)');
+  assert.ok(_idx.includes('id="hc-deep"') && /window\._txValRefreshDeep/.test(_idx), 'el flujo no embebe/actualiza las secciones a detalle');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');
@@ -1626,9 +1637,10 @@ test('TXMAP: inmunoClases parsea, cubre agentes críticos y todos tienen los 4 c
 });
 
 /* ═══════════ Trasplante Vacunación (v305, Fase 2b): subtab nuevo, conectado y renderiza ═══════════ */
-test('TXVAC: subtab Vacunación en _TX_SUBTABS y despachado', () => {
-  assert.ok(_idx.includes("{id:'tx-vacunas'"), 'no está en _TX_SUBTABS');
-  assert.ok(_idx.includes("sub==='tx-vacunas')cont.innerHTML=_renderTxVacunas(p)"), 'no despachado en renderTrasplantePac');
+test('TXVAC: Vacunación reutilizada y embebida en la Valoración (v368 colapsó las pestañas)', () => {
+  // v368: tx-vacunas dejó de ser pestaña; _renderTxVacunas ahora se reusa como sección "A detalle".
+  assert.ok(_idx.includes('vacunas:_renderTxVacunas'), 'la vacunación ya no se reutiliza en las secciones a detalle');
+  assert.ok(_idx.includes("deep('vacunas'"), 'la sección Vacunación no está embebida en el flujo de valoración');
 });
 test('TXVAC: _renderTxVacunas ejecuta y produce el contenido clave citado', () => {
   const s = _idx.indexOf('function _renderTxVacunas(p){');

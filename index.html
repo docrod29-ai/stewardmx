@@ -25860,16 +25860,11 @@ window._tx24hWordExport=function(){
 // Browsers block <script> execution when injected via innerHTML (HTML5 spec).
 // _execScripts clones each script node so the browser parses & runs it.
 function _execScripts(c){Array.from(c.querySelectorAll('script')).forEach(function(s){var n=document.createElement('script');n.textContent=s.textContent;c.appendChild(n);s.remove();});}
+// v368: UN SOLO flujo conectado. Las 8 sub-pestañas se colapsaron en la Valoración (historia → etapa+tipo →
+// recomendaciones + secciones "A detalle" colapsables). Los motores siguen vivos, ahora embebidos por
+// _txValDeep; el dispatch de abajo conserva sus ramas (inalcanzables como tab, pero las funciones se reusan).
 const _TX_SUBTABS=[
-  {id:'tx-valoracion',label:'🧬 Historia clínica ID'},
-  {id:'tx-tipo',label:'🫀 Tipo y Fase'},
-  {id:'tx-profilaxis',label:'💊 Profilaxis'},
-  {id:'tx-patogenos',label:'🦠 Patógenos por Fase'},
-  {id:'tx-cmv',label:'🔬 CMV Monitor'},
-  {id:'tx-neutropenia',label:'🩸 Neutropenia F.'},
-  {id:'tx-pretx',label:'📋 Pre-Trasplante'},
-  {id:'tx-vacunas',label:'💉 Vacunación'},
-  {id:'tx-24h',label:'🚨 Protocolo 24h'},
+  {id:'tx-valoracion',label:'🧬 Valoración'},
 ];
 // ══ v366: Valoración Infectológica del Inmunocomprometido — historia clínica dirigida + modos ══
 // Sub-pestaña "🧬 Historia clínica ID": historia dirigida + modo INICIAL (estudios a solicitar) y
@@ -25923,7 +25918,7 @@ function _renderTxValoracion(p){
   html+=`</div></div>`;
   html+=`<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.5;">${modo==='inicial'?'<b>INICIAL:</b> historia clínica dirigida + estudios a solicitar.':'<b>SEGUIMIENTO:</b> resultados de estudios + nota de evolución + recomendaciones.'} Para serologías D/R detalladas y recomendaciones por patógeno usa también <b>📋 Pre-Trasplante</b>.</div>`;
   html+=`<div class="fsec-t">Tipo de huésped inmunocomprometido</div>`;
-  html+=`<div style="margin:6px 0 4px;"><select id="hc_huesped" onchange="window._txSaveValoracion&&window._txSaveValoracion();window._txValRefreshEstudios&&window._txValRefreshEstudios();window._txValRecs&&window._txValRecs();" style="width:100%;max-width:420px;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;">`+hOpts.map(o=>`<option value="${E(o)}"${(s.hc_huesped||'')===o?' selected':''}>${E(o)}</option>`).join('')+`</select></div>`;
+  html+=`<div style="margin:6px 0 4px;"><select id="hc_huesped" onchange="window._txSaveValoracion&&window._txSaveValoracion();window._txValRefreshEstudios&&window._txValRefreshEstudios();window._txValRecs&&window._txValRecs();window._txValRefreshDeep&&window._txValRefreshDeep();" style="width:100%;max-width:420px;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;">`+hOpts.map(o=>`<option value="${E(o)}"${(s.hc_huesped||'')===o?' selected':''}>${E(o)}</option>`).join('')+`</select></div>`;
   html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;">`+tx('hc_fechatx','Fecha de TX / inicio de inmunosupresión','AAAA-MM-DD')+tx('hc_cd4','CD4 (si VIH, cels/µL)','ej. 350')+`</div>`;
   html+=`<div class="fsec-t" style="margin-top:14px;">📝 Historia clínica dirigida</div>`;
   html+=ta('hc_padecimiento','Padecimiento actual','Motivo, síntomas, tiempo de evolución…');
@@ -25946,6 +25941,9 @@ function _renderTxValoracion(p){
     html+=`<button onclick="window._txValGenerarNota&&window._txValGenerarNota()" class="btn-main" style="width:100%;margin-top:12px;background:rgba(0,212,168,.12);border:1px solid rgba(0,212,168,.4);color:var(--teal);">📄 Generar nota de seguimiento + recomendaciones</button>`;
   }
   html+=`<div id="hc-recs" style="margin-top:16px;"></div><div id="hc-nota" style="margin-top:14px;"></div>`;
+  html+=`<div class="fsec-t" style="margin-top:18px;">🔎 A detalle — todo aquí, sin pestañas sueltas</div>`;
+  html+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px;">Toca para expandir. Se ajusta a lo que elegiste arriba.</div>`;
+  html+=`<div id="hc-deep">`+_txValDeepSectionsHTML(s.hc_huesped||'')+`</div>`;
   setTimeout(function(){ try{ window._txValRecs&&window._txValRecs(); }catch(_){} },50);
   return html;
 }
@@ -26046,6 +26044,34 @@ window._txValGenerarNota=function(){
 };
 window._txValCopiarNota=function(){ const d=document.getElementById('hc-nota-doc'); if(!d)return; const t=d.innerText; if(navigator.clipboard){ navigator.clipboard.writeText(t).then(()=>{if(typeof toast==='function')toast('Nota copiada ✓','ok');}).catch(()=>{if(typeof toast==='function')toast('No se pudo copiar','am');}); } };
 window._txValImprimirNota=function(){ const d=document.getElementById('hc-nota-doc'); if(!d)return; const w=window.open('','_blank'); if(!w)return; w.document.write('<html><head><meta charset="utf-8"><title>Valoración infectológica</title></head><body style="font-family:system-ui,sans-serif;padding:24px;max-width:760px;margin:auto;">'+d.innerHTML+'</body></html>'); w.document.close(); w.focus(); w.print(); };
+// v368: "A detalle" — las antiguas 8 sub-pestañas ahora son secciones COLAPSABLES dentro del mismo flujo,
+// contextualizadas por el huésped, con carga perezosa (solo se renderiza la que el médico expande → aísla
+// riesgo y mantiene la pantalla ligera). Reusan los motores existentes (_renderTxTipo/Patogenos/Profilaxis/
+// PreTx/CMV/Neutropenia/Vacunas/Protocolo24h) → cero pérdida de funcionalidad, cero redundancia de pestañas.
+function _txValDeepSectionsHTML(hh){
+  const isSOT=/^SOT/.test(hh),isTCMH=/TCMH/.test(hh),isNeutro=/Neutropenia|Quimio/.test(hh),isTx=isSOT||isTCMH;
+  const deep=(key,titulo,cond)=> cond?'<details style="margin-bottom:8px;border:1px solid var(--brd2);border-radius:8px;overflow:hidden;"><summary onclick="setTimeout(function(){window._txValDeep&&window._txValDeep(\''+key+'\');},10)" style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--t2);background:var(--s2);">'+titulo+'</summary><div id="hc-deep-'+key+'" style="padding:10px 12px;"><div style="color:var(--t3);font-size:11px;">Cargando…</div></div></details>':'';
+  return deep('tipo','💊 Fármacos inmunosupresores y sus riesgos',true)
+    +deep('patogenos','🦠 Patógenos esperados por fase',isTx)
+    +deep('profilaxis','🛡️ Profilaxis (detalle)',true)
+    +deep('pretx','🔬 Serologías donante/receptor + recomendaciones por patógeno',isTx)
+    +deep('cmv','🧫 CMV — monitor',isTx)
+    +deep('neutro','🩸 Neutropenia febril',isTCMH||isNeutro)
+    +deep('vacunas','💉 Vacunación',true)
+    +deep('p24','🚨 Protocolo primeras 24 h',isTx);
+}
+window._txValRefreshDeep=function(){
+  const cont=document.getElementById('hc-deep'); if(!cont)return;
+  cont.innerHTML=_txValDeepSectionsHTML(document.getElementById('hc_huesped')?.value||'');
+};
+window._txValDeep=function(key){
+  const cont=document.getElementById('hc-deep-'+key); if(!cont||cont.dataset.loaded==='1')return;
+  const p=window._txCurrentPac; if(!p){cont.innerHTML='<div style="color:var(--t3);font-size:11px;">Selecciona un paciente.</div>';return;}
+  const map={tipo:_renderTxTipo,patogenos:_renderTxPatogenos,profilaxis:_renderTxProfilaxis,pretx:_renderTxPreTx,cmv:_renderTxCMV,neutro:_renderTxNeutropenia,vacunas:_renderTxVacunas,p24:_renderTxProtocolo24h};
+  const fn=map[key]; if(!fn)return;
+  try{ cont.innerHTML=fn(p); cont.dataset.loaded='1'; if(typeof _execScripts==='function')_execScripts(cont); }
+  catch(e){ cont.innerHTML='<div style="color:var(--red);font-size:11px;">No se pudo cargar esta sección: '+(e&&(e.message||e))+'</div>'; }
+};
 window.renderTrasplante=function(){
   // Poblar selector de pacientes
   const sel=document.getElementById('tx-pac-sel');

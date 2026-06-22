@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v368 (Inmunocomprometido — UN SOLO flujo conectado, sin pestañas sueltas)
+//  El Dr. pidió todo conectado en una pantalla, amigable, sin redundancia: historia clínica primero →
+//  seleccionas etapa (inicial/seguimiento) y tipo de huésped → todo lo demás se arma solo. Las 8 sub-
+//  pestañas (Tipo y Fase, Profilaxis, Patógenos, CMV, Neutropenia, Pre-TX, Vacunación, Protocolo 24h) se
+//  COLAPSARON en la Valoración: su contenido pasó a secciones "A detalle" colapsables, contextualizadas por
+//  el huésped y con CARGA PEREZOSA (solo se renderiza la que el médico expande → aísla riesgo, pantalla
+//  ligera). _txValDeep reusa los motores existentes (_renderTxTipo/Patogenos/Profilaxis/PreTx/CMV/
+//  Neutropenia/Vacunas/Protocolo24h) → cero pérdida de funcionalidad. +1 prueba (278).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v367 (Inmunocomprometido — auto-bridge + recomendaciones profundizadas)
 //  (1) Auto-bridge: al guardar el alta rápida (_txGuardarSimple), abre DIRECTO la 🧬 Historia clínica ID
 //  del paciente nuevo, ya seleccionado (antes había que ir a buscar la sub-pestaña). (2) _txValRecs
@@ -997,7 +1006,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v367';
+const CACHE = 'stewardmx-v368';
 const SHELL = [
   '/',
   '/index.html',
