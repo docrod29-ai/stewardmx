@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v367 (Inmunocomprometido — auto-bridge + recomendaciones profundizadas)
+//  (1) Auto-bridge: al guardar el alta rápida (_txGuardarSimple), abre DIRECTO la 🧬 Historia clínica ID
+//  del paciente nuevo, ya seleccionado (antes había que ir a buscar la sub-pestaña). (2) _txValRecs
+//  profundizado por evidencia: FASE post-TX → patógenos esperados (Fishman NEJM 2007), VIH por ESCALÓN de
+//  CD4 (PJP<200 · Toxo<100+CrAg · MAC<50, DHHS/IDSA OI), asplenia→encapsulados+vacunas, biológicos→tamizaje
+//  dirigido (anti-CD20→VHB, anti-TNF→TB, JAK→zóster). Dosis "validación clínica". +1 prueba (277).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v366 (Inmunocomprometido — valoración ID: historia dirigida + modos + nota)
 //  Pestaña "🫀 Trasplante" renombrada a "🛡️ Inmunocomprometido" (cubre SOT/TCMH/VIH/no-VIH). Nueva sub-
 //  pestaña "🧬 Historia clínica ID" (_renderTxValoracion): historia clínica DIRIGIDA + modo INICIAL
@@ -990,7 +997,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v366';
+const CACHE = 'stewardmx-v367';
 const SHELL = [
   '/',
   '/index.html',

@@ -1281,6 +1281,15 @@ test('INMUNO v366: valoración infectológica del inmunocomprometido (historia d
   assert.ok(/window\._txValGenerarNota/.test(_idx) && _idx.includes('txValoracion:data'), 'no genera/persiste la nota de valoración');
   assert.ok(_idx.includes("label:'Inmunocomprometido'"), 'la pestaña no se renombró a Inmunocomprometido');
 });
+test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
+  // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
+  assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');
+  // Profundización por evidencia:
+  assert.ok(_idx.includes('Fishman, NEJM 2007') && _idx.includes('Fase post-TX'), 'falta la fase post-TX (Fishman) en las recomendaciones');
+  assert.ok(_idx.includes('profilaxis de OI por CD4') && _idx.includes('MAC<50'), 'falta el escalón VIH por CD4 (PJP<200/Toxo<100/MAC<50)');
+  assert.ok(_idx.includes('Asplenia / hipoesplenia') && _idx.includes('ENCAPSULADOS'), 'falta la recomendación de asplenia (encapsulados)');
+  assert.ok(_idx.includes('Biológicos — tamizaje dirigido') && _idx.includes('anti-CD20'), 'falta el tamizaje dirigido de biológicos (anti-CD20/anti-TNF/JAK)');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');

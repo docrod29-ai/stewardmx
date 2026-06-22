@@ -25974,6 +25974,17 @@ window._txValRecs=function(){
   const rec=(ic,t,c,col)=>`<div style="border-left:4px solid ${col};background:var(--s2);border-radius:0 6px 6px 0;padding:9px 12px;margin-bottom:7px;"><div style="font-size:12px;font-weight:700;color:${col};">${ic} ${t}</div><div style="font-size:11px;color:var(--t2);line-height:1.45;margin-top:2px;">${c}</div></div>`;
   let h2='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:8px;">Recomendaciones (por evidencia)</div>';
   if(!h||h==='—'){ el.innerHTML=h2+'<div style="font-size:11px;color:var(--t3);padding:8px;">Selecciona el tipo de huésped para ver recomendaciones.</div>'; return; }
+  // Fase post-TX → patógenos esperados (Fishman, NEJM 2007). Solo SOT/TCMH y si hay fecha.
+  const fx=g('hc_fechatx');
+  if((isSOT||isTCMH)&&fx){
+    const d=Math.floor((Date.now()-new Date(fx).getTime())/86400000);
+    if(!isNaN(d)&&d>=0){
+      const faseTxt=isTCMH
+        ?(d<30?'preinjerto/neutropénica (&lt;30 d): bacterias (gram- y gram+), Candida, HSV':(d<100?'temprana (30–100 d): CMV, Aspergillus, PJP, adenovirus':'tardía (&gt;100 d): encapsulados (S. pneumoniae), VZV, CMV tardío, PJP — sobre todo con EICH crónica'))
+        :(d<30?'&lt;1 mes: nosocomiales/MDR, candidiasis, derivadas del donante, sitio quirúrgico, reactivación HSV':(d<180?'1–6 meses: oportunistas (PJP, CMV, hongos, reactivación BK/HBV/TB, Listeria, Nocardia)':'&gt;6 meses: comunitarias + oportunistas tardías si inmunosupresión alta'));
+      h2+=rec('🗓️','Fase post-TX (~'+d+' d) — patógenos esperados',faseTxt+'. [Fishman, NEJM 2007]','var(--purple)');
+    }
+  }
   const tienePJP=/tmp|smx|cotrimox|sulfa/.test(prof);
   if(isSOT||isTCMH||isVIH||isNeutro||isBio){
     if(tienePJP) h2+=rec('✅','Profilaxis PJP en curso','Continuar TMP-SMX mientras dure la inmunosupresión relevante. [AST-IDCOP 2019; DHHS/IDSA OI]','var(--teal)');
@@ -25983,10 +25994,18 @@ window._txValRecs=function(){
   if(/Pulmonar/.test(h)) h2+=rec('🍄','Antifúngica (trasplante pulmonar)','Cobertura anti-mohos según protocolo del centro (azol / anfotericina inhalada). [AST-IDCOP 2019]','var(--amber)');
   if(isTCMH&&isAllo) h2+=rec('🍄','Antifúngica (TCMH alogénico)','Anti-mohos (p. ej. posaconazol) durante neutropenia/EICH; galactomanano de vigilancia. [ECIL]','var(--amber)');
   if(isVIH){
-    if(!isNaN(cd4)&&cd4<200) h2+=rec('🔴','VIH con CD4<200','PJP + considerar profilaxis Toxoplasma (si IgG+) y, si CD4<50, MAC. Optimizar TAR. [DHHS/IDSA OI]','var(--red)');
-    else h2+=rec('🟡','VIH — optimizar TAR','Mantener TAR; CD4 y carga viral basales; vacunas inactivadas. [DHHS/IDSA OI]','var(--amber)');
+    if(!isNaN(cd4)){
+      const l=[];
+      if(cd4<200)l.push('<b>PJP</b> (TMP-SMX)');
+      if(cd4<100)l.push('<b>Toxoplasma</b> si IgG+ (TMP-SMX) + descartar criptococo (<b>CrAg</b> sérico)');
+      if(cd4<50)l.push('<b>MAC</b> (azitromicina) + vigilar CMV (fondo de ojo)');
+      if(l.length) h2+=rec('🔴','VIH — profilaxis de OI por CD4 ('+cd4+' cels/µL)','Indicadas: '+l.join('; ')+'. Iniciar/optimizar TAR; suspender profilaxis tras reconstitución sostenida. [DHHS/IDSA OI]','var(--red)');
+      else h2+=rec('🟢','VIH — CD4 '+cd4+' cels/µL','Sin profilaxis de OI por recuento (≥200). Mantener TAR + vacunas inactivadas; vivas según CD4. [DHHS/IDSA OI]','var(--teal)');
+    } else h2+=rec('🟡','VIH — falta CD4','Captura CD4 y carga viral: define el escalón de profilaxis (PJP<200, Toxo<100, MAC<50). [DHHS/IDSA OI]','var(--amber)');
   }
   if(isNeutro) h2+=rec('🩸','Neutropenia','Neutropenia febril: hemocultivos + beta-lactámico antipseudomonas en la 1ª hora; estratificar MASCC. [IDSA neutropenia febril]','var(--amber)');
+  if(/Asplenia/.test(h)) h2+=rec('🛡️','Asplenia / hipoesplenia','Riesgo de sepsis fulminante por ENCAPSULADOS (S. pneumoniae, H. influenzae b, N. meningitidis). Vacunar (neumococo, meningococo ACWY+B, Hib); antibiótico de reserva en casa + tarjeta de alerta; umbral bajo para empíricos ante fiebre. [IDSA/CDC]','var(--red)');
+  if(/Biológicos/.test(h)) h2+=rec('🧬','Biológicos — tamizaje dirigido','anti-CD20 (rituximab): tamizar VHB (HBsAg/anti-HBc) → entecavir/tenofovir profiláctico si anti-HBc+ (riesgo de reactivación). anti-TNF: descartar TB latente (IGRA) antes de iniciar. JAK: riesgo de zóster → vacuna recombinante (Shingrix). [AGA/AASLD; IDSA]','var(--amber)');
   h2+=rec('🧫','TB latente','Tamizar con IGRA + Rx tórax; si positivo, isoniazida (ojo interacción rifamicina-calcineurínicos). [OMS; AST-IDCOP 2019]','var(--blue)');
   h2+=rec('💉','Vacunación','Inactivadas indicadas (influenza, neumococo PCV+PPSV23, HepB, SARS-CoV-2). VIVAS contraindicadas bajo inmunosupresión (idealmente ≥4 sem pre-TX). [IDSA 2013; AST]','var(--blue)');
   h2+=rec('ℹ️','Dosis exactas','Las dosis/duración requieren validación clínica del Dr. según función renal, fármacos y protocolo local.','var(--t3)');
@@ -26106,9 +26125,18 @@ window._txGuardarSimple=async function(){
     toast('⚠ El nombre del paciente es obligatorio','rd');
     var n=document.getElementById('f-nom');if(n)n.focus();return;
   }
+  const _before=new Set(PACS.map(function(p){return p.id;}));
   try{ await window.guardar(); }catch(e){ toast('Error: '+(e&&e.message||e),'rd'); return; }
-  // guardar() ya cerró el modal y sincronizó; refrescar el selector de Trasplante cuando PACS llegue.
-  setTimeout(function(){ try{ if(typeof renderTrasplante==='function') renderTrasplante(); }catch(_){} },700);
+  // v367 auto-bridge: tras crear, llevar DIRECTO a la 🧬 Historia clínica ID del paciente nuevo, ya
+  // seleccionado. Así "agregar" y "valorar" son un solo camino (antes había que ir a buscar la pestaña).
+  setTimeout(function(){
+    try{
+      window._txSubTab='tx-valoracion';
+      if(typeof renderTrasplante==='function') renderTrasplante();
+      const nuevo=PACS.find(function(p){return !_before.has(p.id)&&(p.inmuno==='trasplante'||p.tipoVisita==='trasplante');});
+      if(nuevo){ const sel=document.getElementById('tx-pac-sel'); if(sel)sel.value=nuevo.id; if(typeof renderTrasplantePac==='function') renderTrasplantePac(nuevo.id); }
+    }catch(_){}
+  },900);
 };
 
 // v309: PERSISTENCIA de la evaluación Pre-Trasplante en el expediente del paciente.
