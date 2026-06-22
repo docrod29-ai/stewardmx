@@ -1327,6 +1327,31 @@ test('INMUNO v369: los 8 motores embebidos ("A detalle") CORREN sin tronar + aco
   assert.ok(_idx.includes("document.querySelectorAll('[id^=\"hc-deep-\"]')"), 'falta el acordeón (limpiar otras secciones) en _txValDeep');
   assert.ok(_idx.includes('<details name="hc-deep"'), 'falta el cierre exclusivo nativo (name) en las secciones a detalle');
 });
+test('INMUNO v370: historia completa (datos grales + antecedentes + estado IS) + ligado + Word — y CORREN', async () => {
+  // Feedback del Dr.: faltaban datos/antecedentes generales; no todos toman IS; ligar inicial→seguimiento;
+  // y un Word completísimo al final. Verificamos los campos + que render y Word corren sin tronar.
+  assert.ok(_idx.includes('🪪 Datos generales') && _idx.includes('Editar / completar datos'), 'falta el bloque de datos generales');
+  assert.ok(_idx.includes('Va a iniciar (pre-protocolo)') && _idx.includes('Ninguna / suspendida'), 'falta el estado de inmunosupresión (no todos la reciben)');
+  for (const f of ['hc_is_estado','hc_comorbilidades','hc_antec_quir','hc_habitos']) assert.ok(_idx.includes(f), 'falta campo nuevo de historia: ' + f);
+  assert.ok(_idx.includes('📋 Solicitado en la valoración inicial'), 'falta el ligado inicial→seguimiento');
+  assert.ok(/window\._txValWordExport=function/.test(_idx) && _idx.includes("type:'application/msword'") && _idx.includes("a.download='ValoracionID_'"), 'falta el Word completo de la valoración');
+  assert.ok(_idx.includes('const _TX_EST_LABELS='), 'falta el mapa de etiquetas de estudios compartido');
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración');
+  const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  assert.ok(start >= 0 && end > start, 'no se ubicó el bloque de valoración');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{} };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx);
+  const got = vm.runInContext(block + '\n;({render:_renderTxValoracion, word:window._txValWordExport})', ctx);
+  const p = { id:'p1', nombre:'Prueba', edad:55, sexo:'M', exp:'123', peso:70, servicio:'Trasplante', cama:'4', txValoracion:{ hc_huesped:'SOT — Renal', hc_est_cmv:'1' } };
+  let out;
+  assert.doesNotThrow(() => { out = got.render(p); }, '_renderTxValoracion truena');
+  assert.ok(typeof out === 'string' && out.length > 1000, '_renderTxValoracion no rinde');
+  assert.doesNotThrow(() => { got.word(); }, '_txValWordExport truena');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');

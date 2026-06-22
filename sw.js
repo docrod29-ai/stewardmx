@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v370 (Inmunocomprometido — valoración completísima + Word para el solicitante)
+//  Feedback del Dr.: (1) NO todos toman inmunosupresores → nuevo "¿Inmunosupresión hoy?" (en curso / va a
+//  iniciar / ninguna) que afina recomendaciones (pre-protocolo → tamizaje + vacunas vivas AHORA). (2) Faltaban
+//  DATOS GENERALES (chip editable del paciente) y ANTECEDENTES GENERALES (comorbilidades, quirúrgicos,
+//  hábitos). (3) LIGADO inicial→seguimiento: en seguimiento se muestra "Solicitado en la valoración inicial"
+//  (lee los hc_est_* guardados). (4) WORD COMPLETO (_txValWordExport, Blob application/msword) con TODO +
+//  recomendaciones citadas, para entregar a quien pidió la interconsulta. Verificado en sandbox: render
+//  (21k chars) y Word corren sin tronar. +1 prueba (280).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v369 (Inmunocomprometido — secciones "A detalle" BLINDADAS: cero fallas)
 //  El Dr. exigió que no fallen las secciones embebidas. (1) VERIFICADO: smoke-test en node:vm ejecuta los 8
 //  motores (_renderTxVacunas/Tipo/Profilaxis/Patogenos/CMV/PreTx/Neutropenia/Protocolo24h) con un paciente
@@ -1013,7 +1022,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v369';
+const CACHE = 'stewardmx-v370';
 const SHELL = [
   '/',
   '/index.html',

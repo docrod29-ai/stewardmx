@@ -25873,28 +25873,77 @@ const _TX_SUBTABS=[
 // Persiste en p.txValoracion (campos hc_*). Cubre SOT, TCMH, VIH y no-VIH (biológicos/corticoides/quimio).
 window._txValModo='inicial';
 window._txValSetModo=function(m){ window._txValModo=m; const p=window._txCurrentPac; renderTrasplantePac(p?p.id:''); };
+const _TX_EST_LABELS={
+  hc_est_bh:'Biometría hemática (neutrófilos/linfocitos absolutos)',hc_est_quim:'Química + función renal (TFG)',
+  hc_est_pfh:'Pruebas de función hepática',hc_est_vih:'VIH Ag/Ab 4ª gen',hc_est_hbv:'VHB: HBsAg + anti-HBc + anti-HBs',
+  hc_est_hcv:'Anti-VHC',hc_est_sifilis:'VDRL/RPR (sífilis)',hc_est_igra:'IGRA (TB latente) + Rx tórax',
+  hc_est_cmv:'CMV IgG (donante y receptor)',hc_est_ebv:'EBV VCA IgG (D/R)',hc_est_hsv:'HSV-1/2 IgG',hc_est_vzv:'VZV IgG',
+  hc_est_toxo:'Toxoplasma IgG',hc_est_chagas:'T. cruzi (Chagas) IgG',hc_est_strongy:'Strongyloides serología',
+  hc_est_g6pd:'G6PD (antes de TMP-SMX/dapsona)',hc_est_gm:'Galactomanano basal',hc_est_cultvig:'Cultivos de vigilancia',
+  hc_est_cd4:'CD4 + carga viral VIH',hc_est_crag:'Antígeno criptocócico (si CD4<100)',
+  hc_est_micosis:'Micosis endémica según región (Coccidioides/Histoplasma)'
+};
 function _txValEstudiosHTML(s){
   const E=window.escHtml||(x=>x);
   const h=s.hc_huesped||'';
   const isSOT=/^SOT/.test(h),isTCMH=/TCMH/.test(h),isVIH=/^VIH/.test(h),isNeutro=/Neutropenia|Quimio/.test(h);
-  let items=[
-    ['hc_est_bh','Biometría hemática (neutrófilos/linfocitos absolutos)'],
-    ['hc_est_quim','Química + función renal (TFG)'],['hc_est_pfh','Pruebas de función hepática'],
-    ['hc_est_vih','VIH Ag/Ab 4ª gen'],['hc_est_hbv','VHB: HBsAg + anti-HBc + anti-HBs'],
-    ['hc_est_hcv','Anti-VHC'],['hc_est_sifilis','VDRL/RPR (sífilis)'],
-    ['hc_est_igra','IGRA (TB latente) + Rx tórax'],
-  ];
-  if(isSOT||isTCMH)items=items.concat([
-    ['hc_est_cmv','CMV IgG (donante y receptor)'],['hc_est_ebv','EBV VCA IgG (D/R)'],
-    ['hc_est_hsv','HSV-1/2 IgG'],['hc_est_vzv','VZV IgG'],['hc_est_toxo','Toxoplasma IgG'],
-    ['hc_est_chagas','T. cruzi (Chagas) IgG'],['hc_est_strongy','Strongyloides serología'],
-    ['hc_est_g6pd','G6PD (antes de TMP-SMX/dapsona)'],
-  ]);
-  if(isTCMH||isNeutro)items=items.concat([['hc_est_gm','Galactomanano basal'],['hc_est_cultvig','Cultivos de vigilancia']]);
-  if(isVIH)items=items.concat([['hc_est_cd4','CD4 + carga viral VIH'],['hc_est_crag','Antígeno criptocócico (si CD4<100)']]);
-  items.push(['hc_est_micosis','Micosis endémica según región (Coccidioides/Histoplasma)']);
-  return items.map(([id,lbl])=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--t2);"><input type="checkbox" id="${id}"${s[id]==='1'?' checked':''} onchange="window._txSaveValoracion&&window._txSaveValoracion()" style="width:15px;height:15px;accent-color:var(--blue);">${E(lbl)}</label>`).join('');
+  let keys=['hc_est_bh','hc_est_quim','hc_est_pfh','hc_est_vih','hc_est_hbv','hc_est_hcv','hc_est_sifilis','hc_est_igra'];
+  if(isSOT||isTCMH)keys=keys.concat(['hc_est_cmv','hc_est_ebv','hc_est_hsv','hc_est_vzv','hc_est_toxo','hc_est_chagas','hc_est_strongy','hc_est_g6pd']);
+  if(isTCMH||isNeutro)keys=keys.concat(['hc_est_gm','hc_est_cultvig']);
+  if(isVIH)keys=keys.concat(['hc_est_cd4','hc_est_crag']);
+  keys.push('hc_est_micosis');
+  return keys.map(id=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--t2);"><input type="checkbox" id="${id}"${s[id]==='1'?' checked':''} onchange="window._txSaveValoracion&&window._txSaveValoracion()" style="width:15px;height:15px;accent-color:var(--blue);">${E(_TX_EST_LABELS[id]||id)}</label>`).join('');
 }
+// Word COMPLETO de la valoración — para entregar a quien pidió la interconsulta (todo + recomendaciones).
+window._txValWordExport=function(){
+  const p=window._txCurrentPac; if(!p){ if(typeof toast==='function')toast('Selecciona un paciente','am'); return; }
+  if(window._txValRecs)window._txValRecs();
+  const g=id=>(document.getElementById(id)?.value||'').trim();
+  const E=window.escHtml||(x=>x);
+  const modo=window._txValModo||'inicial';
+  const fecha=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const hosp=(window.HInfo&&HInfo.nombre)||'';
+  const medico=window._userName||'';
+  const solic=[]; document.querySelectorAll('#hc-estudios input[type=checkbox]:checked').forEach(cb=>{ const l=(cb.parentElement?.textContent||'').trim(); if(l)solic.push(l); });
+  let recsHtml=''; const rn=document.getElementById('hc-recs');
+  if(rn) rn.querySelectorAll('div[style*="border-left"]').forEach(d=>{ const dd=d.querySelectorAll('div'); const t=(dd[0]?.textContent||'').trim(); const c=(dd[1]?.textContent||'').trim(); if(t)recsHtml+='<li style="margin-bottom:4px;"><b>'+E(t)+'</b>'+(c?' — '+E(c):'')+'</li>'; });
+  const row=(lbl,val)=> val?'<tr><td style="border:1px solid #cfd8d4;padding:5px 8px;font-weight:bold;width:34%;vertical-align:top;background:#f3f8f6;">'+lbl+'</td><td style="border:1px solid #cfd8d4;padding:5px 8px;">'+E(val).replace(/\n/g,'<br>')+'</td></tr>':'';
+  const sec=(t,id)=>{ const x=g(id); return x?'<div style="margin:8px 0;"><div style="font-weight:bold;color:#1a6b52;font-size:13px;border-bottom:1px solid #ddd;padding-bottom:2px;">'+t+'</div><div style="font-size:12px;white-space:pre-wrap;margin-top:3px;">'+E(x)+'</div></div>':''; };
+  let w='<div style="font-family:Calibri,Arial,sans-serif;color:#111;">';
+  w+='<div style="text-align:center;border-bottom:2px solid #1a6b52;padding-bottom:8px;margin-bottom:12px;"><div style="font-size:17px;font-weight:bold;color:#1a6b52;">VALORACIÓN INFECTOLÓGICA · PACIENTE INMUNOCOMPROMETIDO</div><div style="font-size:12px;color:#555;">'+E(hosp)+' · '+fecha+' · '+(modo==='inicial'?'Valoración inicial':'Nota de seguimiento')+'</div></div>';
+  w+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;">';
+  w+=row('Paciente',(p.nombre||'')+(p.exp?'  (Exp. '+p.exp+')':''));
+  w+=row('Edad · Sexo · Peso',[p.edad?p.edad+' años':'',p.sexo||'',p.peso?p.peso+' kg':''].filter(Boolean).join(' · '));
+  w+=row('Servicio · Cama',[p.servicio||'',p.cama||''].filter(Boolean).join(' · '));
+  w+=row('Tipo de huésped',g('hc_huesped')!=='—'?g('hc_huesped'):'');
+  w+=row('Inmunosupresión',[g('hc_is_estado')&&g('hc_is_estado')!=='—'?g('hc_is_estado'):'',g('hc_fechatx')?'desde '+g('hc_fechatx'):'',g('hc_cd4')?'CD4 '+g('hc_cd4'):''].filter(Boolean).join(' · '));
+  w+='</table>';
+  w+=sec('Padecimiento actual / motivo de la interconsulta','hc_padecimiento');
+  w+=sec('Antecedentes y comorbilidades','hc_comorbilidades');
+  w+=sec('Antecedentes quirúrgicos / dispositivos','hc_antec_quir');
+  w+=sec('Hábitos','hc_habitos');
+  w+=sec('Esquema inmunosupresor','hc_inmunosup');
+  w+=sec('Profilaxis activas','hc_profilaxis');
+  w+=sec('Antecedentes infectológicos','hc_antecedentes');
+  w+=sec('Exposiciones epidemiológicas','hc_exposiciones');
+  w+=sec('Vacunación','hc_vacunas');
+  w+=sec('Exploración física','hc_exploracion');
+  w+=sec('Alergias','hc_alergias');
+  if(modo==='inicial' && solic.length) w+='<div style="margin:8px 0;"><div style="font-weight:bold;color:#1a6b52;font-size:13px;border-bottom:1px solid #ddd;">Estudios solicitados</div><ul style="font-size:12px;margin:4px 0 0 18px;">'+solic.map(e=>'<li>'+E(e)+'</li>').join('')+'</ul></div>';
+  if(modo==='seguimiento'){ w+=sec('Evolución desde la última valoración','hc_evolucion'); w+=sec('Resultados de estudios','hc_resultados'); }
+  if(recsHtml) w+='<div style="margin:10px 0;"><div style="font-weight:bold;color:#1a6b52;font-size:13px;border-bottom:1px solid #ddd;">Impresión y recomendaciones (PROA / Infectología)</div><ul style="font-size:12px;margin:4px 0 0 18px;">'+recsHtml+'</ul></div>';
+  w+='<div style="margin-top:14px;font-size:11px;color:#555;border-top:1px solid #ddd;padding-top:6px;">Documento de apoyo PROA / Infectología — NOM-004-SSA3. Las dosis y duraciones requieren validación clínica del médico tratante.'+(medico?'<br>Elaboró: '+E(medico):'')+'</div></div>';
+  const wordContent='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body>'+w+'</body></html>';
+  try{
+    const blob=new Blob([wordContent],{type:'application/msword'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='ValoracionID_'+((p.nombre||'paciente').replace(/\s+/g,'_'))+'_'+new Date().toISOString().slice(0,10)+'.doc';
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },1000);
+    if(typeof toast==='function')toast('📄 Word descargado','ok');
+    if(window._txSaveValoracion)window._txSaveValoracion();
+  }catch(e){ if(typeof toast==='function')toast('No se pudo generar el Word: '+(e.message||e),'rd'); }
+};
 window._txValRefreshEstudios=function(){
   const cont=document.getElementById('hc-estudios'); if(!cont)return;
   const p=window._txCurrentPac; const s=Object.assign({},p&&p.txValoracion||{});
@@ -25917,29 +25966,55 @@ function _renderTxValoracion(p){
   html+=`<button onclick="window._txValSetModo('seguimiento')" style="padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;${modo==='seguimiento'?'background:var(--teal);color:#031613;':'background:transparent;color:var(--t3);'}">🟢 Seguimiento</button>`;
   html+=`</div></div>`;
   html+=`<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.5;">${modo==='inicial'?'<b>INICIAL:</b> historia clínica dirigida + estudios a solicitar.':'<b>SEGUIMIENTO:</b> resultados de estudios + nota de evolución + recomendaciones.'} Para serologías D/R detalladas y recomendaciones por patógeno usa también <b>📋 Pre-Trasplante</b>.</div>`;
-  html+=`<div class="fsec-t">Tipo de huésped inmunocomprometido</div>`;
+  // Datos generales del paciente (de su expediente). "Editar/completar" abre el form del paciente (fuente única).
+  html+=`<div class="fsec-t">🪪 Datos generales</div>`;
+  html+=`<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 4px;font-size:12px;color:var(--t2);">`;
+  html+=`<span style="background:var(--s2);border-radius:6px;padding:6px 10px;"><b>${E(p.nombre||'—')}</b></span>`;
+  html+=`<span style="background:var(--s2);border-radius:6px;padding:6px 10px;">${p.edad?E(String(p.edad))+' a':'edad —'}</span>`;
+  html+=`<span style="background:var(--s2);border-radius:6px;padding:6px 10px;">${p.sexo?E(p.sexo):'sexo —'}</span>`;
+  html+=`<span style="background:var(--s2);border-radius:6px;padding:6px 10px;">${p.peso?E(String(p.peso))+' kg':'peso —'}</span>`;
+  html+=`<span style="background:var(--s2);border-radius:6px;padding:6px 10px;">Exp. ${p.exp?E(p.exp):'—'}</span>`;
+  html+=`<span style="background:var(--s2);border-radius:6px;padding:6px 10px;">${p.servicio?E(p.servicio):'servicio —'}${p.cama?' · '+E(p.cama):''}</span>`;
+  html+=`<button onclick="window.abrirEditar&&abrirEditar('${escJs(p.id)}')" style="background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.4);color:#a78bfa;border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;">✎ Editar / completar datos</button>`;
+  html+=`</div>`;
+  html+=`<div class="fsec-t" style="margin-top:14px;">Tipo de huésped inmunocomprometido</div>`;
   html+=`<div style="margin:6px 0 4px;"><select id="hc_huesped" onchange="window._txSaveValoracion&&window._txSaveValoracion();window._txValRefreshEstudios&&window._txValRefreshEstudios();window._txValRecs&&window._txValRecs();window._txValRefreshDeep&&window._txValRefreshDeep();" style="width:100%;max-width:420px;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;">`+hOpts.map(o=>`<option value="${E(o)}"${(s.hc_huesped||'')===o?' selected':''}>${E(o)}</option>`).join('')+`</select></div>`;
-  html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;">`+tx('hc_fechatx','Fecha de TX / inicio de inmunosupresión','AAAA-MM-DD')+tx('hc_cd4','CD4 (si VIH, cels/µL)','ej. 350')+`</div>`;
+  // Estado de inmunosupresión — NO todos la reciben (puede ir a iniciar o no tener).
+  const isEstOpts=['—','En curso','Va a iniciar (pre-protocolo)','Ninguna / suspendida'];
+  html+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px;">`;
+  html+=`<div><label style="display:block;font-size:11px;color:var(--t2);margin-bottom:4px;font-weight:600;">¿Inmunosupresión hoy?</label><select id="hc_is_estado" onchange="window._txSaveValoracion&&window._txSaveValoracion();window._txValRecs&&window._txValRecs();" style="width:100%;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;">`+isEstOpts.map(o=>`<option value="${E(o)}"${(s.hc_is_estado||'')===o?' selected':''}>${E(o)}</option>`).join('')+`</select></div>`;
+  html+=`<div><label style="display:block;font-size:11px;color:var(--t2);margin-bottom:4px;font-weight:600;">Fecha TX / inicio IS</label><input id="hc_fechatx" oninput="window._txSaveValoracion&&window._txSaveValoracion();window._txValRecs&&window._txValRecs();" placeholder="AAAA-MM-DD" value="${v('hc_fechatx')}" style="width:100%;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;box-sizing:border-box;"></div>`;
+  html+=`<div><label style="display:block;font-size:11px;color:var(--t2);margin-bottom:4px;font-weight:600;">CD4 (si VIH)</label><input id="hc_cd4" oninput="window._txSaveValoracion&&window._txSaveValoracion();window._txValRecs&&window._txValRecs();" placeholder="ej. 350" value="${v('hc_cd4')}" style="width:100%;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;box-sizing:border-box;"></div>`;
+  html+=`</div>`;
   html+=`<div class="fsec-t" style="margin-top:14px;">📝 Historia clínica dirigida</div>`;
-  html+=ta('hc_padecimiento','Padecimiento actual','Motivo, síntomas, tiempo de evolución…');
-  html+=ta('hc_inmunosup','Inmunosupresión actual (fármacos y dosis)','Esteroides, calcineurínico (tacro/ciclo), MMF/AZA, mTOR, biológicos, JAK…');
+  html+=ta('hc_padecimiento','Padecimiento actual / motivo de la interconsulta','Síntomas, tiempo de evolución, quién solicita…');
+  html+=ta('hc_comorbilidades','Antecedentes y comorbilidades (generales)','DM, ERC, hepatopatía, cardiopatía, neoplasia de base…');
+  html+=ta('hc_antec_quir','Antecedentes quirúrgicos / dispositivos','Cirugías, CVC/PICC, sonda, prótesis…');
+  html+=tx('hc_habitos','Hábitos (tabaquismo / alcohol / tóxicos)','—');
+  html+=ta('hc_inmunosup','Esquema inmunosupresor (fármacos y dosis)','Esteroides, tacro/ciclo, MMF/AZA, mTOR, biológicos, JAK… o "ninguno aún"');
   html+=ta('hc_profilaxis','Profilaxis activas','TMP-SMX (PJP), (val)ganciclovir/letermovir (CMV), antifúngico, INH (TB)…');
   html+=ta('hc_antecedentes','Antecedentes infectológicos','Infecciones previas, colonización/infección MDR (BLEE/CRE/MRSA/VRE), C. difficile, TB previa…');
-  html+=ta('hc_exposiciones','Exposiciones epidemiológicas','Residencia/viajes (zona endémica de micosis), animales, contactos TB, transfusiones…');
+  html+=ta('hc_exposiciones','Exposiciones epidemiológicas','Zona endémica de micosis, animales, contactos TB, viajes, transfusiones…');
   html+=tx('hc_vacunas','Estado de vacunación','Influenza, neumococo, HepB, SARS-CoV-2…');
   html+=ta('hc_exploracion','Exploración física dirigida','Catéter/piel, pulmón, abdomen, SNC, mucosas, focos…');
   html+=tx('hc_alergias','Alergias a antimicrobianos','—');
   if(modo==='inicial'){
     html+=`<div class="fsec-t" style="margin-top:14px;">🔬 Estudios a solicitar (sugeridos por huésped)</div>`;
-    html+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px;">Marca lo que vas a solicitar — la lista base se ajusta al tipo de huésped.</div>`;
+    html+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px;">Marca lo que vas a solicitar — se ajusta al huésped y se GUARDA para la visita de seguimiento.</div>`;
     html+=`<div id="hc-estudios">`+_txValEstudiosHTML(s)+`</div>`;
-    html+=`<button onclick="window._txValGenerarNota&&window._txValGenerarNota()" class="btn-main" style="width:100%;margin-top:12px;background:rgba(61,155,255,.12);border:1px solid rgba(61,155,255,.4);color:var(--blue);">📄 Generar nota de valoración inicial + órdenes</button>`;
   } else {
+    const _solic=Object.keys(s).filter(k=>k.indexOf('hc_est_')===0&&s[k]==='1');
+    if(_solic.length){
+      html+=`<div style="background:rgba(61,155,255,.06);border:1px solid rgba(61,155,255,.25);border-radius:8px;padding:10px 12px;margin:14px 0 10px;"><div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:4px;">📋 Solicitado en la valoración inicial</div><div style="font-size:11px;color:var(--t2);line-height:1.5;">`+_solic.map(k=>'• '+E(_TX_EST_LABELS[k]||k)).join('<br>')+`</div></div>`;
+    }
     html+=`<div class="fsec-t" style="margin-top:14px;">🟢 Resultados y evolución</div>`;
     html+=ta('hc_evolucion','Cambios / eventos desde la última nota','Fiebre, focos nuevos, ajustes de IS, episodios infecciosos…');
-    html+=ta('hc_resultados','Resultados de estudios solicitados','Serologías, cargas virales (CMV/EBV PCR), galactomanano, cultivos, imagen…');
-    html+=`<button onclick="window._txValGenerarNota&&window._txValGenerarNota()" class="btn-main" style="width:100%;margin-top:12px;background:rgba(0,212,168,.12);border:1px solid rgba(0,212,168,.4);color:var(--teal);">📄 Generar nota de seguimiento + recomendaciones</button>`;
+    html+=ta('hc_resultados','Resultados de los estudios solicitados','Serologías, cargas virales (CMV/EBV PCR), galactomanano, cultivos, imagen…');
   }
+  html+=`<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">`;
+  html+=`<button onclick="window._txValGenerarNota&&window._txValGenerarNota()" class="btn-main" style="flex:1;min-width:170px;background:rgba(0,212,168,.12);border:1px solid rgba(0,212,168,.4);color:var(--teal);">📄 ${modo==='inicial'?'Nota inicial + órdenes':'Nota de seguimiento'}</button>`;
+  html+=`<button onclick="window._txValWordExport&&window._txValWordExport()" class="btn-main" style="flex:1;min-width:170px;background:rgba(61,155,255,.12);border:1px solid rgba(61,155,255,.4);color:var(--blue);">⬇ Descargar Word completo</button>`;
+  html+=`</div>`;
   html+=`<div id="hc-recs" style="margin-top:16px;"></div><div id="hc-nota" style="margin-top:14px;"></div>`;
   html+=`<div class="fsec-t" style="margin-top:18px;">🔎 A detalle — todo aquí, sin pestañas sueltas</div>`;
   html+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px;">Toca para expandir. Se ajusta a lo que elegiste arriba.</div>`;
@@ -25972,6 +26047,10 @@ window._txValRecs=function(){
   const rec=(ic,t,c,col)=>`<div style="border-left:4px solid ${col};background:var(--s2);border-radius:0 6px 6px 0;padding:9px 12px;margin-bottom:7px;"><div style="font-size:12px;font-weight:700;color:${col};">${ic} ${t}</div><div style="font-size:11px;color:var(--t2);line-height:1.45;margin-top:2px;">${c}</div></div>`;
   let h2='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:8px;">Recomendaciones (por evidencia)</div>';
   if(!h||h==='—'){ el.innerHTML=h2+'<div style="font-size:11px;color:var(--t3);padding:8px;">Selecciona el tipo de huésped para ver recomendaciones.</div>'; return; }
+  // Estado de inmunosupresión (no todos la reciben).
+  const isEst=g('hc_is_estado');
+  if(isEst==='Va a iniciar (pre-protocolo)') h2+=rec('🧭','Pre-protocolo (aún SIN inmunosupresión)','Enfoque en TAMIZAJE basal (serologías D/R, TB latente, VHB, Strongyloides) y VACUNACIÓN: las vacunas VIVAS solo se pueden aplicar AHORA (≥4 sem antes de iniciar IS). Tratar TB latente / Strongyloides / Chagas ANTES de inmunosuprimir. [AST-IDCOP 2019]','var(--blue)');
+  else if(isEst==='Ninguna / suspendida') h2+=rec('ℹ️','Sin inmunosupresión activa','Menor riesgo de oportunistas sin IS; reevaluar la profilaxis según la causa de base y los planes de tratamiento. [AST-IDCOP 2019]','var(--t3)');
   // Fase post-TX → patógenos esperados (Fishman, NEJM 2007). Solo SOT/TCMH y si hay fecha.
   const fx=g('hc_fechatx');
   if((isSOT||isTCMH)&&fx){
