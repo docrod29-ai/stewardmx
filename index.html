@@ -26050,7 +26050,7 @@ window._txValImprimirNota=function(){ const d=document.getElementById('hc-nota-d
 // PreTx/CMV/Neutropenia/Vacunas/Protocolo24h) → cero pérdida de funcionalidad, cero redundancia de pestañas.
 function _txValDeepSectionsHTML(hh){
   const isSOT=/^SOT/.test(hh),isTCMH=/TCMH/.test(hh),isNeutro=/Neutropenia|Quimio/.test(hh),isTx=isSOT||isTCMH;
-  const deep=(key,titulo,cond)=> cond?'<details style="margin-bottom:8px;border:1px solid var(--brd2);border-radius:8px;overflow:hidden;"><summary onclick="setTimeout(function(){window._txValDeep&&window._txValDeep(\''+key+'\');},10)" style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--t2);background:var(--s2);">'+titulo+'</summary><div id="hc-deep-'+key+'" style="padding:10px 12px;"><div style="color:var(--t3);font-size:11px;">Cargando…</div></div></details>':'';
+  const deep=(key,titulo,cond)=> cond?'<details name="hc-deep" style="margin-bottom:8px;border:1px solid var(--brd2);border-radius:8px;overflow:hidden;"><summary onclick="setTimeout(function(){window._txValDeep&&window._txValDeep(\''+key+'\');},10)" style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--t2);background:var(--s2);">'+titulo+'</summary><div id="hc-deep-'+key+'" style="padding:10px 12px;"><div style="color:var(--t3);font-size:11px;">Cargando…</div></div></details>':'';
   return deep('tipo','💊 Fármacos inmunosupresores y sus riesgos',true)
     +deep('patogenos','🦠 Patógenos esperados por fase',isTx)
     +deep('profilaxis','🛡️ Profilaxis (detalle)',true)
@@ -26065,7 +26065,10 @@ window._txValRefreshDeep=function(){
   cont.innerHTML=_txValDeepSectionsHTML(document.getElementById('hc_huesped')?.value||'');
 };
 window._txValDeep=function(key){
-  const cont=document.getElementById('hc-deep-'+key); if(!cont||cont.dataset.loaded==='1')return;
+  const cont=document.getElementById('hc-deep-'+key); if(!cont)return;
+  // Acordeón: deja SOLO este motor en el DOM (limpia los demás) → mismo patrón que las pestañas, sin colisión de IDs.
+  document.querySelectorAll('[id^="hc-deep-"]').forEach(function(d){ if(d!==cont){ d.innerHTML='<div style="color:var(--t3);font-size:11px;">Cargando…</div>'; d.dataset.loaded=''; } });
+  if(cont.dataset.loaded==='1')return;
   const p=window._txCurrentPac; if(!p){cont.innerHTML='<div style="color:var(--t3);font-size:11px;">Selecciona un paciente.</div>';return;}
   const map={tipo:_renderTxTipo,patogenos:_renderTxPatogenos,profilaxis:_renderTxProfilaxis,pretx:_renderTxPreTx,cmv:_renderTxCMV,neutro:_renderTxNeutropenia,vacunas:_renderTxVacunas,p24:_renderTxProtocolo24h};
   const fn=map[key]; if(!fn)return;

@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v369 (Inmunocomprometido — secciones "A detalle" BLINDADAS: cero fallas)
+//  El Dr. exigió que no fallen las secciones embebidas. (1) VERIFICADO: smoke-test en node:vm ejecuta los 8
+//  motores (_renderTxVacunas/Tipo/Profilaxis/Patogenos/CMV/PreTx/Neutropenia/Protocolo24h) con un paciente
+//  simulado → los 8 rinden HTML sin lanzar excepción (prueba permanente en la suite). (2) BLINDAJE: _txValDeep
+//  ahora es ACORDEÓN — deja UN solo motor en el DOM a la vez (limpia los demás) + <details name="hc-deep">
+//  (cierre exclusivo nativo) → imposible colisión de IDs aunque se abran varias. +1 prueba (279).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v368 (Inmunocomprometido — UN SOLO flujo conectado, sin pestañas sueltas)
 //  El Dr. pidió todo conectado en una pantalla, amigable, sin redundancia: historia clínica primero →
 //  seleccionas etapa (inicial/seguimiento) y tipo de huésped → todo lo demás se arma solo. Las 8 sub-
@@ -1006,7 +1013,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v368';
+const CACHE = 'stewardmx-v369';
 const SHELL = [
   '/',
   '/index.html',

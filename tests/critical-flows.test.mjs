@@ -1301,6 +1301,32 @@ test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración
   assert.ok(/map=\{tipo:_renderTxTipo[\s\S]{0,300}p24:_renderTxProtocolo24h\}/.test(_idx), '_txValDeep no reusa los motores existentes (sin pérdida de funcionalidad)');
   assert.ok(_idx.includes('id="hc-deep"') && /window\._txValRefreshDeep/.test(_idx), 'el flujo no embebe/actualiza las secciones a detalle');
 });
+test('INMUNO v369: los 8 motores embebidos ("A detalle") CORREN sin tronar + acordeón anti-colisión', async () => {
+  // El Dr. exigió cero fallas. Ejecutamos los 8 render en un sandbox (node:vm) con dependencias stubeadas y
+  // un paciente simulado: ninguno debe lanzar excepción y todos deben rendir HTML. Además, _txValDeep deja
+  // SOLO un motor en el DOM a la vez (acordeón) → sin colisión de IDs si se abren varias secciones.
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('function _renderTxVacunas(p){');
+  const end = _idx.indexOf('\nwindow.sfx=sfx;');
+  assert.ok(start >= 0 && end > start, 'no se ubicó el bloque de motores');
+  const block = _idx.slice(start, end);
+  let STUB;
+  STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const docStub = { getElementById:()=>null, querySelector:()=>null, querySelectorAll:()=>[], createElement:()=>({style:{},dataset:{},appendChild(){},setAttribute(){},addEventListener(){}}), body:{appendChild(){}} };
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl, document:docStub, window:{}, navigator:{}, location:{href:''} };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx);
+  const engines = vm.runInContext(block + '\n;({_renderTxVacunas,_renderTxTipo,_renderTxProfilaxis,_renderTxPatogenos,_renderTxCMV,_renderTxPreTx,_renderTxNeutropenia,_renderTxProtocolo24h})', ctx);
+  const mockP = { id:'p1', nombre:'Prueba', edad:55, sexo:'M', exp:'12345', servicio:'Trasplante', cama:'4', inmuno:'trasplante', tipoVisita:'trasplante', organismo:'', dx:'Trasplante renal', atbList:[], abg:{}, muestras:[], eventos:[], txPretx:{}, txValoracion:{hc_huesped:'SOT — Renal'}, riesgo:'alto', inicio:'2026-02-01' };
+  for (const [name, fn] of Object.entries(engines)) {
+    assert.equal(typeof fn, 'function', name + ' no es función');
+    let out;
+    assert.doesNotThrow(() => { out = fn(mockP); }, name + ' truena al renderizar embebido');
+    assert.ok(typeof out === 'string' && out.length > 0, name + ' no rinde HTML');
+  }
+  assert.ok(_idx.includes("document.querySelectorAll('[id^=\"hc-deep-\"]')"), 'falta el acordeón (limpiar otras secciones) en _txValDeep');
+  assert.ok(_idx.includes('<details name="hc-deep"'), 'falta el cierre exclusivo nativo (name) en las secciones a detalle');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');
