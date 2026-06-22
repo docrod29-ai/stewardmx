@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v366 (Inmunocomprometido — valoración ID: historia dirigida + modos + nota)
+//  Pestaña "🫀 Trasplante" renombrada a "🛡️ Inmunocomprometido" (cubre SOT/TCMH/VIH/no-VIH). Nueva sub-
+//  pestaña "🧬 Historia clínica ID" (_renderTxValoracion): historia clínica DIRIGIDA + modo INICIAL
+//  (checklist de estudios a solicitar por tipo de huésped) y SEGUIMIENTO (resultados + nota de evolución),
+//  con recomendaciones por evidencia (AST-IDCOP 2019, IDSA, ECIL, TTS/Kotton 2018, AASLD, DHHS/IDSA OI) y
+//  generación de nota (copiar/imprimir, NOM-004). Persiste en p.txValoracion (campos hc_*). ADITIVO: el
+//  Pre-TX (serologías D/R + recs por patógeno + Word) queda intacto y enlazado. +1 prueba (276).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v365 (Versión visible REAL — fin de la confusión del badge "v77")
 //  El médico vio "v77" en el badge y preguntó por qué, si la versión real era v364. Causa: el badge estaba
 //  ESCRITO A MANO ("v77", nunca se actualizaba) y _APP_VER (sello del Excel) quedó en "v309" — tres números
@@ -982,7 +990,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v365';
+const CACHE = 'stewardmx-v366';
 const SHELL = [
   '/',
   '/index.html',

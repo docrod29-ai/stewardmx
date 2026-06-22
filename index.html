@@ -6673,7 +6673,7 @@ function abrirFormPaciente(p){
     {v:'seguimiento',icon:'📋',label:'Seguimiento diario',color:'var(--teal)',bg:'rgba(0,212,168,.12)',brd:'rgba(0,212,168,.4)'},
     {v:'interconsulta',icon:'🔄',label:'Interconsulta',color:'var(--blue)',bg:'rgba(61,155,255,.12)',brd:'rgba(61,155,255,.4)'},
     {v:'urgente',icon:'🚨',label:'Urgente / Nuevo',color:'var(--red)',bg:'rgba(255,77,109,.12)',brd:'rgba(255,77,109,.4)'},
-    {v:'trasplante',icon:'🫀',label:'Trasplante / Hemato',color:'var(--purple)',bg:'rgba(167,139,250,.12)',brd:'rgba(167,139,250,.4)'},
+    {v:'trasplante',icon:'🛡️',label:'Inmunocomprometido',color:'var(--purple)',bg:'rgba(167,139,250,.12)',brd:'rgba(167,139,250,.4)'},
   ];
   html+='<div class="fsec-t">🏥 Tipo de Visita</div>';
   html+='<div class="frow2" style="margin-bottom:4px;"><div class="fg" style="grid-column:1/-1;">';
@@ -12030,7 +12030,7 @@ window.abrirMobMas=function(btn){
     {icon:'📊',label:'Analítica',view:'analytics',plan:true},
     {icon:'🔔',label:'Alertas 24h',view:'alertas24h',admin:true},
     {icon:'🔀',label:'Flujograma',view:'flujograma',always:true},
-    {icon:'🫀',label:'Trasplante',view:'trasplante',always:true},
+    {icon:'🛡️',label:'Inmunocomprometido',view:'trasplante',always:true},
     {icon:'🧪',label:'Farmacia',view:'farmacia',farm:true},
     {icon:'🔴',label:'Aut. ATB',view:'atb',atb:true},
     {icon:'👥',label:'Usuarios',view:'usuarios',admin:true},
@@ -25861,6 +25861,7 @@ window._tx24hWordExport=function(){
 // _execScripts clones each script node so the browser parses & runs it.
 function _execScripts(c){Array.from(c.querySelectorAll('script')).forEach(function(s){var n=document.createElement('script');n.textContent=s.textContent;c.appendChild(n);s.remove();});}
 const _TX_SUBTABS=[
+  {id:'tx-valoracion',label:'🧬 Historia clínica ID'},
   {id:'tx-tipo',label:'🫀 Tipo y Fase'},
   {id:'tx-profilaxis',label:'💊 Profilaxis'},
   {id:'tx-patogenos',label:'🦠 Patógenos por Fase'},
@@ -25870,6 +25871,162 @@ const _TX_SUBTABS=[
   {id:'tx-vacunas',label:'💉 Vacunación'},
   {id:'tx-24h',label:'🚨 Protocolo 24h'},
 ];
+// ══ v366: Valoración Infectológica del Inmunocomprometido — historia clínica dirigida + modos ══
+// Sub-pestaña "🧬 Historia clínica ID": historia dirigida + modo INICIAL (estudios a solicitar) y
+// SEGUIMIENTO (resultados + nota), con recomendaciones por evidencia (AST-IDCOP / IDSA / ECIL / TTS-Kotton /
+// AASLD / DHHS-IDSA OI). ADITIVO: el Pre-TX (serologías D/R + recs por patógeno + Word) queda intacto.
+// Persiste en p.txValoracion (campos hc_*). Cubre SOT, TCMH, VIH y no-VIH (biológicos/corticoides/quimio).
+window._txValModo='inicial';
+window._txValSetModo=function(m){ window._txValModo=m; const p=window._txCurrentPac; renderTrasplantePac(p?p.id:''); };
+function _txValEstudiosHTML(s){
+  const E=window.escHtml||(x=>x);
+  const h=s.hc_huesped||'';
+  const isSOT=/^SOT/.test(h),isTCMH=/TCMH/.test(h),isVIH=/^VIH/.test(h),isNeutro=/Neutropenia|Quimio/.test(h);
+  let items=[
+    ['hc_est_bh','Biometría hemática (neutrófilos/linfocitos absolutos)'],
+    ['hc_est_quim','Química + función renal (TFG)'],['hc_est_pfh','Pruebas de función hepática'],
+    ['hc_est_vih','VIH Ag/Ab 4ª gen'],['hc_est_hbv','VHB: HBsAg + anti-HBc + anti-HBs'],
+    ['hc_est_hcv','Anti-VHC'],['hc_est_sifilis','VDRL/RPR (sífilis)'],
+    ['hc_est_igra','IGRA (TB latente) + Rx tórax'],
+  ];
+  if(isSOT||isTCMH)items=items.concat([
+    ['hc_est_cmv','CMV IgG (donante y receptor)'],['hc_est_ebv','EBV VCA IgG (D/R)'],
+    ['hc_est_hsv','HSV-1/2 IgG'],['hc_est_vzv','VZV IgG'],['hc_est_toxo','Toxoplasma IgG'],
+    ['hc_est_chagas','T. cruzi (Chagas) IgG'],['hc_est_strongy','Strongyloides serología'],
+    ['hc_est_g6pd','G6PD (antes de TMP-SMX/dapsona)'],
+  ]);
+  if(isTCMH||isNeutro)items=items.concat([['hc_est_gm','Galactomanano basal'],['hc_est_cultvig','Cultivos de vigilancia']]);
+  if(isVIH)items=items.concat([['hc_est_cd4','CD4 + carga viral VIH'],['hc_est_crag','Antígeno criptocócico (si CD4<100)']]);
+  items.push(['hc_est_micosis','Micosis endémica según región (Coccidioides/Histoplasma)']);
+  return items.map(([id,lbl])=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--t2);"><input type="checkbox" id="${id}"${s[id]==='1'?' checked':''} onchange="window._txSaveValoracion&&window._txSaveValoracion()" style="width:15px;height:15px;accent-color:var(--blue);">${E(lbl)}</label>`).join('');
+}
+window._txValRefreshEstudios=function(){
+  const cont=document.getElementById('hc-estudios'); if(!cont)return;
+  const p=window._txCurrentPac; const s=Object.assign({},p&&p.txValoracion||{});
+  s.hc_huesped=document.getElementById('hc_huesped')?.value||s.hc_huesped||'';
+  document.querySelectorAll('#hc-estudios input[type=checkbox]').forEach(cb=>{ s[cb.id]=cb.checked?'1':''; });
+  cont.innerHTML=_txValEstudiosHTML(s);
+};
+function _renderTxValoracion(p){
+  if(!p) return '<div style="padding:30px;text-align:center;color:var(--t3);font-size:13px;">Selecciona primero un paciente para iniciar su valoración infectológica.</div>';
+  const s=p.txValoracion||{}; const modo=window._txValModo||'inicial';
+  const E=window.escHtml||(x=>x); const v=id=>E(s[id]||'');
+  const ta=(id,lbl,ph)=>`<div style="margin-bottom:10px;"><label style="display:block;font-size:11px;color:var(--t2);margin-bottom:4px;font-weight:600;">${lbl}</label><textarea id="${id}" oninput="window._txSaveValoracion&&window._txSaveValoracion()" placeholder="${ph||''}" style="width:100%;min-height:58px;resize:vertical;padding:8px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;box-sizing:border-box;font-family:inherit;">${v(id)}</textarea></div>`;
+  const tx=(id,lbl,ph)=>`<div style="margin-bottom:10px;"><label style="display:block;font-size:11px;color:var(--t2);margin-bottom:4px;font-weight:600;">${lbl}</label><input id="${id}" oninput="window._txSaveValoracion&&window._txSaveValoracion()" placeholder="${ph||''}" value="${v(id)}" style="width:100%;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;box-sizing:border-box;"></div>`;
+  const hOpts=['—','SOT — Renal','SOT — Hepático','SOT — Cardíaco','SOT — Pulmonar','SOT — Páncreas','SOT — Intestino/Multivisceral','TCMH autólogo','TCMH alogénico relacionado','TCMH alogénico no relacionado','TCMH haploidéntico','TCMH cordón','VIH','Biológicos (anti-CD20/anti-TNF/JAK)','Corticoides crónicos','Quimioterapia/Neutropenia','Asplenia','Inmunodeficiencia primaria'];
+  let html='';
+  html+=`<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">`;
+  html+=`<div style="font-size:14px;font-weight:700;color:var(--purple);">🧬 Valoración Infectológica del Inmunocomprometido</div>`;
+  html+=`<div style="display:flex;gap:4px;background:var(--s2);border:1px solid var(--brd2);border-radius:8px;padding:3px;">`;
+  html+=`<button onclick="window._txValSetModo('inicial')" style="padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;${modo==='inicial'?'background:var(--blue);color:#031018;':'background:transparent;color:var(--t3);'}">🔵 Inicial</button>`;
+  html+=`<button onclick="window._txValSetModo('seguimiento')" style="padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;${modo==='seguimiento'?'background:var(--teal);color:#031613;':'background:transparent;color:var(--t3);'}">🟢 Seguimiento</button>`;
+  html+=`</div></div>`;
+  html+=`<div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.5;">${modo==='inicial'?'<b>INICIAL:</b> historia clínica dirigida + estudios a solicitar.':'<b>SEGUIMIENTO:</b> resultados de estudios + nota de evolución + recomendaciones.'} Para serologías D/R detalladas y recomendaciones por patógeno usa también <b>📋 Pre-Trasplante</b>.</div>`;
+  html+=`<div class="fsec-t">Tipo de huésped inmunocomprometido</div>`;
+  html+=`<div style="margin:6px 0 4px;"><select id="hc_huesped" onchange="window._txSaveValoracion&&window._txSaveValoracion();window._txValRefreshEstudios&&window._txValRefreshEstudios();window._txValRecs&&window._txValRecs();" style="width:100%;max-width:420px;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;">`+hOpts.map(o=>`<option value="${E(o)}"${(s.hc_huesped||'')===o?' selected':''}>${E(o)}</option>`).join('')+`</select></div>`;
+  html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;">`+tx('hc_fechatx','Fecha de TX / inicio de inmunosupresión','AAAA-MM-DD')+tx('hc_cd4','CD4 (si VIH, cels/µL)','ej. 350')+`</div>`;
+  html+=`<div class="fsec-t" style="margin-top:14px;">📝 Historia clínica dirigida</div>`;
+  html+=ta('hc_padecimiento','Padecimiento actual','Motivo, síntomas, tiempo de evolución…');
+  html+=ta('hc_inmunosup','Inmunosupresión actual (fármacos y dosis)','Esteroides, calcineurínico (tacro/ciclo), MMF/AZA, mTOR, biológicos, JAK…');
+  html+=ta('hc_profilaxis','Profilaxis activas','TMP-SMX (PJP), (val)ganciclovir/letermovir (CMV), antifúngico, INH (TB)…');
+  html+=ta('hc_antecedentes','Antecedentes infectológicos','Infecciones previas, colonización/infección MDR (BLEE/CRE/MRSA/VRE), C. difficile, TB previa…');
+  html+=ta('hc_exposiciones','Exposiciones epidemiológicas','Residencia/viajes (zona endémica de micosis), animales, contactos TB, transfusiones…');
+  html+=tx('hc_vacunas','Estado de vacunación','Influenza, neumococo, HepB, SARS-CoV-2…');
+  html+=ta('hc_exploracion','Exploración física dirigida','Catéter/piel, pulmón, abdomen, SNC, mucosas, focos…');
+  html+=tx('hc_alergias','Alergias a antimicrobianos','—');
+  if(modo==='inicial'){
+    html+=`<div class="fsec-t" style="margin-top:14px;">🔬 Estudios a solicitar (sugeridos por huésped)</div>`;
+    html+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px;">Marca lo que vas a solicitar — la lista base se ajusta al tipo de huésped.</div>`;
+    html+=`<div id="hc-estudios">`+_txValEstudiosHTML(s)+`</div>`;
+    html+=`<button onclick="window._txValGenerarNota&&window._txValGenerarNota()" class="btn-main" style="width:100%;margin-top:12px;background:rgba(61,155,255,.12);border:1px solid rgba(61,155,255,.4);color:var(--blue);">📄 Generar nota de valoración inicial + órdenes</button>`;
+  } else {
+    html+=`<div class="fsec-t" style="margin-top:14px;">🟢 Resultados y evolución</div>`;
+    html+=ta('hc_evolucion','Cambios / eventos desde la última nota','Fiebre, focos nuevos, ajustes de IS, episodios infecciosos…');
+    html+=ta('hc_resultados','Resultados de estudios solicitados','Serologías, cargas virales (CMV/EBV PCR), galactomanano, cultivos, imagen…');
+    html+=`<button onclick="window._txValGenerarNota&&window._txValGenerarNota()" class="btn-main" style="width:100%;margin-top:12px;background:rgba(0,212,168,.12);border:1px solid rgba(0,212,168,.4);color:var(--teal);">📄 Generar nota de seguimiento + recomendaciones</button>`;
+  }
+  html+=`<div id="hc-recs" style="margin-top:16px;"></div><div id="hc-nota" style="margin-top:14px;"></div>`;
+  setTimeout(function(){ try{ window._txValRecs&&window._txValRecs(); }catch(_){} },50);
+  return html;
+}
+window._txSaveValoracion=(function(){
+  var _t=null;
+  return function(){
+    var p=window._txCurrentPac; if(!p||!p.id)return;
+    var data={};
+    document.querySelectorAll('[id^="hc_"]').forEach(function(el){
+      if(el.type==='checkbox'){ if(el.checked)data[el.id]='1'; }
+      else { var val=(el.value||'').trim(); if(val!=='')data[el.id]=val; }
+    });
+    clearTimeout(_t);
+    _t=setTimeout(function(){
+      updateDoc(doc(db,..._pacPath(),p.id),{txValoracion:data,txValoracionAt:new Date().toISOString()})
+        .then(function(){ p.txValoracion=data; var pi=PACS.find(function(x){return x.id===p.id;}); if(pi)pi.txValoracion=data; })
+        .catch(function(e){ console.warn('[txValoracion save]',e); });
+    },1000);
+  };
+})();
+window._txValRecs=function(){
+  const el=document.getElementById('hc-recs'); if(!el)return;
+  const g=id=>(document.getElementById(id)?.value||'');
+  const h=g('hc_huesped'),prof=(g('hc_profilaxis')||'').toLowerCase(),cd4=parseFloat(g('hc_cd4')||'NaN');
+  const isSOT=/^SOT/.test(h),isTCMH=/TCMH/.test(h),isAllo=/alog|haplo|cord/i.test(h),isVIH=/^VIH/.test(h),isNeutro=/Neutropenia|Quimio/.test(h),isBio=/Biológicos|Corticoides/.test(h);
+  const rec=(ic,t,c,col)=>`<div style="border-left:4px solid ${col};background:var(--s2);border-radius:0 6px 6px 0;padding:9px 12px;margin-bottom:7px;"><div style="font-size:12px;font-weight:700;color:${col};">${ic} ${t}</div><div style="font-size:11px;color:var(--t2);line-height:1.45;margin-top:2px;">${c}</div></div>`;
+  let h2='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:8px;">Recomendaciones (por evidencia)</div>';
+  if(!h||h==='—'){ el.innerHTML=h2+'<div style="font-size:11px;color:var(--t3);padding:8px;">Selecciona el tipo de huésped para ver recomendaciones.</div>'; return; }
+  const tienePJP=/tmp|smx|cotrimox|sulfa/.test(prof);
+  if(isSOT||isTCMH||isVIH||isNeutro||isBio){
+    if(tienePJP) h2+=rec('✅','Profilaxis PJP en curso','Continuar TMP-SMX mientras dure la inmunosupresión relevante. [AST-IDCOP 2019; DHHS/IDSA OI]','var(--teal)');
+    else h2+=rec('💊','Profilaxis PJP indicada','Falta TMP-SMX. Indicada en SOT, TCMH alogénico, VIH con CD4<200 y corticoides ≥20 mg/d ≥4 sem o biológicos de alto riesgo. Si G6PD deficiente: atovacuona. Dosis: validación clínica. [AST-IDCOP 2019; DHHS/IDSA]','var(--blue)');
+  }
+  if(isSOT||isTCMH) h2+=rec('🔬','CMV — estratificar por D/R','Definir serostatus donante/receptor (D+/R- = máximo riesgo). Profilaxis (valganciclovir; letermovir en TCMH) vs estrategia anticipada por PCR según tipo. Detalle en Pre-Trasplante. [TTS/Kotton 2018]','var(--amber)');
+  if(/Pulmonar/.test(h)) h2+=rec('🍄','Antifúngica (trasplante pulmonar)','Cobertura anti-mohos según protocolo del centro (azol / anfotericina inhalada). [AST-IDCOP 2019]','var(--amber)');
+  if(isTCMH&&isAllo) h2+=rec('🍄','Antifúngica (TCMH alogénico)','Anti-mohos (p. ej. posaconazol) durante neutropenia/EICH; galactomanano de vigilancia. [ECIL]','var(--amber)');
+  if(isVIH){
+    if(!isNaN(cd4)&&cd4<200) h2+=rec('🔴','VIH con CD4<200','PJP + considerar profilaxis Toxoplasma (si IgG+) y, si CD4<50, MAC. Optimizar TAR. [DHHS/IDSA OI]','var(--red)');
+    else h2+=rec('🟡','VIH — optimizar TAR','Mantener TAR; CD4 y carga viral basales; vacunas inactivadas. [DHHS/IDSA OI]','var(--amber)');
+  }
+  if(isNeutro) h2+=rec('🩸','Neutropenia','Neutropenia febril: hemocultivos + beta-lactámico antipseudomonas en la 1ª hora; estratificar MASCC. [IDSA neutropenia febril]','var(--amber)');
+  h2+=rec('🧫','TB latente','Tamizar con IGRA + Rx tórax; si positivo, isoniazida (ojo interacción rifamicina-calcineurínicos). [OMS; AST-IDCOP 2019]','var(--blue)');
+  h2+=rec('💉','Vacunación','Inactivadas indicadas (influenza, neumococo PCV+PPSV23, HepB, SARS-CoV-2). VIVAS contraindicadas bajo inmunosupresión (idealmente ≥4 sem pre-TX). [IDSA 2013; AST]','var(--blue)');
+  h2+=rec('ℹ️','Dosis exactas','Las dosis/duración requieren validación clínica del Dr. según función renal, fármacos y protocolo local.','var(--t3)');
+  el.innerHTML=h2;
+};
+window._txValGenerarNota=function(){
+  const p=window._txCurrentPac; if(!p){if(typeof toast==='function')toast('Selecciona un paciente','am');return;}
+  const out=document.getElementById('hc-nota'); if(!out)return;
+  const modo=window._txValModo||'inicial';
+  const g=id=>(document.getElementById(id)?.value||'').trim();
+  const E=window.escHtml||(x=>x);
+  const fecha=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const huesped=g('hc_huesped');
+  let estudios=[];
+  document.querySelectorAll('#hc-estudios input[type=checkbox]:checked').forEach(cb=>{ const l=(cb.parentElement?.textContent||'').trim(); if(l)estudios.push(l); });
+  const secc=(t,id)=>{ const x=g(id); return x?`<p style="margin:4px 0;"><b>${t}:</b> ${E(x)}</p>`:''; };
+  let n='';
+  n+=`<div style="font-size:13px;font-weight:700;color:var(--purple);margin-bottom:6px;">📄 ${modo==='inicial'?'Nota de valoración inicial — Infectología':'Nota de seguimiento — Infectología'}</div>`;
+  n+=`<div id="hc-nota-doc" style="background:#fff;color:#111;border-radius:8px;padding:16px;font-size:12px;line-height:1.5;">`;
+  n+=`<div style="font-weight:700;font-size:14px;">Valoración infectológica del paciente inmunocomprometido</div>`;
+  n+=`<div style="color:#555;font-size:11px;margin-bottom:8px;">${E(p.nombre||'')}${p.exp?' · Exp. '+E(p.exp):''}${p.edad?' · '+E(String(p.edad))+' a':''}${p.sexo?' · '+E(p.sexo):''} · ${fecha}</div>`;
+  if(huesped&&huesped!=='—') n+=`<p style="margin:4px 0;"><b>Huésped:</b> ${E(huesped)}${g('hc_fechatx')?' · TX/IS desde '+E(g('hc_fechatx')):''}${g('hc_cd4')?' · CD4 '+E(g('hc_cd4')):''}</p>`;
+  n+=secc('Padecimiento actual','hc_padecimiento')+secc('Inmunosupresión actual','hc_inmunosup')+secc('Profilaxis activas','hc_profilaxis')+secc('Antecedentes infectológicos','hc_antecedentes')+secc('Exposiciones epidemiológicas','hc_exposiciones')+secc('Vacunación','hc_vacunas')+secc('Exploración física','hc_exploracion')+secc('Alergias','hc_alergias');
+  if(modo==='inicial'){
+    n+=`<p style="margin:6px 0 2px;"><b>Estudios solicitados:</b></p>`;
+    n+= estudios.length?('<ul style="margin:2px 0 0 18px;">'+estudios.map(e=>'<li>'+E(e)+'</li>').join('')+'</ul>'):'<p style="color:#888;margin:2px 0;">(ninguno marcado)</p>';
+  } else {
+    n+=secc('Evolución','hc_evolucion')+secc('Resultados de estudios','hc_resultados');
+  }
+  const recsText=(document.getElementById('hc-recs')?.innerText||'').trim();
+  if(recsText) n+=`<p style="margin:8px 0 2px;"><b>Plan y recomendaciones:</b></p><div style="white-space:pre-wrap;font-size:11px;">${E(recsText)}</div>`;
+  n+=`<p style="color:#888;font-size:10px;margin-top:10px;">Documento de apoyo PROA/Infectología (NOM-004-SSA3). Las dosis requieren validación clínica del médico tratante.</p>`;
+  n+=`</div>`;
+  n+=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;"><button onclick="window._txValCopiarNota&&window._txValCopiarNota()" class="btn-sm btn-sm-teal">📋 Copiar</button><button onclick="window._txValImprimirNota&&window._txValImprimirNota()" class="btn-sm">🖨 Imprimir</button></div>`;
+  out.innerHTML=n;
+  if(window._txSaveValoracion)window._txSaveValoracion();
+  setTimeout(()=>{ try{ out.scrollIntoView({behavior:'smooth',block:'start'}); }catch(_){} },80);
+};
+window._txValCopiarNota=function(){ const d=document.getElementById('hc-nota-doc'); if(!d)return; const t=d.innerText; if(navigator.clipboard){ navigator.clipboard.writeText(t).then(()=>{if(typeof toast==='function')toast('Nota copiada ✓','ok');}).catch(()=>{if(typeof toast==='function')toast('No se pudo copiar','am');}); } };
+window._txValImprimirNota=function(){ const d=document.getElementById('hc-nota-doc'); if(!d)return; const w=window.open('','_blank'); if(!w)return; w.document.write('<html><head><meta charset="utf-8"><title>Valoración infectológica</title></head><body style="font-family:system-ui,sans-serif;padding:24px;max-width:760px;margin:auto;">'+d.innerHTML+'</body></html>'); w.document.close(); w.focus(); w.print(); };
 window.renderTrasplante=function(){
   // Poblar selector de pacientes
   const sel=document.getElementById('tx-pac-sel');
@@ -25880,7 +26037,7 @@ window.renderTrasplante=function(){
   // Render sub-tabs
   const subCont=document.getElementById('trasplante-subtabs');
   if(subCont){
-    if(!window._txSubTab)window._txSubTab='tx-tipo';
+    if(!window._txSubTab)window._txSubTab='tx-valoracion';
     subCont.innerHTML=_TX_SUBTABS.map(t=>`<button onclick="window._txSubTab='${t.id}';renderTrasplantePac(document.getElementById('tx-pac-sel')?.value||'');" style="padding:7px 13px;border-radius:20px;border:1px solid ${window._txSubTab===t.id?'var(--purple)':'var(--brd)'};background:${window._txSubTab===t.id?'rgba(167,139,250,.12)':'transparent'};color:${window._txSubTab===t.id?'var(--purple)':'var(--t2)'};cursor:pointer;font-size:12px;font-weight:${window._txSubTab===t.id?'700':'400'};transition:.15s;">${t.label}</button>`).join('');
   }
   renderTrasplantePac('');
@@ -25888,7 +26045,7 @@ window.renderTrasplante=function(){
 window.renderTrasplantePac=function(pid){
   const cont=document.getElementById('trasplante-content');
   if(!cont)return;
-  if(!window._txSubTab)window._txSubTab='tx-tipo';
+  if(!window._txSubTab)window._txSubTab='tx-valoracion';
   const p=pid?PACS.find(x=>x.id===pid):null;
   window._txCurrentPac=p;
   const sub=window._txSubTab;
@@ -25897,7 +26054,8 @@ window.renderTrasplantePac=function(pid){
   if(subCont){
     subCont.innerHTML=_TX_SUBTABS.map(t=>`<button onclick="window._txSubTab='${t.id}';renderTrasplantePac('${escJs(pid)}');" style="padding:7px 13px;border-radius:20px;border:1px solid ${window._txSubTab===t.id?'var(--purple)':'var(--brd)'};background:${window._txSubTab===t.id?'rgba(167,139,250,.12)':'transparent'};color:${window._txSubTab===t.id?'var(--purple)':'var(--t2)'};cursor:pointer;font-size:12px;font-weight:${window._txSubTab===t.id?'700':'400'};transition:.15s;">${t.label}</button>`).join('');
   }
-  if(sub==='tx-tipo')cont.innerHTML=_renderTxTipo(p);
+  if(sub==='tx-valoracion')cont.innerHTML=_renderTxValoracion(p);
+  else if(sub==='tx-tipo')cont.innerHTML=_renderTxTipo(p);
   else if(sub==='tx-profilaxis')cont.innerHTML=p?_renderTxProfilaxis(p):'<div style="padding:30px;text-align:center;color:var(--t3);font-size:13px;">Selecciona primero un paciente de trasplante para ver su profilaxis.</div>';// v325: guard anti-crash sin paciente
   else if(sub==='tx-patogenos')cont.innerHTML=_renderTxPatogenos(p);
   else if(sub==='tx-cmv')cont.innerHTML=_renderTxCMV(p);
@@ -32496,8 +32654,8 @@ input:focus,select:focus,textarea:focus{
   <div class="view" id="view-trasplante"><div style="flex:1;overflow:auto;padding:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
-        <div style="font-size:16px;font-weight:700;">🫀 Módulo Trasplante / Hematología</div>
-        <div style="font-size:11px;color:var(--t3);margin-top:2px;">Protocolos infecciosos IDSA · ECMM · EBMT · AST — paciente inmunocomprometido</div>
+        <div style="font-size:16px;font-weight:700;">🛡️ Inmunocomprometido — Valoración por Infectología</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px;">SOT · TCMH · VIH · biológicos/corticoides — IDSA · AST-IDCOP · ECIL · TTS — historia dirigida + recomendaciones</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <button onclick="window._txNuevoPaciente&&window._txNuevoPaciente()" title="Crea un paciente nuevo ya marcado como trasplante (sin necesidad de ATB)" style="font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid var(--purple);background:rgba(167,139,250,.12);color:var(--purple);cursor:pointer;font-weight:700;white-space:nowrap;">➕ Nuevo paciente de trasplante</button>

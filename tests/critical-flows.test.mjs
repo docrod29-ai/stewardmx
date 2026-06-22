@@ -1268,6 +1268,19 @@ test('VER v365: el badge muestra la versión REAL del SW (leída de stewardmx-vX
   assert.ok(_idx.includes('match(/stewardmx-v(\\d+)/)'), 'no parsea la versión real del SW desde sw.js');
   assert.ok(_idx.includes("getElementById('app-ver-badge')") && _idx.includes('b.textContent = v'), 'no actualiza el badge con la versión real');
 });
+test('INMUNO v366: valoración infectológica del inmunocomprometido (historia dirigida + modos + nota)', () => {
+  // Nueva sub-pestaña "🧬 Historia clínica ID" en el módulo renombrado a Inmunocomprometido. Cubre SOT/TCMH/
+  // VIH/no-VIH, modo Inicial (estudios a solicitar) y Seguimiento (resultados+nota), con recomendaciones
+  // citadas. ADITIVO: el Pre-TX queda intacto.
+  assert.ok(_idx.includes("{id:'tx-valoracion'"), 'falta la sub-pestaña tx-valoracion');
+  assert.ok(_idx.includes('function _renderTxValoracion(p)') && _idx.includes("sub==='tx-valoracion'"), '_renderTxValoracion no está definida/dispatcheada');
+  assert.ok(/window\._txValSetModo/.test(_idx) && _idx.includes("window._txValModo='inicial'"), 'falta el toggle de modo Inicial/Seguimiento');
+  assert.ok(_idx.includes('hc_padecimiento') && _idx.includes('hc_inmunosup') && _idx.includes('hc_antecedentes'), 'faltan campos de historia clínica dirigida');
+  assert.ok(_idx.includes('function _txValEstudiosHTML') && _idx.includes('hc_est_igra'), 'falta el checklist de estudios a solicitar');
+  assert.ok(/window\._txValRecs/.test(_idx) && _idx.includes('AST-IDCOP 2019') && _idx.includes('DHHS/IDSA'), 'faltan recomendaciones citadas (VIH y no-VIH)');
+  assert.ok(/window\._txValGenerarNota/.test(_idx) && _idx.includes('txValoracion:data'), 'no genera/persiste la nota de valoración');
+  assert.ok(_idx.includes("label:'Inmunocomprometido'"), 'la pestaña no se renombró a Inmunocomprometido');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');
