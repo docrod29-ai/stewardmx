@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v379 (Inmunocomprometido — CADA serología emite su recomendación en seguimiento)
+//  Feedback del Dr.: marcó 10 serologías y faltaban recomendaciones. Ahora _txValRecs interpreta cada resultado
+//  capturado: CMV IgG (R+/R−), EBV IgG (riesgo PTLD), HSV (profilaxis aciclovir), VZV (inmune / vacunar pre-IS),
+//  Toxoplasma (reactivación / D+/R− corazón), anti-VHC (confirmar RNA + DAA), VDRL/RPR (treponémica + penicilina),
+//  además de las ya existentes (HBV por patrón, CMV PCR, galactomanano/BDG, CrAg, BK, hemocultivo, C. difficile,
+//  IGRA, micosis endémica). Sin citas; dosis con validación clínica; nada se emite sin resultado. +1 prueba (289).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v378 (Inmunocomprometido — hepatitis B por prueba separada + recs por patrón)
 //  Feedback del Dr.: separar el perfil de HBV (la interpretación depende de la COMBINACIÓN) y, en seguimiento,
 //  emitir recomendaciones por la mejor evidencia. Serologías basales: HBsAg, anti-HBc total, anti-HBs y HBV DNA
@@ -1089,7 +1096,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v378';
+const CACHE = 'stewardmx-v379';
 const SHELL = [
   '/',
   '/index.html',

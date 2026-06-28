@@ -26163,6 +26163,7 @@ window._txValRecs=function(){
   // Resultados capturados (modo seguimiento). Solo interpretan lo que de hecho se marcó — sin resultados, sin recs por resultado.
   const resVal=k=>(g('hc_res_'+k)||'').toLowerCase();
   const resPos=k=>/positivo/.test(resVal(k));
+  const neg=k=>/negativo/.test(resVal(k));
   const g6pdDef=/defic/.test(resVal('g6pd'));
   const tienePJP=!!(document.getElementById('hc_cb_prof_pjp')||{}).checked;
 
@@ -26223,11 +26224,22 @@ window._txValRecs=function(){
   if(resPos('igra')) h2+=rec('Tuberculosis latente positiva','IGRA/PPD positivo: tratar la infección latente; si va a iniciar inmunosupresión, hacerlo antes, vigilando las interacciones de las rifamicinas.','var(--blue)');
   // Hepatitis B — interpretación POR PATRÓN serológico (mejor evidencia). La reactivación es la complicación clave bajo inmunosupresión.
   const hbsagPos=resPos('hbsag'), hbcPos=resPos('antihbc'), hbsPos=resPos('antihbs');
-  const neg=k=>/negativo/.test(resVal(k));
   if(hbsagPos) h2+=rec('Hepatitis B activa (HBsAg positivo)','Cuantificar HBV DNA y transaminasas e iniciar tratamiento antiviral con un análogo de alta barrera genética (entecavir o tenofovir), imprescindible antes y durante la inmunosupresión por el riesgo de reactivación e insuficiencia hepática. Coordinar con hepatología; dosis y duración con validación clínica.','var(--red)');
   else if(hbcPos) h2+=rec('Hepatitis B resuelta u oculta (anti-HBc positivo, HBsAg negativo)','Riesgo de reactivación bajo inmunosupresión, alto con anti-CD20 (rituximab), corticoides en dosis altas o quimioterapia. Indicar profilaxis antiviral (entecavir o tenofovir) durante la inmunosupresión y al menos 6 a 12 meses después —más prolongada tras rituximab—, con vigilancia de HBV DNA y transaminasas; si no se administra profilaxis, monitorización estrecha. Dosis con validación clínica.','var(--amber)');
   else if(neg('hbsag')&&neg('antihbc')&&neg('antihbs')) h2+=rec('Hepatitis B: susceptible','Sin infección ni inmunidad (HBsAg, anti-HBc y anti-HBs negativos): vacunar contra hepatitis B. En candidatos a inmunosupresión, considerar esquema acelerado o de doble dosis y verificar la seroconversión (anti-HBs ≥10 mUI/mL).','var(--blue)');
   else if(hbsPos&&neg('antihbc')) h2+=rec('Hepatitis B: inmune por vacuna','Anti-HBs positivo con anti-HBc negativo: inmunidad vacunal; sin medidas adicionales. Vigilar el título si recibe inmunosupresión intensa y reforzar si cae por debajo de 10 mUI/mL.','var(--teal)');
+  // Serologías — interpretación por resultado (el serostatus define riesgo y conducta). Cada una emite su recomendación.
+  if(resPos('cmv')) h2+=rec('CMV IgG positivo (receptor seropositivo)','Riesgo de reactivación bajo inmunosupresión: definir profilaxis o estrategia anticipada guiada por carga viral, según el órgano y el régimen.','var(--amber)');
+  else if(neg('cmv')) h2+=rec('CMV IgG negativo (receptor seronegativo)','Con donante positivo (D+/R−) es el escenario de mayor riesgo de enfermedad por CMV: indicar profilaxis y usar hemoderivados leucorreducidos o CMV-negativos.','var(--red)');
+  if(resPos('ebv')) h2+=rec('EBV IgG positivo','Riesgo bajo de síndrome linfoproliferativo postrasplante; vigilancia clínica.','var(--teal)');
+  else if(neg('ebv')) h2+=rec('EBV IgG negativo (seronegativo)','Con donante positivo, riesgo de primoinfección y de enfermedad linfoproliferativa postrasplante: monitorizar la carga viral de EBV y minimizar la inmunosupresión.','var(--amber)');
+  if(resPos('hsv')) h2+=rec('HSV seropositivo','Riesgo de reactivación: profilaxis con aciclovir o valaciclovir durante la inmunosupresión intensa o el postrasplante temprano, salvo que ya reciba un antiviral que lo cubra (dosis con validación clínica).','var(--amber)');
+  if(resPos('vzv')) h2+=rec('VZV seropositivo','Inmunidad presente; ante exposición o herpes zóster, tratamiento antiviral oportuno. Considerar la vacuna recombinante de zóster.','var(--teal)');
+  else if(neg('vzv')) h2+=rec('VZV seronegativo','Susceptible a varicela grave: aplicar la vacuna de varicela ANTES de inmunosuprimir (es viva, contraindicada bajo inmunosupresión) y dar profilaxis postexposición ante un contacto.','var(--amber)');
+  if(resPos('toxo')) h2+=rec('Toxoplasma seropositivo','Riesgo de reactivación bajo inmunosupresión (mayor en trasplante cardiaco y hematopoyético); la profilaxis con trimetoprima-sulfametoxazol lo cubre.','var(--amber)');
+  else if(neg('toxo')) h2+=rec('Toxoplasma seronegativo','En trasplante cardiaco con donante positivo (D+/R−) es el grupo de mayor riesgo: indicar profilaxis dirigida.','var(--amber)');
+  if(resPos('hcv')) h2+=rec('Anti-VHC positivo','Confirmar con carga viral (HCV RNA); si hay viremia, tratar con antivirales de acción directa y referir a hepatología; vigilar la función hepática bajo inmunosupresión.','var(--amber)');
+  if(resPos('sifilis')) h2+=rec('VDRL/RPR positivo','Confirmar con prueba treponémica (FTA-ABS o TP-PA); estadificar y tratar con penicilina según la etapa; ante datos neurológicos o coinfección por VIH, valorar punción lumbar.','var(--amber)');
   el.innerHTML=h2;
 };
 window._txValGenerarNota=function(){

@@ -1405,6 +1405,25 @@ test('INMUNO v378: hepatitis B por prueba separada + recomendaciones por patrón
   assert.ok(runRecs({ ...H, hc_res_hbsag:'Negativo', hc_res_antihbc:'Negativo', hc_res_antihbs:'Negativo' }).includes('susceptible'), 'los tres negativos no marcan susceptible (vacunar)');
   assert.ok(!runRecs(H).includes('Hepatitis B'), 'sin resultados no debe emitir interpretación de hepatitis B');
 });
+test('INMUNO v379: CADA serología capturada emite su recomendación (CMV/EBV/HSV/VZV/Toxo/VHC/VDRL)', async () => {
+  // El Dr. marcó múltiples serologías positivas y faltaban recomendaciones. Ahora cada resultado emite la suya.
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{}, escHtml:x=>x };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx); vm.runInContext(block, ctx);
+  const recsDoc = (vals) => { const cache={}; return { getElementById:id=>{ if(cache[id]) return cache[id]; const el=(id==='hc-recs')?{innerHTML:''}:{value:(vals[id]!=null?vals[id]:''),checked:false}; cache[id]=el; return el; } }; };
+  const runRecs = (vals) => { ctx.document=recsDoc(vals); ctx.window._txValRecs(); return ctx.document.getElementById('hc-recs').innerHTML; };
+  const o = runRecs({ hc_huesped:'SOT — Renal', hc_is_estado:'En curso', hc_res_cmv:'Positivo', hc_res_ebv:'Positivo', hc_res_hsv:'Positivo', hc_res_vzv:'Positivo', hc_res_toxo:'Positivo', hc_res_hcv:'Positivo', hc_res_sifilis:'Positivo' });
+  ['CMV IgG positivo','EBV IgG positivo','HSV seropositivo','VZV seropositivo','Toxoplasma seropositivo','Anti-VHC positivo','VDRL/RPR positivo'].forEach(w=>{
+    assert.ok(o.includes(w), 'no emite recomendación para: '+w);
+  });
+  const negs = runRecs({ hc_huesped:'SOT — Renal', hc_is_estado:'En curso', hc_res_cmv:'Negativo', hc_res_vzv:'Negativo' });
+  assert.ok(negs.includes('CMV IgG negativo') && negs.includes('VZV seronegativo'), 'no interpreta los serostatus negativos relevantes');
+  assert.ok(!/CMV IgG|seropositivo|Anti-VHC positivo|VDRL/.test(runRecs({ hc_huesped:'SOT — Renal', hc_is_estado:'En curso' })), 'inventa serologías sin resultados capturados');
+});
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas
   // se colapsan en la Valoración; su contenido se vuelve secciones colapsables (lazy) que reusan los motores.
