@@ -1294,7 +1294,7 @@ test('INMUNO v373: recomendaciones por fase/paciente — SIN emojis ni bibliogra
   // Feedback del Dr.: el plan debe ser por fase y por paciente, profesional, sin emojis ni citas.
   // Extraemos el cuerpo de _txValRecs y verificamos que no haya citas ni emojis en sus textos.
   const s = _idx.indexOf('window._txValRecs=function(){');
-  const e = _idx.indexOf('window._txValGenerarNota=function', s);
+  const e = _idx.indexOf('// ── Fase 3: redacción por IA', s);  // acota a _txValRecs (excluye el motor IA, cuyo spinner sí usa emojis)
   assert.ok(s >= 0 && e > s, 'no se ubicó _txValRecs');
   const body = _idx.slice(s, e);
   assert.ok(!/\[(AST|DHHS|TTS|Fishman|OMS|IDSA|ECIL|AGA|CDC|Kotton)/.test(body), 'las recomendaciones aún tienen bibliografía entre corchetes');
@@ -1438,6 +1438,27 @@ test('INMUNO v380: _txResHTML SIEMPRE incluye las serologías basales (hepatitis
   ['HBsAg','Anti-HBc total','Anti-HBs','HBV DNA','VIH Ag/Ab','Anti-VHC','VDRL'].forEach(w=>{
     assert.ok(res.includes(w), 'falta en seguimiento (debería estar siempre): '+w);
   });
+});
+test('INMUNO v381: Fase 3 (IA) — redacta con reglas duras (solo ID, sin citas, sin emojis, no inventa) y reusa el plan', async () => {
+  // Híbrido: el motor determinista define el PLAN; la IA SOLO redacta. Verificamos el cableado al proxy seguro.
+  assert.ok(_idx.includes('const _IA_SYSTEM_VALORACION_ID=') && _idx.includes('window._txValRedactarIA='), 'falta el motor de redacción IA');
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k==='then') return undefined; if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const cap = {};
+  const llamar = async (messages,system,maxtok,model) => { Object.assign(cap,{messages,system,maxtok,model}); return { content:[{ text:'NOTA REDACTADA DE PRUEBA' }] }; };
+  const notaEl = { innerHTML:'' };
+  const docMock = { getElementById:id=>{ if(id==='hc-nota') return notaEl; if(id==='hc-recs') return { innerText:'Impresión y plan — Infectología\nProfilaxis para Pneumocystis indicada', textContent:'' }; if(id==='hc_motivo') return { options:[{text:'Fiebre'}], selectedIndex:0, value:'fiebre' }; if(id&&id.indexOf('hc_cb_')===0) return null; return { value:(id==='hc_huesped'?'SOT — Renal':'') }; }, querySelectorAll:()=>[] };
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, navigator:{}, location:{}, escHtml:x=>x, document:docMock, Blob:STUB, URL:STUB, llamarAnthropicSeguro:llamar, window:{ _anthropicProxyURL:'proxy', _txCurrentPac:{ id:'p', nombre:'Test' } }, toast:()=>{} };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx); vm.runInContext(block, ctx);
+  await ctx.window._txValRedactarIA();
+  assert.ok(/SOLO infectología/.test(cap.system) && /SIN citas/.test(cap.system) && /SIN emojis/.test(cap.system), 'el system de la IA no impone las reglas duras');
+  assert.ok(/NO inventes dosis|requiere validación clínica/.test(cap.system), 'la IA no está restringida a no inventar dosis');
+  assert.equal(cap.model, 'claude-sonnet-4-6', 'modelo incorrecto');
+  assert.ok(/PLAN DEFINIDO[\s\S]*Pneumocystis indicada/.test(cap.messages[0].content), 'la IA no recibe el plan determinista para redactarlo');
+  assert.ok(notaEl.innerHTML.includes('hc-nota-ia') && notaEl.innerHTML.includes('NOTA REDACTADA DE PRUEBA') && notaEl.innerHTML.includes('Descargar Word'), 'no renderiza el borrador editable + descarga');
 });
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas

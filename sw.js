@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v381 (Inmunocomprometido — Fase 3: redacción por IA, híbrida y segura)
+//  "sigue" del Dr.: la IA redacta la valoración. HÍBRIDO: el formulario captura, los motores DETERMINISTAS
+//  deciden el PLAN; la IA SOLO redacta en prosa profesional (no inventa dosis ni recomendaciones). Botón
+//  "🤖 Redactar con IA (borrador)" (solo si la IA está configurada) → _txValRedactarIA arma el contexto
+//  (huésped, motivo, datos compuestos, estudios solicitados y el PLAN del motor) y llama llamarAnthropicSeguro
+//  (claude-sonnet-4-6) con _IA_SYSTEM_VALORACION_ID que impone: solo infectología, sin citas, sin emojis, no
+//  inventar dosis ("requiere validación clínica"), no agregar recs fuera del plan. Devuelve un borrador EDITABLE
+//  con Copiar y Descargar Word (_txValCopiarIA / _txValDescargarIADoc). +1 prueba (291).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v380 (Inmunocomprometido — serologías basales SIEMPRE en seguimiento)
 //  Feedback del Dr.: al separar el perfil de HBV (v378) cambiaron las claves y las serologías de hepatitis B
 //  desaparecían del seguimiento (tenía marcada la "VHB" combinada vieja). Fix: _txResHTML ahora muestra, además
@@ -1103,7 +1112,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v380';
+const CACHE = 'stewardmx-v381';
 const SHELL = [
   '/',
   '/index.html',

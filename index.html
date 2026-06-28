@@ -26108,6 +26108,7 @@ function _renderTxValoracion(p){
   html+=`<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">`;
   html+=`<button onclick="window._txValGenerarNota&&window._txValGenerarNota()" class="btn-main" style="flex:1;min-width:170px;background:rgba(0,212,168,.12);border:1px solid rgba(0,212,168,.4);color:var(--teal);">📄 ${modo==='inicial'?'Nota inicial + órdenes':'Nota de seguimiento'}</button>`;
   html+=`<button onclick="window._txValWordExport&&window._txValWordExport()" class="btn-main" style="flex:1;min-width:170px;background:rgba(61,155,255,.12);border:1px solid rgba(61,155,255,.4);color:var(--blue);">⬇ Descargar Word completo</button>`;
+  if(window._anthropicProxyURL||window._abgApiKey) html+=`<button onclick="window._txValRedactarIA&&window._txValRedactarIA()" class="btn-main" style="flex:1;min-width:170px;background:linear-gradient(135deg,rgba(124,58,237,.18),rgba(0,212,168,.14));border:1px solid rgba(124,58,237,.45);color:var(--purple);">🤖 Redactar con IA (borrador)</button>`;
   html+=`</div>`;
   html+=`<div id="hc-recs" style="margin-top:16px;"></div><div id="hc-nota" style="margin-top:14px;"></div>`;
   const _deepHtml=_txValDeepSectionsHTML(s.hc_huesped||'', motivo);
@@ -26244,6 +26245,82 @@ window._txValRecs=function(){
   if(resPos('hcv')) h2+=rec('Anti-VHC positivo','Confirmar con carga viral (HCV RNA); si hay viremia, tratar con antivirales de acción directa y referir a hepatología; vigilar la función hepática bajo inmunosupresión.','var(--amber)');
   if(resPos('sifilis')) h2+=rec('VDRL/RPR positivo','Confirmar con prueba treponémica (FTA-ABS o TP-PA); estadificar y tratar con penicilina según la etapa; ante datos neurológicos o coinfección por VIH, valorar punción lumbar.','var(--amber)');
   el.innerHTML=h2;
+};
+// ── Fase 3: redacción por IA (HÍBRIDO). El formulario captura, los motores deterministas deciden el PLAN; la IA
+// SOLO redacta en prosa profesional. No inventa dosis ni recomendaciones nuevas. Reutiliza llamarAnthropicSeguro
+// (proxy seguro, claude-sonnet-4-6). Apoyo a la decisión: el médico tratante valida.
+const _IA_SYSTEM_VALORACION_ID=`Eres infectólogo. Redacta una NOTA DE VALORACIÓN INFECTOLÓGICA del paciente inmunocomprometido, en prosa profesional, lista para el expediente y para entregar a quien solicitó la interconsulta.
+
+REGLAS ESTRICTAS:
+- SOLO infectología. No incluyas recomendaciones de otras especialidades.
+- SIN citas bibliográficas ni referencias.
+- SIN emojis.
+- NO inventes dosis, fechas, microorganismos ni datos que no estén en la información dada. Si una dosis es necesaria, escribe "requiere validación clínica".
+- NO agregues recomendaciones clínicas nuevas fuera del PLAN que se te entrega: puedes integrarlo, ordenarlo, priorizarlo según el MOTIVO y explicarlo con claridad, pero sin cambiar su contenido.
+- Eres un apoyo a la decisión; el médico tratante valida.
+
+ESTRUCTURA (prosa con encabezados simples, sin viñetas con emojis):
+- Resumen del caso (huésped, motivo de la interconsulta, fase si aplica).
+- Antecedentes relevantes (comorbilidades, inmunosupresión, exposiciones, vacunación; menciona los negativos pertinentes de forma concisa).
+- Resultados (interpreta los disponibles; señala los pendientes).
+- Impresión infectológica.
+- Plan (reproduce y prioriza el plan dado, dirigido al motivo).
+- Pendientes y seguimiento.
+
+Devuelve solo la nota, sin preámbulos.`;
+window._txValRedactarIA=async function(){
+  const p=window._txCurrentPac; if(!p){ if(typeof toast==='function')toast('Selecciona un paciente','am'); return; }
+  if(!window._anthropicProxyURL&&!window._abgApiKey){ if(typeof toast==='function')toast('⚠ IA no configurada. Contacta al administrador.','am'); return; }
+  const out=document.getElementById('hc-nota'); if(!out)return;
+  const g=id=>(document.getElementById(id)?.value||'').trim();
+  const E=window.escHtml||(x=>x);
+  const motSel=document.getElementById('hc_motivo');
+  const motivo=motSel?((motSel.options[motSel.selectedIndex]||{}).text||motSel.value):'';
+  const huesped=g('hc_huesped');
+  // Estudios solicitados (Inicial).
+  const estudios=[]; document.querySelectorAll('#hc-estudios input[type=checkbox]:checked').forEach(cb=>{ const l=(cb.parentElement?.textContent||'').trim(); if(l)estudios.push(l); });
+  // Plan determinista (texto plano del panel de recomendaciones ya calculado por _txValRecs).
+  const recsEl=document.getElementById('hc-recs'); const plan=recsEl?(recsEl.innerText||recsEl.textContent||'').trim():'';
+  // Contexto estructurado.
+  let ctx='';
+  if(motivo&&motivo!=='—')ctx+='MOTIVO DE LA INTERCONSULTA: '+motivo+'\n';
+  if(huesped&&huesped!=='—')ctx+='HUÉSPED: '+huesped+(g('hc_fechatx')?' (TX/IS desde '+g('hc_fechatx')+')':'')+(g('hc_cd4')?' · CD4 '+g('hc_cd4'):'')+'\n';
+  (window._txValCompose?window._txValCompose():[]).forEach(r=>{ ctx+=r[0]+': '+r[1]+'\n'; });
+  if(estudios.length)ctx+='ESTUDIOS SOLICITADOS: '+estudios.join('; ')+'\n';
+  if(plan)ctx+='\nPLAN DEFINIDO (motor determinista — no lo cambies, solo redáctalo y priorízalo):\n'+plan+'\n';
+  out.innerHTML='<div style="text-align:center;padding:24px;color:var(--t3);"><div style="font-size:22px;margin-bottom:8px;">🤖</div>Redactando la valoración con IA… (10–25 s)</div>';
+  try{
+    const result=await llamarAnthropicSeguro([{role:'user',content:'Datos de la valoración:\n\n'+ctx+'\n\nRedacta la nota infectológica siguiendo las reglas.'}],_IA_SYSTEM_VALORACION_ID,2500,'claude-sonnet-4-6');
+    if(result&&result.error)throw new Error(result.error.message||'error de la API');
+    const text=(result&&result.content&&result.content[0]&&result.content[0].text)||'';
+    if(!text)throw new Error('Respuesta vacía. Intenta de nuevo.');
+    out.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:6px;">Borrador IA — valida y edita antes de usar</div>'
+      +'<textarea id="hc-nota-ia" style="width:100%;min-height:340px;padding:12px;border:1px solid var(--brd2);border-radius:8px;background:var(--s2);color:var(--t1);font-size:12px;line-height:1.55;resize:vertical;">'+E(text)+'</textarea>'
+      +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">'
+      +'<button onclick="window._txValCopiarIA&&window._txValCopiarIA()" class="btn-main" style="flex:1;min-width:140px;background:rgba(0,212,168,.12);border:1px solid rgba(0,212,168,.4);color:var(--teal);">Copiar texto</button>'
+      +'<button onclick="window._txValDescargarIADoc&&window._txValDescargarIADoc()" class="btn-main" style="flex:1;min-width:140px;background:rgba(61,155,255,.12);border:1px solid rgba(61,155,255,.4);color:var(--blue);">⬇ Descargar Word</button>'
+      +'</div>'
+      +'<div style="font-size:10px;color:var(--t3);margin-top:6px;">Documento de apoyo PROA/Infectología. La IA redacta el plan ya definido; las dosis y decisiones requieren validación del médico tratante.</div>';
+  }catch(e){
+    out.innerHTML='<div style="color:var(--red);font-size:12px;padding:14px;">🔴 '+E(e.message||'error')+'</div>';
+  }
+};
+window._txValCopiarIA=function(){ const ta=document.getElementById('hc-nota-ia'); if(!ta)return; ta.select(); try{document.execCommand('copy');}catch(_){ } if(navigator.clipboard)navigator.clipboard.writeText(ta.value).catch(()=>{}); if(typeof toast==='function')toast('Copiado'); };
+window._txValDescargarIADoc=function(){
+  const ta=document.getElementById('hc-nota-ia'); if(!ta)return;
+  const p=window._txCurrentPac||{}; const E=window.escHtml||(x=>x);
+  const fecha=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const body=E(ta.value).replace(/\n/g,'<br>');
+  const html='<html><head><meta charset="utf-8"></head><body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#111;">'
+    +'<div style="font-weight:700;font-size:14pt;">Valoración infectológica del paciente inmunocomprometido</div>'
+    +'<div style="color:#555;font-size:9pt;margin-bottom:10px;">'+E(p.nombre||'')+(p.exp?' · Exp. '+E(p.exp):'')+' · '+fecha+'</div>'
+    +'<div>'+body+'</div>'
+    +'<div style="color:#777;font-size:8pt;margin-top:16px;">Documento de apoyo PROA/Infectología (NOM-004-SSA3). Las dosis y decisiones requieren validación del médico tratante.</div>'
+    +'</body></html>';
+  const blob=new Blob(['﻿'+html],{type:'application/msword'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='ValoracionID_IA_'+((p.nombre||'paciente').replace(/\s+/g,'_'))+'_'+(new Date().toISOString().slice(0,10))+'.doc';
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },120);
 };
 window._txValGenerarNota=function(){
   const p=window._txCurrentPac; if(!p){if(typeof toast==='function')toast('Selecciona un paciente','am');return;}
