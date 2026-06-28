@@ -2007,3 +2007,45 @@ test('W1.1 — pareo de paciente por exp/MRN (prioridad) → fhirId → nombre �
   db = makeDb({ 'exp:777': 'pac_num' });
   assert.equal(await findExistingPatient(db, 'H', '2026-06', { exp: '777' }), 'pac_num', 'no hizo fallback numérico de exp');
 });
+test('W1.2 — parser HL7 v2 ORU^R01 → {exp, organismo, antibiograma} (forma que ya consume StewardMX)', async () => {
+  const { parseORU } = await import('../functions/lib/hl7.js');
+  // Mensaje 1: cultivo + antibiograma (S/I/R en OBX-8, MIC en OBX-5). PID-3 con 2 ids → debe elegir el tipo MR.
+  const m1 = [
+    'MSH|^~\\&|LIS|LAB|STEWARD|HOSP|20260628100000||ORU^R01|MSG001|P|2.5.1',
+    'PID|1||9999^^^X^AN~0012345^^^HOSP^MR||PEREZ^JUAN||19750101|M',
+    'PV1|1|I|3A^^304',
+    'OBR|1||CX123|600-7^Culture^LN|||20260626080000',
+    'OBX|1|ST|ORG^Organism identified^L||Escherichia coli||||||F',
+    'OBX|2|NM|CRO^Ceftriaxona^L||>=64|mg/L||R|||F',
+    'OBX|3|NM|MEM^Meropenem^L||<=0.25|mg/L||S|||F',
+    'OBX|4|NM|CIP^Ciprofloxacino^L||2|mg/L||I|||F',
+  ].join('\n');
+  const r1 = parseORU(m1);
+  assert.equal(r1.messageType, 'ORU^R01', 'tipo de mensaje');
+  assert.equal(r1.patient.exp, '0012345', 'no eligió el MRN (tipo MR) sobre el AN');
+  assert.equal(r1.patient.name, 'JUAN PEREZ', 'nombre');
+  assert.equal(r1.patient.sex, 'M', 'sexo');
+  assert.equal(r1.organism, 'Escherichia coli', 'organismo');
+  assert.equal(r1.specimen.collectedAt, '2026-06-26T08:00:00', 'fecha de toma OBR-7');
+  assert.equal(r1.antibiogram.length, 3, 'núm. de antibióticos');
+  const cro = r1.antibiogram.find(a => /Ceftriaxona/.test(a.drug));
+  assert.ok(cro && cro.interpretation === 'R' && cro.mic === '>=64', 'ceftriaxona R / MIC');
+  assert.ok(r1.antibiogram.find(a => /Meropenem/.test(a.drug) && a.interpretation === 'S'), 'meropenem S');
+  assert.ok(r1.antibiogram.find(a => /Ciprofloxacino/.test(a.drug) && a.interpretation === 'I'), 'cipro I');
+  // Mensaje 2: hemocultivo, S/I/R directo en OBX-5 (sin MIC).
+  const m2 = [
+    'MSH|^~\\&|LIS|LAB|STEWARD|HOSP|20260628||ORU^R01|MSG002|P|2.3',
+    'PID|1||77777^^^HOSP^MR||LOPEZ^MARIA||19800505|F',
+    'OBR|1||BC55|HEMO|||20260627',
+    'OBX|1|ST|ORG^Microorganismo^L||Staphylococcus aureus',
+    'OBX|2|ST|OXA^Oxacilina^L||R',
+    'OBX|3|ST|VAN^Vancomicina^L||S',
+  ].join('\n');
+  const r2 = parseORU(m2);
+  assert.equal(r2.patient.exp, '77777', 'exp msg2');
+  assert.equal(r2.organism, 'Staphylococcus aureus', 'organismo msg2');
+  assert.ok(r2.antibiogram.find(a => /Oxacilina/.test(a.drug) && a.interpretation === 'R' && a.mic === null), 'oxacilina R sin MIC');
+  assert.ok(r2.antibiogram.find(a => /Vancomicina/.test(a.drug) && a.interpretation === 'S'), 'vancomicina S');
+  // Robustez: mensaje sin MSH lanza error claro.
+  assert.throws(() => parseORU('PID|1||x'), /MSH/, 'debería rechazar lo que no es HL7');
+});
