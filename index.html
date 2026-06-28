@@ -25983,40 +25983,61 @@ function _txValEstudiosHTML(s){
   return out;
 }
 // Word COMPLETO de la valoración — para entregar a quien pidió la interconsulta (todo + recomendaciones).
-window._txValWordExport=function(){
-  const p=window._txCurrentPac; if(!p){ if(typeof toast==='function')toast('Selecciona un paciente','am'); return; }
-  if(window._txValRecs)window._txValRecs();
+// ── Word PULIDO (carta de interconsulta). Membrete + tipografía compartidos por los 3 export (completo, IA, historial).
+const _TX_DOC_CSS='<style>@page{margin:2cm;}body{font-family:Calibri,Arial,sans-serif;color:#15201d;font-size:12px;line-height:1.5;}h1,h2,h3{font-family:Cambria,Georgia,serif;}</style>';
+function _txValMembrete(titulo, sub){
+  const E=window.escHtml||(x=>x);
+  const hosp=(window.HInfo&&HInfo.nombre)||'';
+  return '<div style="border-bottom:3px solid #1a6b52;padding-bottom:8px;margin-bottom:12px;">'
+    +(hosp?'<div style="font-size:17px;font-weight:bold;color:#1a6b52;letter-spacing:.3px;">'+E(hosp)+'</div>':'')
+    +'<div style="font-size:10px;color:#557;text-transform:uppercase;letter-spacing:1.5px;">Servicio de Infectología · Programa de Optimización de Antimicrobianos (PROA)</div></div>'
+    +(titulo?'<div style="font-family:Cambria,Georgia,serif;font-size:15px;font-weight:bold;color:#15201d;">'+E(titulo)+'</div>':'')
+    +(sub?'<div style="font-size:11px;color:#667;margin-bottom:10px;">'+E(sub)+'</div>':'');
+}
+function _txValDescargarDoc(bodyHtml, filename){
+  const wordContent='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">'+_TX_DOC_CSS+'</head><body>'+bodyHtml+'</body></html>';
+  const blob=new Blob(['﻿'+wordContent],{type:'application/msword'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },800);
+}
+// Mapa de título por motivo (la estructura/encabezado se adapta a lo solicitado).
+const _TX_MOT_TIT={aptitud_pretx:'Valoración de aptitud pretrasplante',aptitud_biologico:'Valoración previa a terapia biológica o inmunosupresora',fiebre:'Valoración por fiebre o foco infeccioso',profilaxis:'Valoración de profilaxis antiinfecciosa',vacunacion:'Valoración de inmunizaciones',otro:'Valoración infectológica del paciente inmunocomprometido'};
+function _txValWordBody(p){
   const g=id=>(document.getElementById(id)?.value||'').trim();
   const E=window.escHtml||(x=>x);
   const modo=window._txValModo||'inicial';
   const fecha=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
-  const hosp=(window.HInfo&&HInfo.nombre)||'';
-  const medico=window._userName||'';
+  const _pac=(window.PACS&&PACS.find)?(PACS.find(x=>x.id===p.id)||p):p;   // cama/servicio ACTUALES (no stale)
+  const motivoVal=(document.getElementById('hc_motivo')||{}).value||'';
+  const titulo=_TX_MOT_TIT[motivoVal]||'Valoración infectológica del paciente inmunocomprometido';
+  const sub=(modo==='inicial'?'Valoración inicial':'Nota de seguimiento')+' · '+fecha;
+  const row=(lbl,val)=> val?'<tr><td style="border:1px solid #cfd8d4;padding:5px 9px;font-weight:bold;width:32%;vertical-align:top;background:#eef5f2;color:#1a6b52;">'+lbl+'</td><td style="border:1px solid #cfd8d4;padding:5px 9px;">'+E(val).replace(/\n/g,'<br>')+'</td></tr>':'';
+  const head=t=>'<div style="font-family:Cambria,Georgia,serif;font-size:13px;font-weight:bold;color:#1a6b52;border-left:4px solid #1a6b52;padding:2px 0 2px 8px;margin:14px 0 5px;">'+E(t)+'</div>';
   const solic=[]; document.querySelectorAll('#hc-estudios input[type=checkbox]:checked').forEach(cb=>{ const l=(cb.parentElement?.textContent||'').trim(); if(l)solic.push(l); });
-  let recsHtml=''; const rn=document.getElementById('hc-recs');
-  if(rn) rn.querySelectorAll('div[style*="border-left"]').forEach(d=>{ const dd=d.querySelectorAll('div'); const t=(dd[0]?.textContent||'').trim(); const c=(dd[1]?.textContent||'').trim(); if(t)recsHtml+='<li style="margin-bottom:4px;"><b>'+E(t)+'</b>'+(c?' — '+E(c):'')+'</li>'; });
-  const row=(lbl,val)=> val?'<tr><td style="border:1px solid #cfd8d4;padding:5px 8px;font-weight:bold;width:34%;vertical-align:top;background:#f3f8f6;">'+lbl+'</td><td style="border:1px solid #cfd8d4;padding:5px 8px;">'+E(val).replace(/\n/g,'<br>')+'</td></tr>':'';
-  const sec=(t,id)=>{ const x=g(id); return x?'<div style="margin:8px 0;"><div style="font-weight:bold;color:#1a6b52;font-size:13px;border-bottom:1px solid #ddd;padding-bottom:2px;">'+t+'</div><div style="font-size:12px;white-space:pre-wrap;margin-top:3px;">'+E(x)+'</div></div>':''; };
-  let w='<div style="font-family:Calibri,Arial,sans-serif;color:#111;">';
-  w+='<div style="text-align:center;border-bottom:2px solid #1a6b52;padding-bottom:8px;margin-bottom:12px;"><div style="font-size:17px;font-weight:bold;color:#1a6b52;">VALORACIÓN INFECTOLÓGICA · PACIENTE INMUNOCOMPROMETIDO</div><div style="font-size:12px;color:#555;">'+E(hosp)+' · '+fecha+' · '+(modo==='inicial'?'Valoración inicial':'Nota de seguimiento')+'</div></div>';
-  w+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;">';
-  w+=row('Paciente',(p.nombre||'')+(p.exp?'  (Exp. '+p.exp+')':''));
-  w+=row('Edad · Sexo · Peso',[p.edad?p.edad+' años':'',p.sexo||'',p.peso?p.peso+' kg':''].filter(Boolean).join(' · '));
-  w+=row('Servicio · Cama',[p.servicio||'',p.cama||''].filter(Boolean).join(' · '));
+  const plan=[]; const rn=document.getElementById('hc-recs');
+  if(rn) rn.querySelectorAll('div[style*="border-left"]').forEach(d=>{ const dd=d.querySelectorAll('div'); const t=(dd[0]?.textContent||'').trim(); const c=(dd[1]?.textContent||'').trim(); if(t)plan.push([t,c]); });
+  let w=_txValMembrete(titulo, sub);
+  w+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px;">';
+  w+=row('Paciente',(_pac.nombre||'')+(_pac.exp?'  (Exp. '+_pac.exp+')':''));
+  w+=row('Edad · Sexo · Peso',[_pac.edad?_pac.edad+' años':'',_pac.sexo||'',_pac.peso?_pac.peso+' kg':''].filter(Boolean).join(' · '));
+  w+=row('Servicio · Cama',[_pac.servicio||'',_pac.cama||''].filter(Boolean).join(' · '));
   w+=row('Tipo de huésped',g('hc_huesped')!=='—'?g('hc_huesped'):'');
   w+=row('Inmunosupresión',[g('hc_is_estado')&&g('hc_is_estado')!=='—'?g('hc_is_estado'):'',g('hc_fechatx')?'desde '+g('hc_fechatx'):'',g('hc_cd4')?'CD4 '+g('hc_cd4'):''].filter(Boolean).join(' · '));
   w+='</table>';
-  (window._txValCompose?window._txValCompose():[]).forEach(function(r){ w+='<div style="margin:8px 0;"><div style="font-weight:bold;color:#1a6b52;font-size:13px;border-bottom:1px solid #ddd;padding-bottom:2px;">'+E(r[0])+'</div><div style="font-size:12px;white-space:pre-wrap;margin-top:3px;">'+E(r[1])+'</div></div>'; });
-  if(modo==='inicial' && solic.length) w+='<div style="margin:8px 0;"><div style="font-weight:bold;color:#1a6b52;font-size:13px;border-bottom:1px solid #ddd;">Estudios solicitados</div><ul style="font-size:12px;margin:4px 0 0 18px;">'+solic.map(e=>'<li>'+E(e)+'</li>').join('')+'</ul></div>';
-  if(recsHtml) w+='<div style="margin:10px 0;"><div style="font-weight:bold;color:#1a6b52;font-size:13px;border-bottom:1px solid #ddd;">Impresión y recomendaciones (PROA / Infectología)</div><ul style="font-size:12px;margin:4px 0 0 18px;">'+recsHtml+'</ul></div>';
-  w+='<div style="margin-top:14px;font-size:11px;color:#555;border-top:1px solid #ddd;padding-top:6px;">Documento de apoyo PROA / Infectología — NOM-004-SSA3. Las dosis y duraciones requieren validación clínica del médico tratante.'+((medico&&medico.indexOf('@')<0)?'<br>Elaboró: '+E(medico):'')+'</div></div>';
-  const wordContent='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body>'+w+'</body></html>';
+  (window._txValCompose?window._txValCompose():[]).forEach(function(r){ w+=head(r[0])+'<div style="font-size:12px;white-space:pre-wrap;">'+E(r[1])+'</div>'; });
+  if(modo==='inicial'&&solic.length) w+=head('Estudios solicitados')+'<ul style="font-size:12px;margin:3px 0 0 18px;">'+solic.map(e=>'<li>'+E(e)+'</li>').join('')+'</ul>';
+  if(plan.length) w+=head('Impresión y plan — Infectología')+'<ol style="font-size:12px;margin:3px 0 0 18px;">'+plan.map(it=>'<li style="margin-bottom:4px;"><b>'+E(it[0])+'.</b>'+(it[1]?' '+E(it[1]):'')+'</li>').join('')+'</ol>';
+  const medico=window._userName||'';
+  w+='<div style="margin-top:26px;font-size:12px;">_____________________________<br>'+((medico&&medico.indexOf('@')<0)?'<b>'+E(medico)+'</b><br>':'')+'<span style="color:#667;">Infectología · PROA</span></div>';
+  w+='<div style="margin-top:14px;font-size:10px;color:#778;border-top:1px solid #dde;padding-top:6px;">Documento de apoyo PROA / Infectología — NOM-004-SSA3. Las dosis y duraciones requieren validación clínica del médico tratante.</div>';
+  return w;
+}
+window._txValWordExport=function(){
+  const p=window._txCurrentPac; if(!p){ if(typeof toast==='function')toast('Selecciona un paciente','am'); return; }
+  if(window._txValRecs)window._txValRecs();
   try{
-    const blob=new Blob([wordContent],{type:'application/msword'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url; a.download='ValoracionID_'+((p.nombre||'paciente').replace(/\s+/g,'_'))+'_'+new Date().toISOString().slice(0,10)+'.doc';
-    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },1000);
+    _txValDescargarDoc(_txValWordBody(p),'ValoracionID_'+((p.nombre||'paciente').replace(/\s+/g,'_'))+'_'+new Date().toISOString().slice(0,10)+'.doc');
     if(typeof toast==='function')toast('📄 Word descargado','ok');
     if(window._txSaveValoracion)window._txSaveValoracion();
   }catch(e){ if(typeof toast==='function')toast('No se pudo generar el Word: '+(e.message||e),'rd'); }
@@ -26312,17 +26333,11 @@ window._txValDescargarIADoc=function(){
   const ta=document.getElementById('hc-nota-ia'); if(!ta)return;
   const p=window._txCurrentPac||{}; const E=window.escHtml||(x=>x);
   const fecha=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
-  const body=E(ta.value).replace(/\n/g,'<br>');
-  const html='<html><head><meta charset="utf-8"></head><body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#111;">'
-    +'<div style="font-weight:700;font-size:14pt;">Valoración infectológica del paciente inmunocomprometido</div>'
-    +'<div style="color:#555;font-size:9pt;margin-bottom:10px;">'+E(p.nombre||'')+(p.exp?' · Exp. '+E(p.exp):'')+' · '+fecha+'</div>'
-    +'<div>'+body+'</div>'
-    +'<div style="color:#777;font-size:8pt;margin-top:16px;">Documento de apoyo PROA/Infectología (NOM-004-SSA3). Las dosis y decisiones requieren validación del médico tratante.</div>'
-    +'</body></html>';
-  const blob=new Blob(['﻿'+html],{type:'application/msword'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download='ValoracionID_IA_'+((p.nombre||'paciente').replace(/\s+/g,'_'))+'_'+(new Date().toISOString().slice(0,10))+'.doc';
-  document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },120);
+  const ident=(p.nombre||'')+(p.exp?' · Exp. '+p.exp:'')+' · '+fecha;
+  const body=_txValMembrete('Valoración infectológica del paciente inmunocomprometido', ident)
+    +'<div style="font-size:12px;">'+E(ta.value).replace(/\n/g,'<br>')+'</div>'
+    +'<div style="margin-top:16px;font-size:10px;color:#778;border-top:1px solid #dde;padding-top:6px;">Documento de apoyo PROA / Infectología — NOM-004-SSA3. Las dosis y decisiones requieren validación del médico tratante.</div>';
+  _txValDescargarDoc(body,'ValoracionID_IA_'+((p.nombre||'paciente').replace(/\s+/g,'_'))+'_'+(new Date().toISOString().slice(0,10))+'.doc');
 };
 // ── Historial de valoraciones (>2): cada valoración se guarda fechada y se acumula en el expediente.
 // Snapshot en texto plano de lo capturado + el plan determinista, para archivar la evolución entre visitas.
@@ -26369,17 +26384,11 @@ window._txValDescargarHist=function(idx){
   const p=window._txCurrentPac||{}; const hist=Array.isArray(p.txValoracionHist)?p.txValoracionHist:[]; const e=hist[idx]; if(!e)return;
   const E=window.escHtml||(x=>x);
   let f=e.fecha||''; try{ f=new Date(e.fecha).toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}); }catch(_){ }
-  const body=E(e.texto||'').replace(/\n/g,'<br>');
-  const html='<html><head><meta charset="utf-8"></head><body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#111;">'
-    +'<div style="font-weight:700;font-size:14pt;">Valoración infectológica del paciente inmunocomprometido</div>'
-    +'<div style="color:#555;font-size:9pt;margin-bottom:10px;">'+E(p.nombre||'')+(p.exp?' · Exp. '+E(p.exp):'')+' · '+(e.modo==='inicial'?'Inicial':'Seguimiento')+' · '+E(f)+'</div>'
-    +'<div>'+body+'</div>'
-    +'<div style="color:#777;font-size:8pt;margin-top:16px;">Documento de apoyo PROA/Infectología (NOM-004-SSA3). Las dosis y decisiones requieren validación del médico tratante.</div>'
-    +'</body></html>';
-  const blob=new Blob(['﻿'+html],{type:'application/msword'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download='ValoracionID_'+((p.nombre||'paciente').replace(/\s+/g,'_'))+'_'+(String(e.fecha||'').slice(0,10))+'.doc';
-  document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },120);
+  const ident=(p.nombre||'')+(p.exp?' · Exp. '+p.exp:'')+' · '+(e.modo==='inicial'?'Inicial':'Seguimiento')+' · '+f;
+  const body=_txValMembrete('Valoración infectológica del paciente inmunocomprometido', ident)
+    +'<div style="font-size:12px;">'+E(e.texto||'').replace(/\n/g,'<br>')+'</div>'
+    +'<div style="margin-top:16px;font-size:10px;color:#778;border-top:1px solid #dde;padding-top:6px;">Documento de apoyo PROA / Infectología — NOM-004-SSA3. Las dosis y decisiones requieren validación del médico tratante.</div>';
+  _txValDescargarDoc(body,'ValoracionID_'+((p.nombre||'paciente').replace(/\s+/g,'_'))+'_'+(String(e.fecha||'').slice(0,10))+'.doc');
 };
 window._txValGenerarNota=function(){
   const p=window._txCurrentPac; if(!p){if(typeof toast==='function')toast('Selecciona un paciente','am');return;}

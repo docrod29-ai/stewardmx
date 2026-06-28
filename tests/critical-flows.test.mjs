@@ -1488,6 +1488,28 @@ test('INMUNO v382: historial de >2 valoraciones — snapshot fechado, guardado y
   assert.ok(html.includes('Valoraciones previas (3)') && html.includes('Inicial') && html.includes('Seguimiento') && html.includes('_txValDescargarHist'), 'no rinde el historial acumulado con descarga');
   assert.equal(histFn({ txValoracionHist:[] }), '', 'sin historial debería ser vacío');
 });
+test('INMUNO v383: Word PULIDO — membrete del hospital + título por motivo + plan numerado (carta de interconsulta)', async () => {
+  assert.ok(_idx.includes('function _txValMembrete') && _idx.includes('function _txValWordBody') && _idx.includes('function _txValDescargarDoc'), 'falta el Word con membrete compartido');
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k==='then') return undefined; if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const recDiv = { querySelectorAll:()=>[{textContent:'Pre-protocolo (aún sin inmunosupresión)'},{textContent:'Completar el tamizaje basal.'}] };
+  const p = { id:'p', nombre:'Juan Pérez', exp:'123', edad:50, sexo:'M', servicio:'Medicina Interna', cama:'304' };
+  const docMock = { getElementById:id=>{ if(id==='hc-recs') return { querySelectorAll:()=>[recDiv] }; if(id==='hc_motivo') return { value:'aptitud_pretx' }; if(id&&id.indexOf('hc_cb_')===0) return null; return { value:(id==='hc_huesped'?'SOT — Renal':'') }; }, querySelectorAll:()=>[] };
+  const hi = { nombre:'Hospital General de Prueba' };
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, navigator:{}, location:{}, escHtml:x=>x, document:docMock, Blob:STUB, URL:STUB, HInfo:hi, PACS:[p], window:{ _txCurrentPac:p, _userName:'Dr. Test', HInfo:hi } };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx); vm.runInContext(block, ctx);
+  ctx.window._txValModo='inicial';
+  const w = vm.runInContext('_txValWordBody', ctx)(p);
+  assert.ok(w.includes('Hospital General de Prueba') && w.includes('Programa de Optimización de Antimicrobianos (PROA)'), 'falta el membrete del hospital + PROA');
+  assert.ok(w.includes('Valoración de aptitud pretrasplante'), 'el título no se adapta al motivo');
+  assert.ok(w.includes('Juan Pérez') && w.includes('Exp. 123') && w.includes('304'), 'falta la ficha de identificación');
+  assert.ok(w.includes('<ol') && w.includes('Pre-protocolo') && w.includes('NOM-004'), 'falta el plan numerado / pie NOM-004');
+  ctx.document = { getElementById:id=>{ if(id==='hc-recs') return { querySelectorAll:()=>[] }; if(id==='hc_motivo') return { value:'fiebre' }; if(id&&id.indexOf('hc_cb_')===0) return null; return { value:'' }; }, querySelectorAll:()=>[] };
+  assert.ok(vm.runInContext('_txValWordBody', ctx)(p).includes('Valoración por fiebre o foco infeccioso'), 'el título no cambia con el motivo');
+});
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas
   // se colapsan en la Valoración; su contenido se vuelve secciones colapsables (lazy) que reusan los motores.
@@ -1534,7 +1556,7 @@ test('INMUNO v370: historia completa (datos grales + antecedentes + estado IS) +
   assert.ok(_idx.includes("ta('hc_notas'"), 'falta el campo único de notas / texto libre');
   // v374: antecedentes/hábitos/etc. ahora son chips (sí/no), no campos de texto.
   assert.ok(_idx.includes('📋 Solicitado en la valoración inicial'), 'falta el ligado inicial→seguimiento');
-  assert.ok(/window\._txValWordExport=function/.test(_idx) && _idx.includes("type:'application/msword'") && _idx.includes("a.download='ValoracionID_'"), 'falta el Word completo de la valoración');
+  assert.ok(/window\._txValWordExport=function/.test(_idx) && _idx.includes('function _txValWordBody') && _idx.includes("type:'application/msword'") && _idx.includes("'ValoracionID_'+"), 'falta el Word completo de la valoración');
   assert.ok(_idx.includes('const _TX_EST_LABELS='), 'falta el mapa de etiquetas de estudios compartido');
   const vm = await import('node:vm');
   const start = _idx.indexOf('// ══ v366: Valoración');

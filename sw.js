@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v383 (Inmunocomprometido — Fase 4/5: Word pulido, carta de interconsulta)
+//  "sigue" del Dr.: pulir el Word. Ahora es una carta profesional: membrete (_txValMembrete: nombre del hospital
+//  desde HInfo + "Servicio de Infectología · PROA"), TÍTULO POR MOTIVO (_TX_MOT_TIT: aptitud pretrasplante,
+//  fiebre, profilaxis, vacunación…), ficha de identificación (cama/servicio ACTUALES desde PACS), secciones con
+//  barra de acento (Cambria), PLAN NUMERADO, línea de firma + NOM-004. Tipografía/_TX_DOC_CSS y descarga
+//  (_txValDescargarDoc) compartidas por los 3 Word (completo, IA e historial) → consistencia total. +1 (293).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v382 (Inmunocomprometido — historial de >2 valoraciones, fechadas)
 //  "sigue" del Dr.: soportar más de 2 valoraciones (Inicial → Seguimiento 1 → 2 → 3…). Botón "💾 Guardar
 //  valoración al historial" → _txValGuardarHist toma un snapshot en texto (datos compuestos + estudios + plan
@@ -1119,7 +1126,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v382';
+const CACHE = 'stewardmx-v383';
 const SHELL = [
   '/',
   '/index.html',
