@@ -1276,7 +1276,7 @@ test('INMUNO v366: valoración infectológica del inmunocomprometido (historia d
   assert.ok(_idx.includes('function _renderTxValoracion(p)') && _idx.includes("sub==='tx-valoracion'"), '_renderTxValoracion no está definida/dispatcheada');
   assert.ok(/window\._txValSetModo/.test(_idx) && _idx.includes("window._txValModo='inicial'"), 'falta el toggle de modo Inicial/Seguimiento');
   assert.ok(_idx.includes('hc_padecimiento') && _idx.includes("ta('hc_notas'") && _idx.includes('_txChipsGroupHTML'), 'faltan elementos de la historia clínica dirigida (padecimiento + notas + chips)');
-  assert.ok(_idx.includes('function _txValEstudiosHTML') && _idx.includes('hc_est_igra'), 'falta el checklist de estudios a solicitar');
+  assert.ok(_idx.includes('function _txValEstudiosHTML') && _idx.includes('const _TX_EST_CATS=') && _idx.includes("igra:'IGRA / PPD'"), 'falta el panel de estudios a solicitar (por categorías)');
   assert.ok(/window\._txValRecs/.test(_idx) && _idx.includes('VIH — profilaxis por CD4') && _idx.includes('Tamizaje según el biológico'), 'faltan recomendaciones por huésped (VIH y no-VIH)');
   assert.ok(/window\._txValGenerarNota/.test(_idx) && _idx.includes('txValoracion:data'), 'no genera/persiste la nota de valoración');
   assert.ok(_idx.includes("label:'Inmunocomprometido'"), 'la pestaña no se renombró a Inmunocomprometido');
@@ -1339,6 +1339,22 @@ test('INMUNO v375: los chips no marcados quedan documentados como NEGATIVOS (sol
   assert.ok(comorb && comorb[1].includes('Presentes: DM2'), 'no lista el chip marcado como presente');
   assert.ok(comorb[1].includes('Negadas:') && comorb[1].includes('ERC'), 'no documenta los no marcados como negativos');
   assert.ok(!out.some(r=>r[0]==='Dispositivos'), 'documenta negativos de un grupo que no se mostró (no evaluado)');
+});
+test('INMUNO v376: panel de estudios a solicitar AMPLIO y por categorías (gateado por huésped)', async () => {
+  assert.ok(_idx.includes('const _TX_EST_CATS=') && _idx.includes("cat:'Cargas virales / molecular'") && _idx.includes("cat:'Micología (vigilancia)'") && _idx.includes("cat:'Imagen'"), 'falta el panel de estudios por categorías');
+  assert.ok(_idx.includes("adeno:'Adenovirus PCR'") && _idx.includes("hbsag:'HBsAg'"), 'no se ampliaron los resultados Pos/Neg');
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{}, escHtml:x=>x };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx);
+  const got = vm.runInContext(block + '\n;({est:_txValEstudiosHTML})', ctx);
+  const sot = got.est({ hc_huesped:'SOT — Renal' });
+  assert.ok(sot.includes('Serologías del trasplante') && sot.includes('CMV PCR') && sot.includes('TC de tórax'), 'SOT no muestra serologías de trasplante / cargas virales / imagen');
+  const vih = got.est({ hc_huesped:'VIH' });
+  assert.ok(!vih.includes('Serologías del trasplante') && vih.includes('Antígeno criptocócico'), 'VIH no debería mostrar serologías de trasplante, pero sí CrAg');
 });
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas

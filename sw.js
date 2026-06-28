@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v376 (Inmunocomprometido — panel de estudios a solicitar AMPLIO y por categorías)
+//  Feedback del Dr.: solicitudes de serologías/estudios más amplias. _TX_EST_CATS reemplaza la lista plana:
+//  9 categorías (Serologías basales, Serologías del trasplante, TB, Micosis endémica/oportunista, Laboratorio,
+//  Cargas virales/molecular [CMV/EBV/BK/adeno/HHV-6/panel respiratorio], Micología de vigilancia [galactomanano,
+//  β-D-glucano], Cultivos [hemo/uro/esputo/vigilancia MDR/C. difficile], Imagen [TC tórax/senos]). Cada categoría
+//  se muestra según el huésped. Resultados Pos/Neg ampliados (14: + adenovirus, CrAg, esputo, C. difficile,
+//  HBsAg, HBV DNA, VDRL). +1 prueba (286).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v375 (Inmunocomprometido — chips más completos + NEGATIVOS documentados)
 //  Feedback del Dr.: más opciones y que lo NO marcado quede plasmado como negativo. _TX_CHIPS ampliado
 //  (comorbilidades 14, dispositivos 12, inmunosupresión 12 con anti-CD20/anti-TNF/belatacept/ATG/eculizumab,
@@ -1061,7 +1069,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v375';
+const CACHE = 'stewardmx-v376';
 const SHELL = [
   '/',
   '/index.html',
