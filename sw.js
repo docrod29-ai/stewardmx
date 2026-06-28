@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v371 (Inmunocomprometido — LOOP Fase 2: flujo dirigido por MOTIVO)
+//  Loop "valoración perfecta", Fase 2 (diseño aprobado por el Dr.). El MOTIVO de la interconsulta (aptitud
+//  pre-TX / fiebre / profilaxis / aptitud biológico / vacunación / otro) ORIENTA el formulario: revelado
+//  progresivo (_txG) que muestra SOLO los grupos relevantes de la historia. Sin motivo → guarda que pide
+//  elegirlo. El eje inicial/seguimiento sigue siendo el toggle modo (= valoración inicial/posterior del
+//  protocolo). Blindaje de datos: _txSaveValoracion y _txValReRender FUSIONAN sobre lo guardado (los campos
+//  ocultos por la disclosure NO se pierden). Verificado en sandbox (con/sin motivo, oculta lo no relevante)
+//  + 281 pruebas. Falta F3 (paso IA que redacta) y F4 (Word adaptable por motivo).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v370 (Inmunocomprometido — valoración completísima + Word para el solicitante)
 //  Feedback del Dr.: (1) NO todos toman inmunosupresores → nuevo "¿Inmunosupresión hoy?" (en curso / va a
 //  iniciar / ninguna) que afina recomendaciones (pre-protocolo → tamizaje + vacunas vivas AHORA). (2) Faltaban
@@ -1022,7 +1031,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v370';
+const CACHE = 'stewardmx-v371';
 const SHELL = [
   '/',
   '/index.html',

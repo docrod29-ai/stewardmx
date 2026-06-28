@@ -25977,8 +25977,12 @@ function _renderTxValoracion(p){
   html+=`<span style="background:var(--s2);border-radius:6px;padding:6px 10px;">${p.servicio?E(p.servicio):'servicio —'}${p.cama?' · '+E(p.cama):''}</span>`;
   html+=`<button onclick="window.abrirEditar&&abrirEditar('${escJs(p.id)}')" style="background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.4);color:#a78bfa;border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;">✎ Editar / completar datos</button>`;
   html+=`</div>`;
+  // MOTIVO de la interconsulta — el eje que ORIENTA todo (revelado progresivo).
+  const _motOpts=[['','— Elige el motivo —'],['aptitud_pretx','Aptitud / protocolo pre-trasplante'],['fiebre','Fiebre / síndrome infeccioso'],['profilaxis','Profilaxis (definir / ajustar)'],['aptitud_biologico','Aptitud para iniciar biológico / inmunosupresor'],['vacunacion','Vacunación'],['otro','Otro / consulta general']];
+  html+=`<div class="fsec-t" style="margin-top:14px;">🎯 Motivo de la interconsulta</div>`;
+  html+=`<div style="margin:6px 0 4px;"><select id="hc_motivo" onchange="window._txValReRender&&window._txValReRender();" style="width:100%;max-width:420px;padding:8px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;font-weight:700;">`+_motOpts.map(([k,l])=>`<option value="${k}"${(s.hc_motivo||'')===k?' selected':''}>${E(l)}</option>`).join('')+`</select></div>`;
   html+=`<div class="fsec-t" style="margin-top:14px;">Tipo de huésped inmunocomprometido</div>`;
-  html+=`<div style="margin:6px 0 4px;"><select id="hc_huesped" onchange="window._txSaveValoracion&&window._txSaveValoracion();window._txValRefreshEstudios&&window._txValRefreshEstudios();window._txValRecs&&window._txValRecs();window._txValRefreshDeep&&window._txValRefreshDeep();" style="width:100%;max-width:420px;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;">`+hOpts.map(o=>`<option value="${E(o)}"${(s.hc_huesped||'')===o?' selected':''}>${E(o)}</option>`).join('')+`</select></div>`;
+  html+=`<div style="margin:6px 0 4px;"><select id="hc_huesped" onchange="window._txValReRender&&window._txValReRender();" style="width:100%;max-width:420px;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;">`+hOpts.map(o=>`<option value="${E(o)}"${(s.hc_huesped||'')===o?' selected':''}>${E(o)}</option>`).join('')+`</select></div>`;
   // Estado de inmunosupresión — NO todos la reciben (puede ir a iniciar o no tener).
   const isEstOpts=['—','En curso','Va a iniciar (pre-protocolo)','Ninguna / suspendida'];
   html+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px;">`;
@@ -25986,17 +25990,28 @@ function _renderTxValoracion(p){
   html+=`<div><label style="display:block;font-size:11px;color:var(--t2);margin-bottom:4px;font-weight:600;">Fecha TX / inicio IS</label><input id="hc_fechatx" oninput="window._txSaveValoracion&&window._txSaveValoracion();window._txValRecs&&window._txValRecs();" placeholder="AAAA-MM-DD" value="${v('hc_fechatx')}" style="width:100%;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;box-sizing:border-box;"></div>`;
   html+=`<div><label style="display:block;font-size:11px;color:var(--t2);margin-bottom:4px;font-weight:600;">CD4 (si VIH)</label><input id="hc_cd4" oninput="window._txSaveValoracion&&window._txSaveValoracion();window._txValRecs&&window._txValRecs();" placeholder="ej. 350" value="${v('hc_cd4')}" style="width:100%;padding:7px 10px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;box-sizing:border-box;"></div>`;
   html+=`</div>`;
+  // Revelado progresivo: el MOTIVO decide qué grupos de la historia aparecen. Sin motivo, se pide elegirlo.
+  const motivo=s.hc_motivo||'';
+  const _GR={
+    aptitud_pretx:{antec:1,inmuno:1,infecto:1,vacunas:1,explora:0},
+    fiebre:{antec:1,inmuno:1,infecto:1,vacunas:0,explora:1},
+    profilaxis:{antec:0,inmuno:1,infecto:1,vacunas:0,explora:0},
+    aptitud_biologico:{antec:1,inmuno:1,infecto:1,vacunas:1,explora:0},
+    vacunacion:{antec:0,inmuno:1,infecto:0,vacunas:1,explora:0},
+    otro:{antec:1,inmuno:1,infecto:1,vacunas:1,explora:1}
+  };
+  const _txG=grp=>!!(motivo&&_GR[motivo]&&_GR[motivo][grp]);
+  if(!motivo){
+    html+=`<div style="margin-top:16px;padding:18px;text-align:center;background:var(--s2);border:1px dashed var(--brd2);border-radius:8px;color:var(--t3);font-size:12px;line-height:1.5;">👉 Elige el <b>motivo de la interconsulta</b> arriba.<br>La valoración se abre dirigida a eso — solo lo relevante.</div>`;
+    return html;
+  }
   html+=`<div class="fsec-t" style="margin-top:14px;">📝 Historia clínica dirigida</div>`;
   html+=ta('hc_padecimiento','Padecimiento actual / motivo de la interconsulta','Síntomas, tiempo de evolución, quién solicita…');
-  html+=ta('hc_comorbilidades','Antecedentes y comorbilidades (generales)','DM, ERC, hepatopatía, cardiopatía, neoplasia de base…');
-  html+=ta('hc_antec_quir','Antecedentes quirúrgicos / dispositivos','Cirugías, CVC/PICC, sonda, prótesis…');
-  html+=tx('hc_habitos','Hábitos (tabaquismo / alcohol / tóxicos)','—');
-  html+=ta('hc_inmunosup','Esquema inmunosupresor (fármacos y dosis)','Esteroides, tacro/ciclo, MMF/AZA, mTOR, biológicos, JAK… o "ninguno aún"');
-  html+=ta('hc_profilaxis','Profilaxis activas','TMP-SMX (PJP), (val)ganciclovir/letermovir (CMV), antifúngico, INH (TB)…');
-  html+=ta('hc_antecedentes','Antecedentes infectológicos','Infecciones previas, colonización/infección MDR (BLEE/CRE/MRSA/VRE), C. difficile, TB previa…');
-  html+=ta('hc_exposiciones','Exposiciones epidemiológicas','Zona endémica de micosis, animales, contactos TB, viajes, transfusiones…');
-  html+=tx('hc_vacunas','Estado de vacunación','Influenza, neumococo, HepB, SARS-CoV-2…');
-  html+=ta('hc_exploracion','Exploración física dirigida','Catéter/piel, pulmón, abdomen, SNC, mucosas, focos…');
+  if(_txG('antec')){ html+=ta('hc_comorbilidades','Antecedentes y comorbilidades (generales)','DM, ERC, hepatopatía, cardiopatía, neoplasia de base…'); html+=ta('hc_antec_quir','Antecedentes quirúrgicos / dispositivos','Cirugías, CVC/PICC, sonda, prótesis…'); html+=tx('hc_habitos','Hábitos (tabaquismo / alcohol / tóxicos)','—'); }
+  if(_txG('inmuno')){ html+=ta('hc_inmunosup','Esquema inmunosupresor (fármacos y dosis)','Esteroides, tacro/ciclo, MMF/AZA, mTOR, biológicos, JAK… o "ninguno aún"'); html+=ta('hc_profilaxis','Profilaxis activas','TMP-SMX (PJP), (val)ganciclovir/letermovir (CMV), antifúngico, INH (TB)…'); }
+  if(_txG('infecto')){ html+=ta('hc_antecedentes','Antecedentes infectológicos','Infecciones previas, colonización/infección MDR (BLEE/CRE/MRSA/VRE), C. difficile, TB previa…'); html+=ta('hc_exposiciones','Exposiciones epidemiológicas','Zona endémica de micosis, animales, contactos TB, viajes, transfusiones…'); }
+  if(_txG('vacunas')) html+=tx('hc_vacunas','Estado de vacunación','Influenza, neumococo, HepB, SARS-CoV-2…');
+  if(_txG('explora')) html+=ta('hc_exploracion','Exploración física dirigida','Catéter/piel, pulmón, abdomen, SNC, mucosas, focos…');
   html+=tx('hc_alergias','Alergias a antimicrobianos','—');
   if(modo==='inicial'){
     html+=`<div class="fsec-t" style="margin-top:14px;">🔬 Estudios a solicitar (sugeridos por huésped)</div>`;
@@ -26026,10 +26041,12 @@ window._txSaveValoracion=(function(){
   var _t=null;
   return function(){
     var p=window._txCurrentPac; if(!p||!p.id)return;
-    var data={};
+    // Fusiona sobre lo guardado: con revelado progresivo, los campos OCULTOS no están en el DOM y no deben
+    // perderse. Partimos de lo previo y sobre-escribimos solo lo visible (inputs y checkboxes).
+    var data=Object.assign({}, p.txValoracion||{});
     document.querySelectorAll('[id^="hc_"]').forEach(function(el){
-      if(el.type==='checkbox'){ if(el.checked)data[el.id]='1'; }
-      else { var val=(el.value||'').trim(); if(val!=='')data[el.id]=val; }
+      if(el.type==='checkbox'){ data[el.id]=el.checked?'1':''; }
+      else { data[el.id]=(el.value||'').trim(); }
     });
     clearTimeout(_t);
     _t=setTimeout(function(){
@@ -26039,6 +26056,16 @@ window._txSaveValoracion=(function(){
     },1000);
   };
 })();
+// Re-render del flujo conservando TODO lo escrito (incluye campos ocultos por el revelado progresivo).
+// Lo llaman los selectores que cambian la disclosure (motivo, huésped).
+window._txValReRender=function(){
+  var p=window._txCurrentPac; if(!p)return;
+  var data=Object.assign({}, p.txValoracion||{});
+  document.querySelectorAll('[id^="hc_"]').forEach(function(e){ if(e.type==='checkbox'){ data[e.id]=e.checked?'1':''; } else { data[e.id]=(e.value||'').trim(); } });
+  p.txValoracion=data; var pi=PACS.find(function(x){return x.id===p.id;}); if(pi)pi.txValoracion=data;
+  if(window._txSaveValoracion)window._txSaveValoracion();
+  if(typeof renderTrasplantePac==='function')renderTrasplantePac(p.id);
+};
 window._txValRecs=function(){
   const el=document.getElementById('hc-recs'); if(!el)return;
   const g=id=>(document.getElementById(id)?.value||'');

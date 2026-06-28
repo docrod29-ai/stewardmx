@@ -1352,6 +1352,28 @@ test('INMUNO v370: historia completa (datos grales + antecedentes + estado IS) +
   assert.ok(typeof out === 'string' && out.length > 1000, '_renderTxValoracion no rinde');
   assert.doesNotThrow(() => { got.word(); }, '_txValWordExport truena');
 });
+test('INMUNO v371: flujo dirigido por MOTIVO (revelado progresivo) + sin pérdida de datos ocultos', async () => {
+  // Fase 2 del loop: el motivo de la interconsulta orienta qué se muestra. Sin motivo → guarda. Y al
+  // re-renderizar/guardar NO se pierden los campos ocultos (merge sobre lo guardado).
+  assert.ok(_idx.includes('id="hc_motivo"'), 'falta el selector de motivo');
+  assert.ok(/window\._txValReRender=function/.test(_idx), 'falta _txValReRender');
+  assert.ok(_idx.includes('var data=Object.assign({}, p.txValoracion||{})'), '_txSaveValoracion no fusiona (perdería campos ocultos)');
+  assert.ok(_idx.includes('const _txG=grp=>'), 'falta el motor de revelado progresivo (_txG)');
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{} };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx);
+  const got = vm.runInContext(block + '\n;({render:_renderTxValoracion})', ctx);
+  const conMotivo = got.render({ id:'p1', nombre:'X', txValoracion:{ hc_motivo:'fiebre', hc_huesped:'SOT — Renal' } });
+  assert.ok(conMotivo.includes('Historia clínica dirigida'), 'con motivo no abre la historia');
+  const sinMotivo = got.render({ id:'p2', nombre:'Y', txValoracion:{} });
+  assert.ok(sinMotivo.includes('Elige el') && !sinMotivo.includes('Historia clínica dirigida'), 'sin motivo no muestra la guarda');
+  const profilaxis = got.render({ id:'p3', nombre:'Z', txValoracion:{ hc_motivo:'profilaxis', hc_huesped:'VIH' } });
+  assert.ok(!profilaxis.includes('Exploración física dirigida'), 'el revelado progresivo no oculta lo no relevante (profilaxis no debe pedir exploración)');
+});
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
   assert.ok(/window\._renderAbgInterpretacionHTML\(a\.abg,a\.organismo\|\|''\)/.test(_idx), 'el panel no se renderiza en la lista de aislamientos guardados');
