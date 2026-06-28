@@ -19,6 +19,8 @@ const admin = require('firebase-admin');
 
 admin.initializeApp();
 const db = admin.firestore();
+// W1.1: pareo de paciente (exp → fhirId → nombre) extraído a un módulo testeable.
+const { findExistingPatient } = require('./lib/pairing');
 
 // ════════════════════════════════════════════════════════════════════
 // ── 1. Proxy seguro a Anthropic ─────────────────────────────────────
@@ -220,27 +222,7 @@ function normalizeSexo(val) {
   return String(val).toUpperCase().slice(0, 1);
 }
 
-/**
- * Busca si ya existe un paciente en el censo con el mismo fhirId o mismo nombre.
- * Devuelve el docId del existente o null si no se encontró.
- */
-async function findExistingPatient(hospId, month, patientFhirId, patientName) {
-  // 1. Por fhirId (más confiable)
-  if (patientFhirId) {
-    const ref = db.doc(`hospitals/${hospId}/months/${month}/patients/ehr_${patientFhirId}`);
-    const snap = await ref.get();
-    if (snap.exists) return `ehr_${patientFhirId}`;
-  }
-  // 2. Por nombre exacto (fallback para EHRs sin ID estándar)
-  if (patientName) {
-    const q = await db.collection(`hospitals/${hospId}/months/${month}/patients`)
-      .where('nombre', '==', patientName)
-      .limit(1)
-      .get();
-    if (!q.empty) return q.docs[0].id;
-  }
-  return null;
-}
+// findExistingPatient(db, hospId, month, {fhirId, name, exp}) → ./lib/pairing.js (W1.1, testeable).
 
 /**
  * Obtiene token OAuth2 client_credentials desde el EHR (SMART on FHIR).
@@ -710,7 +692,7 @@ exports.ehrWebhook = onRequest(
       // El paciente aparece en la tabla principal del equipo PROA automáticamente.
       try {
         // Buscar si ya existe para actualizar en vez de crear duplicado
-        const existingDocId = await findExistingPatient(hospId, currentMonth, patientFhirId, patientName);
+        const existingDocId = await findExistingPatient(db, hospId, currentMonth, { fhirId: patientFhirId, name: patientName, exp });
         const censoDocId = existingDocId || `ehr_${patientFhirId || fhirMedicationRequestId}`;
         const censoRef   = db.doc(`hospitals/${hospId}/months/${currentMonth}/patients/${censoDocId}`);
 

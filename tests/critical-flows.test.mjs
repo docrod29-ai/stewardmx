@@ -1984,3 +1984,26 @@ test('TXPERSIST: la evaluación Pre-TX se guarda al expediente y se pre-carga (v
   assert.ok(_idx.includes('window._txPretxLoading'), 'falta el guard de pre-carga (evita guardar durante la carga)');
   assert.ok(_idx.includes('if(window._txSavePretx)window._txSavePretx()'), '_pretxRecs no dispara el guardado');
 });
+test('W1.1 — pareo de paciente por exp/MRN (prioridad) → fhirId → nombre → null', async () => {
+  // Interoperabilidad: las ingestas EHR/LIS deben ligarse al paciente CORRECTO. exp (MRN) es el más seguro.
+  const mod = await import('../functions/lib/pairing.js');
+  const findExistingPatient = mod.findExistingPatient || (mod.default && mod.default.findExistingPatient);
+  const makeDb = (byField = {}, docs = {}) => ({
+    doc: (path) => ({ get: async () => ({ exists: !!docs[path], id: path.split('/').pop() }) }),
+    collection: () => ({ where: (f, _op, v) => ({ limit: () => ({ get: async () => { const id = byField[f + ':' + JSON.stringify(v)]; return id ? { empty: false, docs: [{ id }] } : { empty: true, docs: [] }; } }) }) }),
+  });
+  // exp gana sobre nombre
+  let db = makeDb({ 'exp:"12345"': 'pac_exp', 'nombre:"Juan Pérez"': 'pac_nombre' });
+  assert.equal(await findExistingPatient(db, 'H', '2026-06', { fhirId: 'X', name: 'Juan Pérez', exp: '12345' }), 'pac_exp', 'exp no tuvo prioridad');
+  // exp no halla → fhirId
+  db = makeDb({}, { 'hospitals/H/months/2026-06/patients/ehr_X': true });
+  assert.equal(await findExistingPatient(db, 'H', '2026-06', { fhirId: 'X', name: 'Juan', exp: '999' }), 'ehr_X', 'no cayó a fhirId');
+  // sin exp/fhirId → nombre (último recurso)
+  db = makeDb({ 'nombre:"Juan Pérez"': 'pac_nombre' });
+  assert.equal(await findExistingPatient(db, 'H', '2026-06', { name: 'Juan Pérez' }), 'pac_nombre', 'no cayó a nombre');
+  // nada coincide → null
+  assert.equal(await findExistingPatient(makeDb({}), 'H', '2026-06', { fhirId: 'Z', name: 'Nadie', exp: '000' }), null, 'debería ser null');
+  // exp numérico almacenado → fallback a Number
+  db = makeDb({ 'exp:777': 'pac_num' });
+  assert.equal(await findExistingPatient(db, 'H', '2026-06', { exp: '777' }), 'pac_num', 'no hizo fallback numérico de exp');
+});
