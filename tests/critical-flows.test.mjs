@@ -2066,3 +2066,27 @@ test('W1.3 — idempotencia (labIdFor) + normalización LIS (HL7/JSON)', async (
   const nj = normalizeLisInput({ body: { patientId: 'pac1', organism: 'K. pneumoniae', antibiogram: [], messageId: 'X9' } });
   assert.ok(nj.patientId === 'pac1' && nj.organism === 'K. pneumoniae' && nj.controlId === 'X9' && nj.source === 'LIS', 'normalización JSON incorrecta');
 });
+test('W1.4 — tubo end-to-end con simulador: HL7 → parse → normaliza → pareo(exp) → labId idempotente', async () => {
+  const { buildORU } = await import('../functions/lib/hl7sim.js');
+  const { parseORU } = await import('../functions/lib/hl7.js');
+  const { normalizeLisInput, labIdFor } = await import('../functions/lib/lis.js');
+  const { findExistingPatient } = await import('../functions/lib/pairing.js');
+  // Mensaje sintético.
+  const msg = buildORU({ controlId: 'E2E1', exp: '55501', family: 'GARCIA', given: 'ANA', sex: 'F', collectedAt: '20260628073000', organism: 'Klebsiella pneumoniae', antibiogram: [{ drug: 'Meropenem', mic: '>=16', interpretation: 'R' }, { drug: 'Amikacina', mic: '<=2', interpretation: 'S' }] });
+  // Parse + normaliza.
+  const parsed = parseORU(msg);
+  assert.equal(parsed.patient.exp, '55501', 'exp del simulador no round-trip');
+  assert.equal(parsed.organism, 'Klebsiella pneumoniae', 'organismo no round-trip');
+  assert.equal(parsed.antibiogram.length, 2, 'antibiograma no round-trip');
+  assert.equal(parsed.specimen.collectedAt, '2026-06-28T07:30:00', 'fecha de toma no round-trip');
+  const inp = normalizeLisInput({ hl7: parsed });
+  assert.equal(inp.exp, '55501'); assert.equal(inp.controlId, 'E2E1');
+  // Pareo por exp contra un Firestore simulado (paciente censado con exp 55501).
+  const db = { doc: () => ({ get: async () => ({ exists: false }) }), collection: () => ({ where: (f, _o, v) => ({ limit: () => ({ get: async () => (f === 'exp' && String(v) === '55501') ? { empty: false, docs: [{ id: 'pac_ana' }] } : { empty: true, docs: [] } }) }) }) };
+  const pid = await findExistingPatient(db, 'H', '2026-06', { exp: inp.exp, name: inp.name });
+  assert.equal(pid, 'pac_ana', 'no pareó el resultado al paciente por exp');
+  // Idempotencia: el MISMO mensaje produce el MISMO labId (no duplica).
+  const id1 = labIdFor({ controlId: parseORU(msg).controlId, patientId: pid });
+  const id2 = labIdFor({ controlId: parseORU(msg).controlId, patientId: pid });
+  assert.equal(id1, id2, 'reenviar el mismo mensaje no es idempotente');
+});
