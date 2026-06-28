@@ -1,4 +1,16 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v377 (Inmunocomprometido — COHERENCIA: recs por estado de IS + resultados dirigidos)
+//  Feedback del Dr. (crítico): no dar "PJP indicada" si no está inmunosuprimido / pre-protocolo / sin resultados;
+//  los negativos no deben enumerarse todos; y en seguimiento deben aparecer TODOS los estudios pedidos.
+//  (1) _txValRecs reescrito y gateado por hc_is_estado: VIH→por CD4; «Va a iniciar»→tamizaje/vacunas ANTES (sin
+//      profilaxis activa); «En curso»→profilaxis activa (PJP/CMV/antifúngica/fase); «Ninguna»→mínimo; «—»→pide
+//      definir el estado. + Recs DIRIGIDAS POR RESULTADOS (CMV+, galactomanano/BDG+, CrAg+, BK+, hemocultivo+,
+//      C. difficile+, IGRA+…) que solo aparecen si el resultado se capturó.
+//  (2) Seguimiento: _txResHTML deriva los resultados de los estudios solicitados (hc_est_*), no de una lista fija;
+//      cuantitativos/imagen como texto, el resto Pos/Neg/Pendiente. _TX_RES eliminado, +_TX_EST_QUANT.
+//  (3) Negativos concisos: nada marcado → frase breve (noneL); algo marcado → positivos + "(resto negado)".
+//  +1 prueba (287).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v376 (Inmunocomprometido — panel de estudios a solicitar AMPLIO y por categorías)
 //  Feedback del Dr.: solicitudes de serologías/estudios más amplias. _TX_EST_CATS reemplaza la lista plana:
 //  9 categorías (Serologías basales, Serologías del trasplante, TB, Micosis endémica/oportunista, Laboratorio,
@@ -1069,7 +1081,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v376';
+const CACHE = 'stewardmx-v377';
 const SHELL = [
   '/',
   '/index.html',

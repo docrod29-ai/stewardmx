@@ -1299,7 +1299,7 @@ test('INMUNO v373: recomendaciones por fase/paciente — SIN emojis ni bibliogra
   const body = _idx.slice(s, e);
   assert.ok(!/\[(AST|DHHS|TTS|Fishman|OMS|IDSA|ECIL|AGA|CDC|Kotton)/.test(body), 'las recomendaciones aún tienen bibliografía entre corchetes');
   assert.ok(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}✅ℹ\u{1F9ED}]/u.test(body), 'las recomendaciones aún contienen emojis');
-  assert.ok(body.includes("preIS||motivo==='vacunacion'") && body.includes('preIS||isBio'), 'TB/vacunas no están condicionadas a lo pertinente (solo lo que necesita el paciente)');
+  assert.ok(body.includes('activeIS') && body.includes('preProto') && body.includes('Define el estado de inmunosupresión'), 'el plan no está gateado por el estado real de inmunosupresión (coherencia)');
 });
 test('INMUNO v374: historia por chips (sí/no) + un solo texto libre + resultados Pos/Neg, compuestos al Word', async () => {
   // El Dr. pidió marcar antecedentes (DM2/HAS/tabaquismo) con chips, un solo campo de texto, y resultados Pos/Neg.
@@ -1316,8 +1316,10 @@ test('INMUNO v374: historia por chips (sí/no) + un solo texto libre + resultado
   const got = vm.runInContext(block + '\n;({render:_renderTxValoracion, chips:_txChipsGroupHTML, res:_txResHTML})', ctx);
   const chipHtml = got.chips('comorb', { 'hc_cb_comorb_dm2':'1' });
   assert.ok(chipHtml.includes('DM2') && chipHtml.includes('id="hc_cb_comorb_dm2"') && chipHtml.includes('checked'), 'el chip DM2 no se marca');
-  const resHtml = got.res({ 'hc_res_cmv':'Positivo' });
-  assert.ok(resHtml.includes('CMV PCR') && resHtml.includes('Positivo'), 'los resultados Pos/Neg no rinden');
+  // Los resultados a capturar son EXACTAMENTE los estudios solicitados (hc_est_*), con su valor (hc_res_*).
+  const resHtml = got.res({ 'hc_est_cmvpcr':'1', 'hc_res_cmvpcr':'Positivo' });
+  assert.ok(resHtml.includes('CMV PCR') && resHtml.includes('Positivo'), 'los resultados Pos/Neg no rinden a partir de los estudios pedidos');
+  assert.ok(got.res({}).includes('Marca los estudios'), 'sin estudios pedidos no invita a marcarlos en Inicial');
   const r = got.render({ id:'p', txValoracion:{ hc_motivo:'fiebre', hc_huesped:'SOT — Renal' } });
   assert.ok(r.includes('Comorbilidades') && r.includes('id="hc_notas"'), 'la historia no muestra chips + el campo de notas');
 });
@@ -1336,13 +1338,18 @@ test('INMUNO v375: los chips no marcados quedan documentados como NEGATIVOS (sol
   vm.runInContext(block, ctx);
   const out = ctx.window._txValCompose();
   const comorb = out.find(r=>r[0]==='Comorbilidades');
-  assert.ok(comorb && comorb[1].includes('Presentes: DM2'), 'no lista el chip marcado como presente');
-  assert.ok(comorb[1].includes('Negadas:') && comorb[1].includes('ERC'), 'no documenta los no marcados como negativos');
-  assert.ok(!out.some(r=>r[0]==='Dispositivos'), 'documenta negativos de un grupo que no se mostró (no evaluado)');
+  // Conciso: algo marcado → positivos + "(resto negado)" (no enumera la lista completa, que confunde).
+  assert.ok(comorb && comorb[1] === 'Presentes: DM2 (resto negado)', 'no documenta conciso el chip marcado + resto negado: '+(comorb&&comorb[1]));
+  assert.ok(!out.some(r=>r[0]==='Dispositivos'), 'documenta un grupo que no se mostró (no evaluado)');
+  // Nada marcado → negativo breve (noneL), no la lista completa.
+  ctx.document = { getElementById:id=>{ if(id.startsWith('hc_cb_comorb_')) return { checked:false }; return null; } };
+  const out0 = ctx.window._txValCompose();
+  const comorb0 = out0.find(r=>r[0]==='Comorbilidades');
+  assert.ok(comorb0 && comorb0[1] === 'Sin comorbilidades referidas', 'nada marcado no se documenta breve: '+(comorb0&&comorb0[1]));
 });
 test('INMUNO v376: panel de estudios a solicitar AMPLIO y por categorías (gateado por huésped)', async () => {
   assert.ok(_idx.includes('const _TX_EST_CATS=') && _idx.includes("cat:'Cargas virales / molecular'") && _idx.includes("cat:'Micología (vigilancia)'") && _idx.includes("cat:'Imagen'"), 'falta el panel de estudios por categorías');
-  assert.ok(_idx.includes("adeno:'Adenovirus PCR'") && _idx.includes("hbsag:'HBsAg'"), 'no se ampliaron los resultados Pos/Neg');
+  assert.ok(_idx.includes('const _TX_EST_QUANT=') && _idx.includes("adenopcr:'Adenovirus PCR'"), 'falta el set de estudios cuantitativos o las cargas virales ampliadas');
   const vm = await import('node:vm');
   const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
   const block = _idx.slice(start, end);
@@ -1355,6 +1362,29 @@ test('INMUNO v376: panel de estudios a solicitar AMPLIO y por categorías (gatea
   assert.ok(sot.includes('Serologías del trasplante') && sot.includes('CMV PCR') && sot.includes('TC de tórax'), 'SOT no muestra serologías de trasplante / cargas virales / imagen');
   const vih = got.est({ hc_huesped:'VIH' });
   assert.ok(!vih.includes('Serologías del trasplante') && vih.includes('Antígeno criptocócico'), 'VIH no debería mostrar serologías de trasplante, pero sí CrAg');
+});
+test('INMUNO v377: COHERENCIA — recomendaciones por estado de IS + dirigidas por resultados + resultados dinámicos', async () => {
+  // Feedback del Dr.: no dar "PJP indicada" si no está inmunosuprimido / pre-protocolo / sin resultados.
+  // Las recs se gatean por hc_is_estado y por los resultados capturados; los resultados son los estudios pedidos.
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{}, escHtml:x=>x };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx); vm.runInContext(block, ctx);
+  const recsDoc = (vals,chk) => { const cache={}; return { getElementById:id=>{ if(cache[id]) return cache[id]; const el=(id==='hc-recs')?{innerHTML:''}:{value:(vals[id]!=null?vals[id]:''),checked:chk.has(id)}; cache[id]=el; return el; } }; };
+  const runRecs = (vals,chk) => { ctx.document=recsDoc(vals,chk||new Set()); ctx.window._txValRecs(); return ctx.document.getElementById('hc-recs').innerHTML; };
+  const pre = runRecs({ hc_huesped:'SOT — Renal', hc_is_estado:'Va a iniciar (pre-protocolo)' });
+  assert.ok(pre.includes('Pre-protocolo') && !pre.includes('Pneumocystis indicada'), 'pre-protocolo no debe recomendar PJP activa');
+  const enc = runRecs({ hc_huesped:'SOT — Renal', hc_is_estado:'En curso' });
+  assert.ok(enc.includes('Profilaxis para Pneumocystis indicada'), 'inmunosupresión en curso sí debe recomendar PJP');
+  const unk = runRecs({ hc_huesped:'SOT — Renal', hc_is_estado:'' });
+  assert.ok(unk.includes('Define el estado') && !unk.includes('Pneumocystis indicada'), 'estado de IS no definido no debe recomendar PJP');
+  const resR = runRecs({ hc_huesped:'SOT — Renal', hc_is_estado:'En curso', hc_res_cmvpcr:'Positivo' });
+  assert.ok(resR.includes('Citomegalovirus detectable'), 'un resultado positivo no genera la rec dirigida');
+  const txResHTML = vm.runInContext('_txResHTML', ctx);
+  assert.ok(txResHTML({ 'hc_est_cmvpcr':'1','hc_est_hemo':'1' }).includes('CMV PCR') && txResHTML({}).includes('Marca los estudios'), 'los resultados no se derivan de los estudios solicitados');
 });
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas
