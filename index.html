@@ -25875,7 +25875,7 @@ window._txValModo='inicial';
 window._txValSetModo=function(m){ window._txValModo=m; const p=window._txCurrentPac; renderTrasplantePac(p?p.id:''); };
 // Panel AMPLIO de estudios a solicitar, por categorías y gateado por huésped. t={isTx,isVIH,isNeutro,isTCMH,isLung}.
 const _TX_EST_CATS=[
-  {cat:'Serologías basales', g:()=>true, items:{vih:'VIH Ag/Ab 4ª gen',hbv:'VHB (HBsAg + anti-HBc + anti-HBs)',hcv:'Anti-VHC',sifilis:'VDRL / RPR'}},
+  {cat:'Serologías basales', g:()=>true, items:{vih:'VIH Ag/Ab 4ª gen',hbsag:'HBsAg',antihbc:'Anti-HBc total',antihbs:'Anti-HBs',hbvdna:'HBV DNA',hcv:'Anti-VHC',sifilis:'VDRL / RPR'}},
   {cat:'Serologías del trasplante', g:t=>t.isTx, items:{cmv:'CMV IgG (donante y receptor)',ebv:'EBV VCA IgG',hsv:'HSV-1/2 IgG',vzv:'VZV IgG',toxo:'Toxoplasma IgG',htlv:'HTLV-1/2',chagas:'T. cruzi (Chagas) IgG',strongy:'Strongyloides serología',sarampion:'Sarampión / rubéola IgG'}},
   {cat:'Tuberculosis', g:()=>true, items:{igra:'IGRA / PPD',rxtorax:'Rx de tórax'}},
   {cat:'Micosis endémica / oportunista', g:t=>t.isTx||t.isVIH||t.isNeutro, items:{cocci:'Coccidioides serología',histo:'Histoplasma Ag urinario',crag:'Antígeno criptocócico (CrAg)'}},
@@ -25899,7 +25899,7 @@ const _TX_CHIPS={
   vac:{label:'Vacunación',posL:'Aplicadas',noneL:'Sin datos de vacunación',items:{flu:'Influenza',neumo:'Neumococo (PCV/PPSV)',hepb:'Hepatitis B',covid:'SARS-CoV-2',zoster:'Herpes zóster (recombinante)',hib:'Hib',mening:'Meningococo'}}
 };
 // Estudios cuantitativos / de imagen → en seguimiento se capturan como TEXTO (valor / hallazgo); el resto, Pos/Neg/Pendiente.
-const _TX_EST_QUANT=new Set(['bh','quim','pfh','g6pd','igg','nivelis','cd4','procal','rxtorax','tctorax','tcsenos']);
+const _TX_EST_QUANT=new Set(['bh','quim','pfh','g6pd','igg','nivelis','cd4','procal','hbvdna','rxtorax','tctorax','tcsenos']);
 function _txChipsGroupHTML(gk, s){
   const E=window.escHtml||(x=>x); const grp=_TX_CHIPS[gk]; if(!grp)return '';
   let h='<div style="margin-bottom:12px;"><div style="font-size:11px;color:var(--t2);margin-bottom:5px;font-weight:600;">'+E(grp.label)+'</div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
@@ -26221,6 +26221,13 @@ window._txValRecs=function(){
   if(resPos('uro')) h2+=rec('Urocultivo positivo','Tratar según el antibiograma y la presencia de síntomas; evitar tratar bacteriuria asintomática salvo situaciones específicas.','var(--amber)');
   if(resPos('cdiff')) h2+=rec('Clostridioides difficile positivo','Suspender el antimicrobiano no esencial e iniciar tratamiento dirigido (vancomicina oral o fidaxomicina); evitar antiperistálticos.','var(--amber)');
   if(resPos('igra')) h2+=rec('Tuberculosis latente positiva','IGRA/PPD positivo: tratar la infección latente; si va a iniciar inmunosupresión, hacerlo antes, vigilando las interacciones de las rifamicinas.','var(--blue)');
+  // Hepatitis B — interpretación POR PATRÓN serológico (mejor evidencia). La reactivación es la complicación clave bajo inmunosupresión.
+  const hbsagPos=resPos('hbsag'), hbcPos=resPos('antihbc'), hbsPos=resPos('antihbs');
+  const neg=k=>/negativo/.test(resVal(k));
+  if(hbsagPos) h2+=rec('Hepatitis B activa (HBsAg positivo)','Cuantificar HBV DNA y transaminasas e iniciar tratamiento antiviral con un análogo de alta barrera genética (entecavir o tenofovir), imprescindible antes y durante la inmunosupresión por el riesgo de reactivación e insuficiencia hepática. Coordinar con hepatología; dosis y duración con validación clínica.','var(--red)');
+  else if(hbcPos) h2+=rec('Hepatitis B resuelta u oculta (anti-HBc positivo, HBsAg negativo)','Riesgo de reactivación bajo inmunosupresión, alto con anti-CD20 (rituximab), corticoides en dosis altas o quimioterapia. Indicar profilaxis antiviral (entecavir o tenofovir) durante la inmunosupresión y al menos 6 a 12 meses después —más prolongada tras rituximab—, con vigilancia de HBV DNA y transaminasas; si no se administra profilaxis, monitorización estrecha. Dosis con validación clínica.','var(--amber)');
+  else if(neg('hbsag')&&neg('antihbc')&&neg('antihbs')) h2+=rec('Hepatitis B: susceptible','Sin infección ni inmunidad (HBsAg, anti-HBc y anti-HBs negativos): vacunar contra hepatitis B. En candidatos a inmunosupresión, considerar esquema acelerado o de doble dosis y verificar la seroconversión (anti-HBs ≥10 mUI/mL).','var(--blue)');
+  else if(hbsPos&&neg('antihbc')) h2+=rec('Hepatitis B: inmune por vacuna','Anti-HBs positivo con anti-HBc negativo: inmunidad vacunal; sin medidas adicionales. Vigilar el título si recibe inmunosupresión intensa y reforzar si cae por debajo de 10 mUI/mL.','var(--teal)');
   el.innerHTML=h2;
 };
 window._txValGenerarNota=function(){

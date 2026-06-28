@@ -1386,6 +1386,25 @@ test('INMUNO v377: COHERENCIA — recomendaciones por estado de IS + dirigidas p
   const txResHTML = vm.runInContext('_txResHTML', ctx);
   assert.ok(txResHTML({ 'hc_est_cmvpcr':'1','hc_est_hemo':'1' }).includes('CMV PCR') && txResHTML({}).includes('Marca los estudios'), 'los resultados no se derivan de los estudios solicitados');
 });
+test('INMUNO v378: hepatitis B por prueba separada + recomendaciones por patrón serológico (mejor evidencia)', async () => {
+  // El Dr. pidió cada prueba de HBV por separado y, en seguimiento, recs por el PATRÓN (reactivación bajo IS).
+  assert.ok(_idx.includes("hbsag:'HBsAg'") && _idx.includes("antihbc:'Anti-HBc total'") && _idx.includes("antihbs:'Anti-HBs'") && _idx.includes("hbvdna:'HBV DNA'"), 'el perfil de hepatitis B no está separado por prueba');
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{}, escHtml:x=>x };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx); vm.runInContext(block, ctx);
+  const recsDoc = (vals) => { const cache={}; return { getElementById:id=>{ if(cache[id]) return cache[id]; const el=(id==='hc-recs')?{innerHTML:''}:{value:(vals[id]!=null?vals[id]:''),checked:false}; cache[id]=el; return el; } }; };
+  const runRecs = (vals) => { ctx.document=recsDoc(vals); ctx.window._txValRecs(); return ctx.document.getElementById('hc-recs').innerHTML; };
+  const H = { hc_huesped:'SOT — Renal', hc_is_estado:'En curso' };
+  assert.ok(runRecs({ ...H, hc_res_hbsag:'Positivo' }).includes('Hepatitis B activa'), 'HBsAg+ no da hepatitis B activa');
+  const oculta = runRecs({ ...H, hc_res_hbsag:'Negativo', hc_res_antihbc:'Positivo' });
+  assert.ok(oculta.includes('resuelta u oculta') && oculta.includes('rituximab'), 'anti-HBc+ no advierte reactivación/profilaxis');
+  assert.ok(runRecs({ ...H, hc_res_hbsag:'Negativo', hc_res_antihbc:'Negativo', hc_res_antihbs:'Negativo' }).includes('susceptible'), 'los tres negativos no marcan susceptible (vacunar)');
+  assert.ok(!runRecs(H).includes('Hepatitis B'), 'sin resultados no debe emitir interpretación de hepatitis B');
+});
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas
   // se colapsan en la Valoración; su contenido se vuelve secciones colapsables (lazy) que reusan los motores.

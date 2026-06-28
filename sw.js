@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v378 (Inmunocomprometido — hepatitis B por prueba separada + recs por patrón)
+//  Feedback del Dr.: separar el perfil de HBV (la interpretación depende de la COMBINACIÓN) y, en seguimiento,
+//  emitir recomendaciones por la mejor evidencia. Serologías basales: HBsAg, anti-HBc total, anti-HBs y HBV DNA
+//  (cuantitativo) como estudios independientes. _txValRecs interpreta el PATRÓN serológico: HBsAg+ → hepatitis B
+//  activa (tratar entecavir/tenofovir); anti-HBc+ con HBsAg− → resuelta/oculta con riesgo de reactivación bajo
+//  inmunosupresión (profilaxis, alta con rituximab); 3 negativos → susceptible (vacunar); anti-HBs+ con anti-HBc−
+//  → inmune por vacuna. Sin citas; dosis con validación clínica. +1 prueba (288).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v377 (Inmunocomprometido — COHERENCIA: recs por estado de IS + resultados dirigidos)
 //  Feedback del Dr. (crítico): no dar "PJP indicada" si no está inmunosuprimido / pre-protocolo / sin resultados;
 //  los negativos no deben enumerarse todos; y en seguimiento deben aparecer TODOS los estudios pedidos.
@@ -1081,7 +1089,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v377';
+const CACHE = 'stewardmx-v378';
 const SHELL = [
   '/',
   '/index.html',
