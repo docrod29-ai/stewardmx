@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v384 (Loop clase mundial — W2: motor de alertas PROA determinista + Worklist)
+//  Nuevo módulo PURO js/core/alerts.js (7 reglas, sin DOM/Firebase, testeable): discordancia
+//  antibiótico–antibiograma, ajuste por función renal, candidato IV→VO, duración prolongada, ATB sin
+//  cultivo, multirresistente (NOM-045) y oportunidad de desescalada. La app inyecta resolveKey (nombre→clave
+//  abg vía ABG_ATBS), CrCl (cockcroftGault), días (calcDia) e isMDR. window.proaWorklist() corre el motor
+//  sobre el censo (PACS) y lo presenta; botón "Worklist PROA" en la pestaña Alertas 24h. alerts.js al SHELL.
+//  +1 prueba (298). Aditivo; no toca el sistema de alarmas existente.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v383 (Inmunocomprometido — Fase 4/5: Word pulido, carta de interconsulta)
 //  "sigue" del Dr.: pulir el Word. Ahora es una carta profesional: membrete (_txValMembrete: nombre del hospital
 //  desde HInfo + "Servicio de Infectología · PROA"), TÍTULO POR MOTIVO (_TX_MOT_TIT: aptitud pretrasplante,
@@ -1126,7 +1134,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v383';
+const CACHE = 'stewardmx-v384';
 const SHELL = [
   '/',
   '/index.html',
@@ -1138,6 +1146,7 @@ const SHELL = [
   '/js/core/dx-cie10.js',
   '/js/core/medical-voice.js',
   '/js/core/abg-phenotype.js',
+  '/js/core/alerts.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',
   '/icons/icon-maskable.svg'

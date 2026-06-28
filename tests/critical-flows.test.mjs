@@ -2090,3 +2090,32 @@ test('W1.4 — tubo end-to-end con simulador: HL7 → parse → normaliza → pa
   const id2 = labIdFor({ controlId: parseORU(msg).controlId, patientId: pid });
   assert.equal(id1, id2, 'reenviar el mismo mensaje no es idempotente');
 });
+test('W2 — motor de alertas PROA (reglas deterministas, puro)', async () => {
+  const A = await import('../js/core/alerts.js');
+  const resolveKey = n => /meropenem/i.test(n) ? 'mem' : (/ceftriaxona/i.test(n) ? 'cro' : null);
+  // 1) bug-drug mismatch
+  assert.equal(A.ruleMismatch({ atbList: [{ nombre: 'Meropenem 1g' }], abg: { mem: 'R' } }, resolveKey).length, 1, 'no detecta discordancia R');
+  assert.equal(A.ruleMismatch({ atbList: [{ nombre: 'Meropenem 1g' }], abg: { mem: 'S' } }, resolveKey).length, 0, 'falso positivo con S');
+  // 2) renal
+  assert.equal(A.ruleRenal({ atbList: [{ nombre: 'Vancomicina' }] }, 20).length, 1, 'no alerta renal <30');
+  assert.equal(A.ruleRenal({ atbList: [{ nombre: 'Vancomicina' }] }, 60).length, 0, 'falso positivo renal ≥30');
+  assert.equal(A.ruleRenal({ atbList: [{ nombre: 'Azitromicina' }] }, 10).length, 0, 'ATB no renal no debe alertar');
+  // 3) IV→PO
+  assert.equal(A.ruleIVtoPO({ atbList: [{ nombre: 'Ceftriaxona', via: 'IV' }] }, 4).length, 1, 'no detecta IV→PO');
+  assert.equal(A.ruleIVtoPO({ atbList: [{ nombre: 'Ceftriaxona', via: 'IV' }] }, 2).length, 0, 'IV<3d no debe alertar');
+  // 4) duración
+  assert.equal(A.ruleDuration({}, 8).length, 1, 'no alerta duración ≥7');
+  assert.equal(A.ruleDuration({}, 3).length, 0, 'duración corta no alerta');
+  // 5) sin cultivo
+  assert.equal(A.ruleNoCulture({ atbList: [{ nombre: 'Meropenem' }] }).length, 1, 'no alerta ATB sin cultivo');
+  assert.equal(A.ruleNoCulture({ atbList: [{ nombre: 'Meropenem' }], organismo: 'E. coli' }).length, 0, 'con organismo no debe alertar');
+  // 6) MDR
+  assert.equal(A.ruleMDR({ organismo: 'K. pneumoniae' }, true).length, 1, 'no alerta MDR');
+  assert.equal(A.ruleMDR({}, false).length, 0, 'sin MDR no alerta');
+  // 7) desescalada
+  assert.equal(A.ruleDeescalation({ atbList: [{ nombre: 'Meropenem' }], organismo: 'E. coli' }).length, 1, 'no detecta desescalada');
+  // agregador
+  const all = A.proaAlerts({ atbList: [{ nombre: 'Meropenem 1g', via: 'IV' }], abg: { mem: 'R' }, organismo: 'K. pneumoniae' }, { resolveKey, crcl: 20, dot: 9, isMDR: true });
+  assert.ok(all.length >= 5, 'el agregador debería combinar varias alertas, dio ' + all.length);
+  assert.ok(all.some(x => x.id.startsWith('mismatch')) && all.some(x => x.id === 'mdr') && all.some(x => x.id === 'renal'), 'faltan alertas clave en el agregado');
+});

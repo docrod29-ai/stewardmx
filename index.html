@@ -4581,6 +4581,42 @@ window._blindarCamposClinicos=function(data, prev){
 // Módulo PURO y testeable; las pruebas importan la función REAL. Reexpuesto en window.* (onclick + IAAS).
 import { calcDiaATB, diaATBLabel, calcDia, _fechaADate, calcDiasEstancia, calcDiasPaciente, calcDOT, dotPer1000 } from './js/core/clinical-days.js';
 window.calcDiaATB=calcDiaATB; window.diaATBLabel=diaATBLabel; window.calcDia=calcDia; window._fechaADate=_fechaADate;
+// W2: motor determinista de alertas PROA (puro). La app inyecta resolveKey/CrCl/días/isMDR.
+import { proaAlerts } from './js/core/alerts.js';
+window.proaAlerts=proaAlerts;
+// Worklist PROA: corre el motor sobre el censo (PACS) y lo presenta. Stateful → vive aquí.
+window.proaWorklist=function(){
+  try{
+    const lookup=(typeof ABG_ATBS!=='undefined')?ABG_ATBS.flatMap(g=>g.a):[];
+    const norm=s=>(s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const resolveKey=name=>{ const n=norm(name); if(!n)return null; let best=null; for(const x of lookup){ const xn=norm(x.n); if(xn&&n.indexOf(xn)>=0){ if(!best||xn.length>norm(best.n).length)best=x; } } return best?best.k:null; };
+    const E=window.escHtml||(x=>x);
+    const rows=[];
+    (window.PACS||[]).forEach(p=>{
+      if(!(p.atbList&&p.atbList.length))return;
+      let crcl=null,dot=0,mdr=false;
+      try{ crcl=window.cockcroftGault?window.cockcroftGault(p.edad,p.peso,p.creat,p.sexo):null; }catch(_){}
+      try{ dot=window.calcDia?window.calcDia(p):0; }catch(_){}
+      try{ mdr=window.isMDR?window.isMDR(p):false; }catch(_){}
+      const al=window.proaAlerts(p,{resolveKey,crcl,dot,isMDR:mdr,maxDur:7});
+      if(al.length)rows.push({p,al});
+    });
+    rows.sort((a,b)=>((b.al.some(z=>z.sev==='alta')?1:0)-(a.al.some(z=>z.sev==='alta')?1:0)));
+    const sevColor=s=>s==='alta'?'var(--red)':(s==='media'?'var(--amber)':'var(--teal)');
+    const total=rows.reduce((n,r)=>n+r.al.length,0);
+    let html='<div style="max-width:900px;margin:0 auto;">';
+    html+='<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Worklist determinista PROA: '+rows.length+' paciente(s) · '+total+' recomendación(es). Apoyo a la decisión — el médico valida.</div>';
+    if(!rows.length){ html+='<div class="alert2 tl"><div class="a2t">✓ Sin recomendaciones</div><div class="a2b">Ningún paciente con antibiótico activa reglas en este momento.</div></div>'; }
+    rows.forEach(r=>{
+      html+='<div style="background:var(--s2);border:1px solid var(--brd2);border-radius:10px;padding:12px 14px;margin-bottom:10px;">';
+      html+='<div style="font-weight:700;color:var(--t1);font-size:13px;margin-bottom:6px;">'+E(r.p.nombre||'')+(r.p.cama?' · Cama '+E(r.p.cama):'')+(r.p.organismo?' · '+E(r.p.organismo):'')+'</div>';
+      r.al.forEach(a=>{ html+='<div style="border-left:3px solid '+sevColor(a.sev)+';padding:5px 0 5px 10px;margin-bottom:5px;"><div style="font-size:12px;font-weight:600;color:var(--t1);">'+E(a.titulo)+'</div><div style="font-size:11px;color:var(--t2);line-height:1.5;">'+E(a.detalle)+'</div></div>'; });
+      html+='</div>';
+    });
+    html+='</div>';
+    (window.abrirContenido||function(){})('🔬 Worklist PROA — recomendaciones', html);
+  }catch(e){ if(window.toast)toast('No se pudo generar el worklist: '+(e.message||e),'rd'); }
+};
 window.calcDiasEstancia=calcDiasEstancia; window.calcDiasPaciente=calcDiasPaciente; window.calcDOT=calcDOT; window.dotPer1000=dotPer1000;
 
 const ABG_ATBS=[
@@ -32953,7 +32989,10 @@ input:focus,select:focus,textarea:focus{
         <div style="font-size:16px;font-weight:700;">🔔 Alertas PROA 24h</div>
         <div style="font-size:11px;color:var(--t3);margin-top:2px;">Pacientes con ATB de amplio espectro en servicios de alto riesgo — revisión obligatoria ≤ 24h</div>
       </div>
-      <button class="btn-sm btn-sm-teal" onclick="renderAlertas24h()">↻ Actualizar</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-sm" style="background:linear-gradient(135deg,#7c3aed,#00d4a8);color:#fff;border:none;" onclick="window.proaWorklist&&window.proaWorklist()">🔬 Worklist PROA</button>
+        <button class="btn-sm btn-sm-teal" onclick="renderAlertas24h()">↻ Actualizar</button>
+      </div>
     </div>
     <div id="alertas24h-content"><div style="text-align:center;padding:40px;color:var(--t3);">Cargando alertas…</div></div>
   </div></div>
