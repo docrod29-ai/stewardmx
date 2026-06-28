@@ -1321,6 +1321,25 @@ test('INMUNO v374: historia por chips (sí/no) + un solo texto libre + resultado
   const r = got.render({ id:'p', txValoracion:{ hc_motivo:'fiebre', hc_huesped:'SOT — Renal' } });
   assert.ok(r.includes('Comorbilidades') && r.includes('id="hc_notas"'), 'la historia no muestra chips + el campo de notas');
 });
+test('INMUNO v375: los chips no marcados quedan documentados como NEGATIVOS (solo grupos mostrados)', async () => {
+  // El Dr. pidió que lo no marcado quede plasmado como negativo. Pero solo de los grupos que SÍ se mostraron
+  // (no afirmar negativos de algo no evaluado).
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const checked = new Set(['hc_cb_comorb_dm2']);
+  const docMock = { getElementById:id=>{ if(id.startsWith('hc_cb_comorb_')) return { checked:checked.has(id) }; if(id.startsWith('hc_cb_')) return null; return null; } };
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, window:{}, document:docMock, Blob:STUB, URL:STUB, navigator:{}, location:{}, escHtml:x=>x };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx);
+  vm.runInContext(block, ctx);
+  const out = ctx.window._txValCompose();
+  const comorb = out.find(r=>r[0]==='Comorbilidades');
+  assert.ok(comorb && comorb[1].includes('Presentes: DM2'), 'no lista el chip marcado como presente');
+  assert.ok(comorb[1].includes('Negadas:') && comorb[1].includes('ERC'), 'no documenta los no marcados como negativos');
+  assert.ok(!out.some(r=>r[0]==='Dispositivos'), 'documenta negativos de un grupo que no se mostró (no evaluado)');
+});
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas
   // se colapsan en la Valoración; su contenido se vuelve secciones colapsables (lazy) que reusan los motores.

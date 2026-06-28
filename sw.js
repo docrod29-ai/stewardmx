@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v375 (Inmunocomprometido — chips más completos + NEGATIVOS documentados)
+//  Feedback del Dr.: más opciones y que lo NO marcado quede plasmado como negativo. _TX_CHIPS ampliado
+//  (comorbilidades 14, dispositivos 12, inmunosupresión 12 con anti-CD20/anti-TNF/belatacept/ATG/eculizumab,
+//  profilaxis 7, antecedentes infectológicos 11, exposiciones 7, vacunación 7). En la nota/Word, cada grupo
+//  MOSTRADO documenta "Presentes: …" y "Negados/Negadas/Pendientes: …" (los no marcados) — pero SOLO de los
+//  grupos que se mostraron (no afirma negativos de algo no evaluado). +1 prueba (285).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v374 (Inmunocomprometido — historia por CHIPS + un solo texto + resultados Pos/Neg)
 //  Feedback del Dr.: que sea super sencillo. La historia (comorbilidades, dispositivos, hábitos,
 //  inmunosupresión, profilaxis, antecedentes infectológicos, exposiciones, vacunación) ahora son CHIPS de
@@ -1054,7 +1061,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v374';
+const CACHE = 'stewardmx-v375';
 const SHELL = [
   '/',
   '/index.html',

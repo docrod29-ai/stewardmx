@@ -25886,14 +25886,14 @@ const _TX_EST_LABELS={
 // v374: historia por CHIPS (sí/no) + un solo texto libre + resultados Pos/Neg. Catálogo compartido (chips
 // y resultados) para render, nota y Word. Cada chip persiste como checkbox id hc_cb_<grupo>_<clave>.
 const _TX_CHIPS={
-  comorb:{label:'Comorbilidades',items:{dm2:'DM2',has:'Hipertensión',erc:'ERC / diálisis',hepatop:'Hepatopatía',cardiop:'Cardiopatía',neopl:'Neoplasia activa',epoc:'EPOC',obesidad:'Obesidad'}},
-  disp:{label:'Dispositivos',items:{cvc:'CVC',picc:'PICC',sondaur:'Sonda urinaria',ostomia:'Ostomía',protesis:'Prótesis',vmi:'Ventilación mecánica'}},
-  habitos:{label:'Hábitos',items:{tabaco:'Tabaquismo',alcohol:'Alcoholismo',drogasiv:'Drogas IV'}},
-  inmuno:{label:'Inmunosupresión actual',items:{est:'Esteroides',cni:'Calcineurínico (tacro/ciclo)',antimet:'Antimetabolito (MMF/AZA)',mtor:'mTOR',biologico:'Biológico',jak:'Inhibidor JAK',quimio:'Quimioterapia'}},
-  prof:{label:'Profilaxis activas',items:{pjp:'TMP-SMX (PJP)',cmvprof:'Valganciclovir / Letermovir',antifung:'Antifúngico',inhtb:'INH (TB)'}},
-  infecto:{label:'Antecedentes infectológicos',items:{blee:'Colonización BLEE',cre:'CRE',mrsa:'MRSA',vre:'VRE',cdiff:'C. difficile previo',tbprev:'TB previa'}},
-  expos:{label:'Exposiciones epidemiológicas',items:{micosis:'Zona endémica de micosis',contactotb:'Contacto con TB',animales:'Animales',viaje:'Viaje reciente',transf:'Transfusiones'}},
-  vac:{label:'Vacunación',items:{flu:'Influenza',neumo:'Neumococo',hepb:'Hepatitis B',covid:'SARS-CoV-2',completo:'Esquema completo'}}
+  comorb:{label:'Comorbilidades',negL:'Negadas',items:{dm2:'DM2',dm1:'DM1',has:'Hipertensión',erc:'ERC / diálisis',hepatop:'Hepatopatía / cirrosis',cardiop:'Cardiopatía',icc:'Insuficiencia cardiaca',epoc:'EPOC',autoinm:'Enf. autoinmune',neopl:'Neoplasia activa',neoplhem:'Neoplasia hematológica',obesidad:'Obesidad',desnut:'Desnutrición',evc:'EVC'}},
+  disp:{label:'Dispositivos invasivos',negL:'Ausentes',items:{cvc:'CVC',picc:'PICC',port:'Port-a-cath',sondaur:'Sonda urinaria',sng:'Sonda nasogástrica',ostomia:'Ostomía',protart:'Prótesis articular',protval:'Prótesis valvular',marcapaso:'Marcapaso / DAI',dvp:'Derivación ventricular',vmi:'Tubo / ventilación mecánica',drenaje:'Drenaje'}},
+  habitos:{label:'Hábitos',negL:'Negados',items:{tabaco:'Tabaquismo',alcohol:'Alcoholismo',drogasiv:'Drogas IV',drogasinh:'Drogas inhaladas'}},
+  inmuno:{label:'Inmunosupresión actual',negL:'No recibe',items:{est:'Esteroides',cni:'Calcineurínico (tacro/ciclo)',antimet:'Antimetabolito (MMF/AZA)',mtor:'mTOR (sirolimus/everolimus)',anticd20:'Anti-CD20 (rituximab)',antitnf:'Anti-TNF',jak:'Inhibidor JAK',belatacept:'Belatacept',atg:'ATG / timoglobulina',alemtuzumab:'Alemtuzumab',eculizumab:'Eculizumab',quimio:'Quimioterapia'}},
+  prof:{label:'Profilaxis activas',negL:'Sin',items:{pjp:'TMP-SMX (PJP)',atovacuona:'Atovacuona / dapsona',valganciclovir:'Valganciclovir',letermovir:'Letermovir',aciclovir:'Aciclovir / valaciclovir',antifung:'Antifúngico',inhtb:'INH (TB)'}},
+  infecto:{label:'Antecedentes infectológicos',negL:'Negados',items:{blee:'Colonización BLEE',cre:'CRE',mrsa:'MRSA',vre:'VRE',pseudo:'Pseudomonas MDR',acineto:'Acinetobacter',cdiff:'C. difficile previo',tbprev:'TB previa',candidemia:'Candidemia previa',aspergilosis:'Aspergilosis previa',cmvprev:'Enfermedad por CMV previa'}},
+  expos:{label:'Exposiciones epidemiológicas',negL:'Negadas',items:{micosis:'Zona endémica de micosis',contactotb:'Contacto con TB',animales:'Animales / aves',viaje:'Viaje reciente',transf:'Transfusiones',jardineria:'Tierra / jardinería',crudos:'Alimentos crudos / no pasteurizados'}},
+  vac:{label:'Vacunación',posL:'Aplicadas',negL:'Pendientes',items:{flu:'Influenza',neumo:'Neumococo (PCV/PPSV)',hepb:'Hepatitis B',covid:'SARS-CoV-2',zoster:'Herpes zóster (recombinante)',hib:'Hib',mening:'Meningococo'}}
 };
 const _TX_RES={cmv:'CMV PCR',ebv:'EBV PCR',gm:'Galactomanano',bdg:'(1,3)-β-D-glucano',hemo:'Hemocultivo',uro:'Urocultivo',bk:'BK virus (PCR)'};
 function _txChipsGroupHTML(gk, s){
@@ -25918,7 +25918,16 @@ function _txResHTML(s){
 window._txValCompose=function(){
   const g=id=>(document.getElementById(id)?.value||'').trim();
   const ck=id=>!!(document.getElementById(id)||{}).checked;
-  const chips=gk=>{ const grp=_TX_CHIPS[gk]; const a=[]; for(const c in grp.items){ if(ck('hc_cb_'+gk+'_'+c))a.push(grp.items[c]); } return a.join(', '); };
+  const chips=gk=>{
+    const grp=_TX_CHIPS[gk]; const keys=Object.keys(grp.items);
+    // Solo documentar grupos que SÍ se mostraron (están en el DOM) — así no se afirman negativos no evaluados.
+    if(!document.getElementById('hc_cb_'+gk+'_'+keys[0]))return '';
+    const pos=[],neg=[]; for(const c of keys){ (ck('hc_cb_'+gk+'_'+c)?pos:neg).push(grp.items[c]); }
+    const posL=grp.posL||'Presentes', negL=grp.negL||'Negativos', parts=[];
+    if(pos.length)parts.push(posL+': '+pos.join(', '));
+    if(neg.length)parts.push(negL+': '+neg.join(', '));   // los no marcados quedan plasmados como negativos
+    return parts.join('. ');
+  };
   const res=()=>{ const a=[]; for(const k in _TX_RES){ const v=g('hc_res_'+k); if(v&&v!=='—')a.push(_TX_RES[k]+': '+v.toLowerCase()); } const o=g('hc_res_otros'); if(o)a.push(o); return a.join('; '); };
   return [
     ['Padecimiento actual / motivo de la interconsulta', g('hc_padecimiento')],
