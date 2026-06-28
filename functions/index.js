@@ -980,22 +980,11 @@ exports.lisSync = onRequest(
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
 
-    // ── W1.3: detectar HL7 v2 (texto) vs JSON ────────────────────────
-    const rawStr = (typeof req.body === 'string') ? req.body
-      : (req.rawBody ? req.rawBody.toString('utf8') : '');
-    const looksHL7 = (typeof req.body === 'string' && req.body.trimStart().slice(0, 3) === 'MSH')
-      || /^\s*MSH/.test(rawStr);
-    let hl7 = null;
-    if (looksHL7) {
-      try { hl7 = parseORU(rawStr || req.body); }
-      catch (e) { return res.status(400).json({ ok: false, error: 'HL7 inválido: ' + e.message }); }
-    }
-
+    // ── Identidad del hospital + token ANTES de parsear nada (defensa en profundidad) ──
     const jsonBody = (req.body && typeof req.body === 'object') ? req.body : {};
     const hospId = (jsonBody.hospId || req.query.hospId || '').trim();
     if (!hospId) return res.status(400).json({ ok: false, error: 'hospId requerido' });
 
-    // ── Validar token contra ehr_config/main ─────────────────────────
     const token = req.headers['x-stewardmx-token'] || req.query.token;
     let validToken = false;
     try {
@@ -1008,8 +997,17 @@ exports.lisSync = onRequest(
     } catch (e) {
       console.error('[lisSync] error validando token:', e.message);
     }
-    if (!validToken) {
-      return res.status(401).json({ ok: false, error: 'Token inválido' });
+    if (!validToken) return res.status(401).json({ ok: false, error: 'Token inválido' });
+
+    // ── W1.3: ya autenticado, detectar y parsear HL7 v2 (texto) vs JSON ──
+    const rawStr = (typeof req.body === 'string') ? req.body
+      : (req.rawBody ? req.rawBody.toString('utf8') : '');
+    const looksHL7 = (typeof req.body === 'string' && req.body.trimStart().slice(0, 3) === 'MSH')
+      || /^\s*MSH/.test(rawStr);
+    let hl7 = null;
+    if (looksHL7) {
+      try { hl7 = parseORU(rawStr || req.body); }
+      catch (e) { return res.status(400).json({ ok: false, error: 'HL7 inválido: ' + e.message }); }
     }
 
     // ── Normalizar entrada (HL7 o JSON) a campos canónicos ───────────
