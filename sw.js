@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v372 (Inmunocomprometido — apoyo "A detalle" filtrado por motivo)
+//  Feedback del Dr.: las 7 secciones de apoyo salían todas y confundían. Ahora _txValDeepSectionsHTML
+//  recibe el MOTIVO y muestra SOLO las relevantes (vacunación→solo Vacunación; aptitud biológico→Fármacos+
+//  Vacunas+Serologías; fiebre→Patógenos/Profilaxis/CMV; etc.), además del filtro por huésped. Si no hay
+//  ninguna relevante, se oculta todo el bloque (renombrado "🔎 Apoyo para esta valoración"). Verificado en
+//  sandbox por motivo. Bonus: los sandboxes de prueba ahora incluyen Set/Map (antes enmascaraban el filtro).
+//  +1 prueba (282).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v371 (Inmunocomprometido — LOOP Fase 2: flujo dirigido por MOTIVO)
 //  Loop "valoración perfecta", Fase 2 (diseño aprobado por el Dr.). El MOTIVO de la interconsulta (aptitud
 //  pre-TX / fiebre / profilaxis / aptitud biológico / vacunación / otro) ORIENTA el formulario: revelado
@@ -1031,7 +1039,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v371';
+const CACHE = 'stewardmx-v372';
 const SHELL = [
   '/',
   '/index.html',

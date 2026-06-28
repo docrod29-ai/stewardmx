@@ -26031,9 +26031,12 @@ function _renderTxValoracion(p){
   html+=`<button onclick="window._txValWordExport&&window._txValWordExport()" class="btn-main" style="flex:1;min-width:170px;background:rgba(61,155,255,.12);border:1px solid rgba(61,155,255,.4);color:var(--blue);">⬇ Descargar Word completo</button>`;
   html+=`</div>`;
   html+=`<div id="hc-recs" style="margin-top:16px;"></div><div id="hc-nota" style="margin-top:14px;"></div>`;
-  html+=`<div class="fsec-t" style="margin-top:18px;">🔎 A detalle — todo aquí, sin pestañas sueltas</div>`;
-  html+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px;">Toca para expandir. Se ajusta a lo que elegiste arriba.</div>`;
-  html+=`<div id="hc-deep">`+_txValDeepSectionsHTML(s.hc_huesped||'')+`</div>`;
+  const _deepHtml=_txValDeepSectionsHTML(s.hc_huesped||'', motivo);
+  if(_deepHtml){
+    html+=`<div class="fsec-t" style="margin-top:18px;">🔎 Apoyo para esta valoración</div>`;
+    html+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px;">Solo lo relevante a este motivo. Toca para expandir.</div>`;
+    html+=`<div id="hc-deep">`+_deepHtml+`</div>`;
+  }
   setTimeout(function(){ try{ window._txValRecs&&window._txValRecs(); }catch(_){} },50);
   return html;
 }
@@ -26154,13 +26157,23 @@ window._txValImprimirNota=function(){ const d=document.getElementById('hc-nota-d
 // contextualizadas por el huésped, con carga perezosa (solo se renderiza la que el médico expande → aísla
 // riesgo y mantiene la pantalla ligera). Reusan los motores existentes (_renderTxTipo/Patogenos/Profilaxis/
 // PreTx/CMV/Neutropenia/Vacunas/Protocolo24h) → cero pérdida de funcionalidad, cero redundancia de pestañas.
-function _txValDeepSectionsHTML(hh){
+function _txValDeepSectionsHTML(hh, motivo){
   const isSOT=/^SOT/.test(hh),isTCMH=/TCMH/.test(hh),isNeutro=/Neutropenia|Quimio/.test(hh),isTx=isSOT||isTCMH;
-  const deep=(key,titulo,cond)=> cond?'<details name="hc-deep" style="margin-bottom:8px;border:1px solid var(--brd2);border-radius:8px;overflow:hidden;"><summary onclick="setTimeout(function(){window._txValDeep&&window._txValDeep(\''+key+'\');},10)" style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--t2);background:var(--s2);">'+titulo+'</summary><div id="hc-deep-'+key+'" style="padding:10px 12px;"><div style="color:var(--t3);font-size:11px;">Cargando…</div></div></details>':'';
+  // Solo el apoyo RELEVANTE al motivo (para no confundir): cada motivo abre sus secciones.
+  const REL={
+    aptitud_pretx:['pretx','vacunas','patogenos','tipo'],
+    fiebre:['patogenos','profilaxis','cmv','neutro'],
+    profilaxis:['profilaxis','cmv','patogenos'],
+    aptitud_biologico:['tipo','vacunas','pretx'],
+    vacunacion:['vacunas'],
+    otro:['tipo','patogenos','profilaxis','pretx','cmv','neutro','vacunas','p24']
+  };
+  const rel=new Set(REL[motivo]||REL.otro);
+  const deep=(key,titulo,cond)=> (cond&&rel.has(key))?'<details name="hc-deep" style="margin-bottom:8px;border:1px solid var(--brd2);border-radius:8px;overflow:hidden;"><summary onclick="setTimeout(function(){window._txValDeep&&window._txValDeep(\''+key+'\');},10)" style="padding:10px 12px;cursor:pointer;font-size:13px;font-weight:600;color:var(--t2);background:var(--s2);">'+titulo+'</summary><div id="hc-deep-'+key+'" style="padding:10px 12px;"><div style="color:var(--t3);font-size:11px;">Cargando…</div></div></details>':'';
   return deep('tipo','💊 Fármacos inmunosupresores y sus riesgos',true)
     +deep('patogenos','🦠 Patógenos esperados por fase',isTx)
     +deep('profilaxis','🛡️ Profilaxis (detalle)',true)
-    +deep('pretx','🔬 Serologías donante/receptor + recomendaciones por patógeno',isTx)
+    +deep('pretx','🔬 Serologías donante/receptor',isTx)
     +deep('cmv','🧫 CMV — monitor',isTx)
     +deep('neutro','🩸 Neutropenia febril',isTCMH||isNeutro)
     +deep('vacunas','💉 Vacunación',true)
@@ -26168,7 +26181,7 @@ function _txValDeepSectionsHTML(hh){
 }
 window._txValRefreshDeep=function(){
   const cont=document.getElementById('hc-deep'); if(!cont)return;
-  cont.innerHTML=_txValDeepSectionsHTML(document.getElementById('hc_huesped')?.value||'');
+  cont.innerHTML=_txValDeepSectionsHTML(document.getElementById('hc_huesped')?.value||'', document.getElementById('hc_motivo')?.value||'');
 };
 window._txValDeep=function(key){
   const cont=document.getElementById('hc-deep-'+key); if(!cont)return;

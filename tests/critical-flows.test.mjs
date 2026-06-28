@@ -1313,7 +1313,7 @@ test('INMUNO v369: los 8 motores embebidos ("A detalle") CORREN sin tronar + aco
   let STUB;
   STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
   const docStub = { getElementById:()=>null, querySelector:()=>null, querySelectorAll:()=>[], createElement:()=>({style:{},dataset:{},appendChild(){},setAttribute(){},addEventListener(){}}), body:{appendChild(){}} };
-  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl, document:docStub, window:{}, navigator:{}, location:{href:''} };
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, document:docStub, window:{}, navigator:{}, location:{href:''} };
   const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
   vm.createContext(ctx);
   const engines = vm.runInContext(block + '\n;({_renderTxVacunas,_renderTxTipo,_renderTxProfilaxis,_renderTxPatogenos,_renderTxCMV,_renderTxPreTx,_renderTxNeutropenia,_renderTxProtocolo24h})', ctx);
@@ -1342,7 +1342,7 @@ test('INMUNO v370: historia completa (datos grales + antecedentes + estado IS) +
   assert.ok(start >= 0 && end > start, 'no se ubicó el bloque de valoración');
   const block = _idx.slice(start, end);
   let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
-  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{} };
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{} };
   const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
   vm.createContext(ctx);
   const got = vm.runInContext(block + '\n;({render:_renderTxValoracion, word:window._txValWordExport})', ctx);
@@ -1363,7 +1363,7 @@ test('INMUNO v371: flujo dirigido por MOTIVO (revelado progresivo) + sin pérdid
   const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
   const block = _idx.slice(start, end);
   let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
-  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{} };
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{} };
   const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
   vm.createContext(ctx);
   const got = vm.runInContext(block + '\n;({render:_renderTxValoracion})', ctx);
@@ -1373,6 +1373,22 @@ test('INMUNO v371: flujo dirigido por MOTIVO (revelado progresivo) + sin pérdid
   assert.ok(sinMotivo.includes('Elige el') && !sinMotivo.includes('Historia clínica dirigida'), 'sin motivo no muestra la guarda');
   const profilaxis = got.render({ id:'p3', nombre:'Z', txValoracion:{ hc_motivo:'profilaxis', hc_huesped:'VIH' } });
   assert.ok(!profilaxis.includes('Exploración física dirigida'), 'el revelado progresivo no oculta lo no relevante (profilaxis no debe pedir exploración)');
+});
+test('INMUNO v372: el apoyo "A detalle" se filtra por motivo (solo lo relevante, no confunde)', async () => {
+  // Feedback del Dr.: las secciones de apoyo no deben salir todas; cada motivo abre solo las suyas.
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{} };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx);
+  const got = vm.runInContext(block + '\n;({render:_renderTxValoracion})', ctx);
+  const ids = html => ['tipo','patogenos','profilaxis','pretx','cmv','neutro','vacunas','p24'].filter(k => html.includes('hc-deep-' + k)).sort();
+  const eq = (a,b) => JSON.stringify(a) === JSON.stringify(b.slice().sort());
+  assert.ok(eq(ids(got.render({ id:'p', txValoracion:{ hc_motivo:'vacunacion', hc_huesped:'SOT — Renal' } })), ['vacunas']), 'vacunación debe abrir solo Vacunación');
+  assert.ok(eq(ids(got.render({ id:'p', txValoracion:{ hc_motivo:'profilaxis', hc_huesped:'VIH' } })), ['profilaxis']), 'profilaxis+VIH debe abrir solo Profilaxis');
+  assert.ok(eq(ids(got.render({ id:'p', txValoracion:{ hc_motivo:'fiebre', hc_huesped:'SOT — Renal' } })), ['cmv','patogenos','profilaxis']), 'fiebre+SOT debe abrir Patógenos/Profilaxis/CMV');
 });
 test('ABGSAFE v341: la interpretación del motor también se muestra al VER un antibiograma guardado', () => {
   // En la lista de aislamientos guardados (subcolección) — recomputado en vivo desde a.abg + a.organismo.
