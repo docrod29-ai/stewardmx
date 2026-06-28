@@ -26109,6 +26109,7 @@ function _renderTxValoracion(p){
   html+=`<button onclick="window._txValGenerarNota&&window._txValGenerarNota()" class="btn-main" style="flex:1;min-width:170px;background:rgba(0,212,168,.12);border:1px solid rgba(0,212,168,.4);color:var(--teal);">📄 ${modo==='inicial'?'Nota inicial + órdenes':'Nota de seguimiento'}</button>`;
   html+=`<button onclick="window._txValWordExport&&window._txValWordExport()" class="btn-main" style="flex:1;min-width:170px;background:rgba(61,155,255,.12);border:1px solid rgba(61,155,255,.4);color:var(--blue);">⬇ Descargar Word completo</button>`;
   if(window._anthropicProxyURL||window._abgApiKey) html+=`<button onclick="window._txValRedactarIA&&window._txValRedactarIA()" class="btn-main" style="flex:1;min-width:170px;background:linear-gradient(135deg,rgba(124,58,237,.18),rgba(0,212,168,.14));border:1px solid rgba(124,58,237,.45);color:var(--purple);">🤖 Redactar con IA (borrador)</button>`;
+  html+=`<button onclick="window._txValGuardarHist&&window._txValGuardarHist()" class="btn-main" style="flex:1;min-width:170px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:var(--amber);">💾 Guardar valoración al historial</button>`;
   html+=`</div>`;
   html+=`<div id="hc-recs" style="margin-top:16px;"></div><div id="hc-nota" style="margin-top:14px;"></div>`;
   const _deepHtml=_txValDeepSectionsHTML(s.hc_huesped||'', motivo);
@@ -26117,6 +26118,7 @@ function _renderTxValoracion(p){
     html+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px;">Solo lo relevante a este motivo. Toca para expandir.</div>`;
     html+=`<div id="hc-deep">`+_deepHtml+`</div>`;
   }
+  html+=_txValHistHTML(p);
   setTimeout(function(){ try{ window._txValRecs&&window._txValRecs(); }catch(_){} },50);
   return html;
 }
@@ -26320,6 +26322,63 @@ window._txValDescargarIADoc=function(){
   const blob=new Blob(['﻿'+html],{type:'application/msword'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url; a.download='ValoracionID_IA_'+((p.nombre||'paciente').replace(/\s+/g,'_'))+'_'+(new Date().toISOString().slice(0,10))+'.doc';
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },120);
+};
+// ── Historial de valoraciones (>2): cada valoración se guarda fechada y se acumula en el expediente.
+// Snapshot en texto plano de lo capturado + el plan determinista, para archivar la evolución entre visitas.
+function _txValSnapshotText(){
+  const g=id=>(document.getElementById(id)?.value||'').trim();
+  const motSel=document.getElementById('hc_motivo'); const motivo=motSel?((motSel.options[motSel.selectedIndex]||{}).text||''):'';
+  let t='';
+  if(motivo&&motivo!=='—')t+='Motivo: '+motivo+'\n';
+  const hu=g('hc_huesped'); if(hu&&hu!=='—')t+='Huésped: '+hu+(g('hc_fechatx')?' (desde '+g('hc_fechatx')+')':'')+(g('hc_cd4')?' · CD4 '+g('hc_cd4'):'')+'\n';
+  (window._txValCompose?window._txValCompose():[]).forEach(r=>{ t+=r[0]+': '+r[1]+'\n'; });
+  const est=[]; document.querySelectorAll('#hc-estudios input[type=checkbox]:checked').forEach(cb=>{ const l=(cb.parentElement?.textContent||'').trim(); if(l)est.push(l); });
+  if(est.length)t+='Estudios solicitados: '+est.join('; ')+'\n';
+  const recsEl=document.getElementById('hc-recs'); const plan=recsEl?(recsEl.innerText||recsEl.textContent||'').trim():'';
+  if(plan)t+='\n'+plan+'\n';
+  return t.trim();
+}
+window._txValGuardarHist=function(){
+  const p=window._txCurrentPac; if(!p||!p.id){ if(typeof toast==='function')toast('Selecciona un paciente','am'); return; }
+  const texto=_txValSnapshotText();
+  if(!texto){ if(typeof toast==='function')toast('Captura la valoración primero','am'); return; }
+  const entry={ fecha:new Date().toISOString(), modo:(window._txValModo||'inicial'), huesped:((document.getElementById('hc_huesped')||{}).value||''), texto };
+  const hist=Array.isArray(p.txValoracionHist)?p.txValoracionHist.slice():[];
+  hist.push(entry); while(hist.length>50)hist.shift();
+  updateDoc(doc(db,..._pacPath(),p.id),{txValoracionHist:hist,txValoracionHistAt:new Date().toISOString()})
+    .then(function(){ p.txValoracionHist=hist; var pi=PACS.find(function(x){return x.id===p.id;}); if(pi)pi.txValoracionHist=hist; if(typeof toast==='function')toast('Valoración guardada al historial'); if(typeof renderTrasplantePac==='function')renderTrasplantePac(p.id); })
+    .catch(function(e){ console.warn('[txValHist]',e); if(typeof toast==='function')toast('No se pudo guardar','rd'); });
+};
+function _txValHistHTML(p){
+  const hist=Array.isArray(p&&p.txValoracionHist)?p.txValoracionHist:[];
+  if(!hist.length)return '';
+  const E=window.escHtml||(x=>x);
+  let h='<div class="fsec-t" style="margin-top:18px;">📚 Valoraciones previas ('+hist.length+')</div>';
+  hist.slice().reverse().forEach(function(e,i){
+    const idx=hist.length-1-i;
+    let f=e.fecha||''; try{ f=new Date(e.fecha).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}); }catch(_){ }
+    const modoTxt=e.modo==='inicial'?'Inicial':'Seguimiento';
+    h+='<details style="background:var(--s2);border:1px solid var(--brd2);border-radius:8px;padding:8px 12px;margin-bottom:6px;"><summary style="cursor:pointer;font-size:12px;color:var(--t1);">'+E(f)+' · '+modoTxt+(e.huesped?' · '+E(e.huesped):'')+'</summary>'
+      +'<pre style="white-space:pre-wrap;font-size:11px;color:var(--t2);font-family:inherit;margin:8px 0 0;">'+E(e.texto||'')+'</pre>'
+      +'<button onclick="window._txValDescargarHist&&window._txValDescargarHist('+idx+')" class="btn-main" style="margin-top:8px;background:rgba(61,155,255,.12);border:1px solid rgba(61,155,255,.4);color:var(--blue);font-size:11px;padding:5px 10px;">⬇ Word</button></details>';
+  });
+  return h;
+}
+window._txValDescargarHist=function(idx){
+  const p=window._txCurrentPac||{}; const hist=Array.isArray(p.txValoracionHist)?p.txValoracionHist:[]; const e=hist[idx]; if(!e)return;
+  const E=window.escHtml||(x=>x);
+  let f=e.fecha||''; try{ f=new Date(e.fecha).toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}); }catch(_){ }
+  const body=E(e.texto||'').replace(/\n/g,'<br>');
+  const html='<html><head><meta charset="utf-8"></head><body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#111;">'
+    +'<div style="font-weight:700;font-size:14pt;">Valoración infectológica del paciente inmunocomprometido</div>'
+    +'<div style="color:#555;font-size:9pt;margin-bottom:10px;">'+E(p.nombre||'')+(p.exp?' · Exp. '+E(p.exp):'')+' · '+(e.modo==='inicial'?'Inicial':'Seguimiento')+' · '+E(f)+'</div>'
+    +'<div>'+body+'</div>'
+    +'<div style="color:#777;font-size:8pt;margin-top:16px;">Documento de apoyo PROA/Infectología (NOM-004-SSA3). Las dosis y decisiones requieren validación del médico tratante.</div>'
+    +'</body></html>';
+  const blob=new Blob(['﻿'+html],{type:'application/msword'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='ValoracionID_'+((p.nombre||'paciente').replace(/\s+/g,'_'))+'_'+(String(e.fecha||'').slice(0,10))+'.doc';
   document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },120);
 };
 window._txValGenerarNota=function(){

@@ -1460,6 +1460,34 @@ test('INMUNO v381: Fase 3 (IA) — redacta con reglas duras (solo ID, sin citas,
   assert.ok(/PLAN DEFINIDO[\s\S]*Pneumocystis indicada/.test(cap.messages[0].content), 'la IA no recibe el plan determinista para redactarlo');
   assert.ok(notaEl.innerHTML.includes('hc-nota-ia') && notaEl.innerHTML.includes('NOTA REDACTADA DE PRUEBA') && notaEl.innerHTML.includes('Descargar Word'), 'no renderiza el borrador editable + descarga');
 });
+test('INMUNO v382: historial de >2 valoraciones — snapshot fechado, guardado y render acumulado', async () => {
+  // El Dr.: "a veces hago más de 2 valoraciones". Cada una se guarda fechada y se acumula (Inicial → Seg 1 → 2 …).
+  assert.ok(_idx.includes('window._txValGuardarHist=') && _idx.includes('function _txValHistHTML') && _idx.includes('txValoracionHist'), 'falta el motor del historial de valoraciones');
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k==='then') return undefined; if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const cap = {};
+  const updateDoc = (ref,data) => { cap.data=data; return Promise.resolve(true); };
+  const pac = { id:'p', nombre:'Test', txValoracionHist:[] };
+  const docMock = { getElementById:id=>{ if(id==='hc-recs') return { innerText:'Impresión y plan — Infectología\nProfilaxis para Pneumocystis indicada', textContent:'' }; if(id==='hc_motivo') return { options:[{text:'Seguimiento'}], selectedIndex:0, value:'profilaxis' }; if(id&&id.indexOf('hc_cb_')===0) return null; return { value:(id==='hc_huesped'?'SOT — Renal':'') }; }, querySelectorAll:()=>[] };
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, navigator:{}, location:{}, escHtml:x=>x, document:docMock, Blob:STUB, URL:STUB, updateDoc, doc:()=>({}), db:{}, _pacPath:()=>['h','H'], PACS:[pac], renderTrasplantePac:()=>{}, toast:()=>{}, window:{ _txValModo:'seguimiento', _txCurrentPac:pac } };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx); vm.runInContext(block, ctx);
+  ctx.window._txValModo='seguimiento';  // el bloque resetea _txValModo='inicial' al cargar; lo fijamos tras ejecutarlo
+  ctx.window._txCurrentPac=pac;
+  const snap = vm.runInContext('_txValSnapshotText', ctx)();
+  assert.ok(/Huésped: SOT/.test(snap) && /Pneumocystis indicada/.test(snap), 'el snapshot no captura huésped + plan');
+  ctx.window._txValGuardarHist();
+  await Promise.resolve(); await Promise.resolve();
+  assert.ok(cap.data && Array.isArray(cap.data.txValoracionHist) && cap.data.txValoracionHist.length===1, 'no guarda una entrada en el historial');
+  const e0 = cap.data.txValoracionHist[0];
+  assert.ok(e0.modo==='seguimiento' && e0.fecha && /Pneumocystis indicada/.test(e0.texto), 'la entrada no lleva modo/fecha/texto');
+  const histFn = vm.runInContext('_txValHistHTML', ctx);
+  const html = histFn({ txValoracionHist:[ {fecha:'2026-06-01T10:00:00Z',modo:'inicial',huesped:'SOT',texto:'A'}, {fecha:'2026-06-10T10:00:00Z',modo:'seguimiento',huesped:'SOT',texto:'B'}, {fecha:'2026-06-20T10:00:00Z',modo:'seguimiento',huesped:'SOT',texto:'C'} ] });
+  assert.ok(html.includes('Valoraciones previas (3)') && html.includes('Inicial') && html.includes('Seguimiento') && html.includes('_txValDescargarHist'), 'no rinde el historial acumulado con descarga');
+  assert.equal(histFn({ txValoracionHist:[] }), '', 'sin historial debería ser vacío');
+});
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas
   // se colapsan en la Valoración; su contenido se vuelve secciones colapsables (lazy) que reusan los motores.

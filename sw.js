@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v382 (Inmunocomprometido — historial de >2 valoraciones, fechadas)
+//  "sigue" del Dr.: soportar más de 2 valoraciones (Inicial → Seguimiento 1 → 2 → 3…). Botón "💾 Guardar
+//  valoración al historial" → _txValGuardarHist toma un snapshot en texto (datos compuestos + estudios + plan
+//  determinista) y lo agrega fechado a p.txValoracionHist (updateDoc merge, tope 50). _txValHistHTML rinde
+//  "Valoraciones previas (N)" colapsables (fecha · modo · huésped) con descarga Word por entrada
+//  (_txValDescargarHist). Acumula la evolución del paciente entre visitas. +1 prueba (292).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v381 (Inmunocomprometido — Fase 3: redacción por IA, híbrida y segura)
 //  "sigue" del Dr.: la IA redacta la valoración. HÍBRIDO: el formulario captura, los motores DETERMINISTAS
 //  deciden el PLAN; la IA SOLO redacta en prosa profesional (no inventa dosis ni recomendaciones). Botón
@@ -1112,7 +1119,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v381';
+const CACHE = 'stewardmx-v382';
 const SHELL = [
   '/',
   '/index.html',
