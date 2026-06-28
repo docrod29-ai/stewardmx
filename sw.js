@@ -1,4 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v386 (Loop clase mundial — W5: arnés de evidencia/impacto PROA)
+//  Nuevo módulo PURO js/core/evidence.js: buildEvidenceReport (DOT/1000, % aceptación de intervenciones,
+//  % multirresistencia, reusando clinical-days) + compareEvidence (antes/después). Botón "Evidencia" en
+//  la pestaña Alertas. Es la INFRAESTRUCTURA de medición para un estudio piloto; el estudio/IRB/publicación
+//  son externos (docs/W5_PROTOCOLO_PILOTO.md). evidence.js al SHELL. +1 prueba (300).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v385 (Loop clase mundial — W3: AUC de vancomicina por 2 niveles)
 //  Nuevo módulo PURO js/core/vanco.js: AUC₀₋₂₄ por DOS niveles (PK de primer orden), objetivo 400–600
 //  (IDSA/ASHP 2020) + sugerencia de dosis. HONESTO: NO es bayesiano (se etiqueta así en la UI); la dosis
@@ -1140,7 +1146,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v385';
+const CACHE = 'stewardmx-v386';
 const SHELL = [
   '/',
   '/index.html',
@@ -1154,6 +1160,7 @@ const SHELL = [
   '/js/core/abg-phenotype.js',
   '/js/core/alerts.js',
   '/js/core/vanco.js',
+  '/js/core/evidence.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',
   '/icons/icon-maskable.svg'

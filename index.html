@@ -4587,6 +4587,9 @@ window.proaAlerts=proaAlerts;
 // W3: AUC de vancomicina por 2 niveles (PK primer orden; NO bayesiano).
 import { vancoAUC2level, vancoSuggestDailyDose } from './js/core/vanco.js';
 window.vancoAUC2level=vancoAUC2level; window.vancoSuggestDailyDose=vancoSuggestDailyDose;
+// W5: arnés de métricas de evidencia/impacto PROA.
+import { buildEvidenceReport, compareEvidence } from './js/core/evidence.js';
+window.buildEvidenceReport=buildEvidenceReport; window.compareEvidence=compareEvidence;
 // Worklist PROA: corre el motor sobre el censo (PACS) y lo presenta. Stateful → vive aquí.
 window.proaWorklist=function(){
   try{
@@ -4649,6 +4652,30 @@ window._vancoCalcRun=function(){
     +'<div style="font-size:11px;color:var(--t2);margin-top:4px;">ke '+r.ke.toFixed(4)+' h⁻¹ · t½ '+r.thalf.toFixed(1)+' h · Cmax '+r.Cmax.toFixed(1)+' · Cmin '+r.Cmin.toFixed(1)+' mg/L</div>'
     +(nd?'<div style="font-size:12px;color:var(--t1);margin-top:8px;">Para AUC ≈ 500: dosis diaria ≈ <b>'+nd.toFixed(0)+' mg/día</b> <span style="color:var(--t3);">(validación clínica)</span></div>':'')
     +'</div>';
+};
+// W5: reporte de evidencia/impacto del censo actual (infraestructura de medición para estudio piloto).
+window._evidenciaReport=function(){
+  try{
+    const E=window.escHtml||(x=>x);
+    const pacs=window.PACS||[];
+    const sols=window.SOLICITUDES||[];
+    const total=sols.length;
+    const aceptadas=sols.filter(s=>/aprob|autoriz|acept/i.test(((s&&(s.estado||s.status||s.decision))||'')+'')).length;
+    let mdr=0,iso=0; pacs.forEach(p=>{ if(p.organismo||p.cult==='positivo'){ iso++; try{ if(window.isMDR&&window.isMDR(p))mdr++; }catch(_){} } });
+    const r=window.buildEvidenceReport(pacs,{intervenciones:{total,aceptadas},resistencia:{mdr,total:iso}});
+    const f=(v,suf)=>v==null?'—':(v+(suf||''));
+    const row=(l,v)=>'<tr><td style="padding:6px 12px;color:var(--t2);border-bottom:1px solid var(--brd2);">'+l+'</td><td style="padding:6px 12px;font-weight:700;color:var(--t1);text-align:right;border-bottom:1px solid var(--brd2);">'+v+'</td></tr>';
+    const html='<div style="max-width:560px;margin:0 auto;">'
+      +'<div style="font-size:11px;color:var(--t3);margin-bottom:10px;">Métricas de impacto PROA del censo actual — infraestructura de medición para un estudio piloto (antes/después). El análisis formal lo valida el equipo.</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:13px;background:var(--s2);border:1px solid var(--brd2);border-radius:8px;overflow:hidden;">'
+      +row('Pacientes',r.pacientes)+row('Días-paciente',r.diasPaciente)+row('DOT (días de terapia)',r.dot)
+      +row('DOT por 1000 días-paciente',f(r.dotPer1000))
+      +row('Intervenciones',r.intervenciones)+row('Aceptación de intervenciones',f(r.aceptacionPct,'%'))
+      +row('Aislamientos multirresistentes',r.mdrIsolados+' / '+r.isolados)+row('% multirresistencia',f(r.mdrPct,'%'))
+      +'</table>'
+      +'<div style="font-size:10px;color:var(--t3);margin-top:8px;">DOT y días-paciente: módulo validado. Aceptación y MDR: derivadas del censo y las solicitudes actuales.</div></div>';
+    (window.abrirContenido||function(){})('📊 Evidencia / impacto PROA', html);
+  }catch(e){ if(window.toast)toast('No se pudo generar el reporte: '+(e.message||e),'rd'); }
 };
 window.calcDiasEstancia=calcDiasEstancia; window.calcDiasPaciente=calcDiasPaciente; window.calcDOT=calcDOT; window.dotPer1000=dotPer1000;
 
@@ -33025,6 +33052,7 @@ input:focus,select:focus,textarea:focus{
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn-sm" style="background:linear-gradient(135deg,#7c3aed,#00d4a8);color:#fff;border:none;" onclick="window.proaWorklist&&window.proaWorklist()">🔬 Worklist PROA</button>
         <button class="btn-sm" style="background:var(--s3);color:var(--t1);border:1px solid var(--brd2);" onclick="window._vancoCalc&&window._vancoCalc()">🧮 AUC vanco</button>
+        <button class="btn-sm" style="background:var(--s3);color:var(--t1);border:1px solid var(--brd2);" onclick="window._evidenciaReport&&window._evidenciaReport()">📊 Evidencia</button>
         <button class="btn-sm btn-sm-teal" onclick="renderAlertas24h()">↻ Actualizar</button>
       </div>
     </div>

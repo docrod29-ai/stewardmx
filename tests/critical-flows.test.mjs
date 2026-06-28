@@ -2136,3 +2136,16 @@ test('W3 — AUC de vancomicina por 2 niveles (PK primer orden) vs caso resuelto
   assert.equal(vancoAUC2level({ C1: 10, t1: 2, C2: 30, t2: 11, tau: 12, tinf: 1 }), null, 'C1<C2 (ke<0) debería ser null');
   assert.equal(vancoAUC2level({ C1: 30, t1: 2, C2: 10, t2: 2, tau: 12, tinf: 1 }), null, 't2<=t1 debería ser null');
 });
+test('W5 — arnés de evidencia: aceptación %, MDR % y comparación antes/después', async () => {
+  const E = await import('../js/core/evidence.js');
+  const r = E.buildEvidenceReport([], { intervenciones: { total: 20, aceptadas: 17 }, resistencia: { mdr: 3, total: 12 } });
+  assert.equal(r.aceptacionPct, 85, 'aceptación %');
+  assert.equal(r.mdrPct, 25, 'MDR %');
+  assert.equal(r.pacientes, 0, 'pacientes');
+  const r2 = E.buildEvidenceReport([], {});
+  assert.equal(r2.aceptacionPct, null, 'sin denominador → null');
+  assert.equal(r2.mdrPct, null, 'sin aislamientos → null');
+  const cmp = E.compareEvidence({ dotPer1000: 800, mdrPct: 30, aceptacionPct: 70 }, { dotPer1000: 600, mdrPct: 24, aceptacionPct: 85 });
+  assert.equal(cmp.dotPer1000.deltaPct, -25, 'delta DOT/1000');
+  assert.equal(cmp.mdrPct.deltaPct, -20, 'delta MDR%');
+});
