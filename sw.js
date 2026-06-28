@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v373 (Inmunocomprometido — recomendaciones por fase/paciente, profesionales)
+//  Feedback del Dr.: el plan debe ser por fase y por paciente, profesional, SIN emojis y SIN bibliografía,
+//  y solo lo que el paciente necesita. Reescrito _txValRecs: se quitaron TODOS los emojis y TODAS las citas;
+//  texto formal; la fase post-TX se calcula por fecha; VIH por escalón de CD4; TB y vacunación SOLO cuando
+//  son pertinentes (pre-IS / aptitud / motivo vacunación) — sin relleno genérico. Esto limpia también el
+//  Word (jala de ahí). El Word ya no imprime el correo como "Elaboró" (solo nombre real). +1 prueba (283).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v372 (Inmunocomprometido — apoyo "A detalle" filtrado por motivo)
 //  Feedback del Dr.: las 7 secciones de apoyo salían todas y confundían. Ahora _txValDeepSectionsHTML
 //  recibe el MOTIVO y muestra SOLO las relevantes (vacunación→solo Vacunación; aptitud biológico→Fármacos+
@@ -1039,7 +1046,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v372';
+const CACHE = 'stewardmx-v373';
 const SHELL = [
   '/',
   '/index.html',

@@ -1277,18 +1277,29 @@ test('INMUNO v366: valoración infectológica del inmunocomprometido (historia d
   assert.ok(/window\._txValSetModo/.test(_idx) && _idx.includes("window._txValModo='inicial'"), 'falta el toggle de modo Inicial/Seguimiento');
   assert.ok(_idx.includes('hc_padecimiento') && _idx.includes('hc_inmunosup') && _idx.includes('hc_antecedentes'), 'faltan campos de historia clínica dirigida');
   assert.ok(_idx.includes('function _txValEstudiosHTML') && _idx.includes('hc_est_igra'), 'falta el checklist de estudios a solicitar');
-  assert.ok(/window\._txValRecs/.test(_idx) && _idx.includes('AST-IDCOP 2019') && _idx.includes('DHHS/IDSA'), 'faltan recomendaciones citadas (VIH y no-VIH)');
+  assert.ok(/window\._txValRecs/.test(_idx) && _idx.includes('VIH — profilaxis por CD4') && _idx.includes('Tamizaje según el biológico'), 'faltan recomendaciones por huésped (VIH y no-VIH)');
   assert.ok(/window\._txValGenerarNota/.test(_idx) && _idx.includes('txValoracion:data'), 'no genera/persiste la nota de valoración');
   assert.ok(_idx.includes("label:'Inmunocomprometido'"), 'la pestaña no se renombró a Inmunocomprometido');
 });
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');
-  // Profundización por evidencia:
-  assert.ok(_idx.includes('Fishman, NEJM 2007') && _idx.includes('Fase post-TX'), 'falta la fase post-TX (Fishman) en las recomendaciones');
-  assert.ok(_idx.includes('profilaxis de OI por CD4') && _idx.includes('MAC<50'), 'falta el escalón VIH por CD4 (PJP<200/Toxo<100/MAC<50)');
-  assert.ok(_idx.includes('Asplenia / hipoesplenia') && _idx.includes('ENCAPSULADOS'), 'falta la recomendación de asplenia (encapsulados)');
-  assert.ok(_idx.includes('Biológicos — tamizaje dirigido') && _idx.includes('anti-CD20'), 'falta el tamizaje dirigido de biológicos (anti-CD20/anti-TNF/JAK)');
+  // Profundización por fase/paciente (v373: redactadas profesionales, sin emojis ni citas):
+  assert.ok(_idx.includes('Fase post-trasplante (aproximadamente'), 'falta la fase post-trasplante en las recomendaciones');
+  assert.ok(_idx.includes('VIH — profilaxis por CD4') && _idx.includes('M. avium <50'), 'falta el escalón VIH por CD4 (Pneumocystis<200/Toxo<100/MAC<50)');
+  assert.ok(_idx.includes("/Asplenia/.test(h)") && _idx.includes('encapsuladas'), 'falta la recomendación de asplenia (encapsulados)');
+  assert.ok(_idx.includes('Tamizaje según el biológico') && _idx.includes('Anti-CD20'), 'falta el tamizaje dirigido de biológicos');
+});
+test('INMUNO v373: recomendaciones por fase/paciente — SIN emojis ni bibliografía, profesionales', () => {
+  // Feedback del Dr.: el plan debe ser por fase y por paciente, profesional, sin emojis ni citas.
+  // Extraemos el cuerpo de _txValRecs y verificamos que no haya citas ni emojis en sus textos.
+  const s = _idx.indexOf('window._txValRecs=function(){');
+  const e = _idx.indexOf('window._txValGenerarNota=function', s);
+  assert.ok(s >= 0 && e > s, 'no se ubicó _txValRecs');
+  const body = _idx.slice(s, e);
+  assert.ok(!/\[(AST|DHHS|TTS|Fishman|OMS|IDSA|ECIL|AGA|CDC|Kotton)/.test(body), 'las recomendaciones aún tienen bibliografía entre corchetes');
+  assert.ok(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}✅ℹ\u{1F9ED}]/u.test(body), 'las recomendaciones aún contienen emojis');
+  assert.ok(body.includes("preIS||motivo==='vacunacion'") && body.includes('preIS||isBio'), 'TB/vacunas no están condicionadas a lo pertinente (solo lo que necesita el paciente)');
 });
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas

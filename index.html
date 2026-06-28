@@ -25932,7 +25932,7 @@ window._txValWordExport=function(){
   if(modo==='inicial' && solic.length) w+='<div style="margin:8px 0;"><div style="font-weight:bold;color:#1a6b52;font-size:13px;border-bottom:1px solid #ddd;">Estudios solicitados</div><ul style="font-size:12px;margin:4px 0 0 18px;">'+solic.map(e=>'<li>'+E(e)+'</li>').join('')+'</ul></div>';
   if(modo==='seguimiento'){ w+=sec('Evolución desde la última valoración','hc_evolucion'); w+=sec('Resultados de estudios','hc_resultados'); }
   if(recsHtml) w+='<div style="margin:10px 0;"><div style="font-weight:bold;color:#1a6b52;font-size:13px;border-bottom:1px solid #ddd;">Impresión y recomendaciones (PROA / Infectología)</div><ul style="font-size:12px;margin:4px 0 0 18px;">'+recsHtml+'</ul></div>';
-  w+='<div style="margin-top:14px;font-size:11px;color:#555;border-top:1px solid #ddd;padding-top:6px;">Documento de apoyo PROA / Infectología — NOM-004-SSA3. Las dosis y duraciones requieren validación clínica del médico tratante.'+(medico?'<br>Elaboró: '+E(medico):'')+'</div></div>';
+  w+='<div style="margin-top:14px;font-size:11px;color:#555;border-top:1px solid #ddd;padding-top:6px;">Documento de apoyo PROA / Infectología — NOM-004-SSA3. Las dosis y duraciones requieren validación clínica del médico tratante.'+((medico&&medico.indexOf('@')<0)?'<br>Elaboró: '+E(medico):'')+'</div></div>';
   const wordContent='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body>'+w+'</body></html>';
   try{
     const blob=new Blob([wordContent],{type:'application/msword'});
@@ -26074,48 +26074,49 @@ window._txValRecs=function(){
   const g=id=>(document.getElementById(id)?.value||'');
   const h=g('hc_huesped'),prof=(g('hc_profilaxis')||'').toLowerCase(),cd4=parseFloat(g('hc_cd4')||'NaN');
   const isSOT=/^SOT/.test(h),isTCMH=/TCMH/.test(h),isAllo=/alog|haplo|cord/i.test(h),isVIH=/^VIH/.test(h),isNeutro=/Neutropenia|Quimio/.test(h),isBio=/Biológicos|Corticoides/.test(h);
-  const rec=(ic,t,c,col)=>`<div style="border-left:4px solid ${col};background:var(--s2);border-radius:0 6px 6px 0;padding:9px 12px;margin-bottom:7px;"><div style="font-size:12px;font-weight:700;color:${col};">${ic} ${t}</div><div style="font-size:11px;color:var(--t2);line-height:1.45;margin-top:2px;">${c}</div></div>`;
-  let h2='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:8px;">Recomendaciones (por evidencia)</div>';
-  if(!h||h==='—'){ el.innerHTML=h2+'<div style="font-size:11px;color:var(--t3);padding:8px;">Selecciona el tipo de huésped para ver recomendaciones.</div>'; return; }
-  // Estado de inmunosupresión (no todos la reciben).
-  const isEst=g('hc_is_estado');
-  if(isEst==='Va a iniciar (pre-protocolo)') h2+=rec('🧭','Pre-protocolo (aún SIN inmunosupresión)','Enfoque en TAMIZAJE basal (serologías D/R, TB latente, VHB, Strongyloides) y VACUNACIÓN: las vacunas VIVAS solo se pueden aplicar AHORA (≥4 sem antes de iniciar IS). Tratar TB latente / Strongyloides / Chagas ANTES de inmunosuprimir. [AST-IDCOP 2019]','var(--blue)');
-  else if(isEst==='Ninguna / suspendida') h2+=rec('ℹ️','Sin inmunosupresión activa','Menor riesgo de oportunistas sin IS; reevaluar la profilaxis según la causa de base y los planes de tratamiento. [AST-IDCOP 2019]','var(--t3)');
-  // Fase post-TX → patógenos esperados (Fishman, NEJM 2007). Solo SOT/TCMH y si hay fecha.
+  const isTx=isSOT||isTCMH;
+  // Sin emojis, sin bibliografía, profesional. El color (borde) marca prioridad; el texto es individualizado.
+  const rec=(t,c,col)=>`<div style="border-left:3px solid ${col};background:var(--s2);border-radius:0 6px 6px 0;padding:9px 12px;margin-bottom:7px;"><div style="font-size:12px;font-weight:700;color:var(--t1);">${t}</div><div style="font-size:11px;color:var(--t2);line-height:1.5;margin-top:2px;">${c}</div></div>`;
+  let h2='<div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--purple);margin-bottom:8px;">Impresión y plan — Infectología</div>';
+  if(!h||h==='—'){ el.innerHTML=h2+'<div style="font-size:11px;color:var(--t3);padding:8px;">Selecciona el tipo de huésped para ver el plan.</div>'; return; }
+  const motivo=g('hc_motivo'), isEst=g('hc_is_estado');
+  const preIS = isEst==='Va a iniciar (pre-protocolo)' || motivo==='aptitud_pretx' || motivo==='aptitud_biologico';
+  if(isEst==='Va a iniciar (pre-protocolo)') h2+=rec('Pre-protocolo (aún sin inmunosupresión)','Completar el tamizaje basal (serologías donante/receptor, TB latente, hepatitis B, Strongyloides) y la vacunación antes de iniciar la inmunosupresión. Las vacunas vivas solo pueden aplicarse en este momento, al menos cuatro semanas antes del inicio. Tratar TB latente, Strongyloides o Chagas, si resultan positivos, previo a inmunosuprimir.','var(--blue)');
+  else if(isEst==='Ninguna / suspendida') h2+=rec('Sin inmunosupresión activa','Menor riesgo de infecciones oportunistas; reevaluar la necesidad de profilaxis según la enfermedad de base y el plan terapéutico.','var(--t3)');
+  // Fase post-trasplante (individual, calculada de la fecha).
   const fx=g('hc_fechatx');
-  if((isSOT||isTCMH)&&fx){
+  if(isTx&&fx){
     const d=Math.floor((Date.now()-new Date(fx).getTime())/86400000);
     if(!isNaN(d)&&d>=0){
       const faseTxt=isTCMH
-        ?(d<30?'preinjerto/neutropénica (&lt;30 d): bacterias (gram- y gram+), Candida, HSV':(d<100?'temprana (30–100 d): CMV, Aspergillus, PJP, adenovirus':'tardía (&gt;100 d): encapsulados (S. pneumoniae), VZV, CMV tardío, PJP — sobre todo con EICH crónica'))
-        :(d<30?'&lt;1 mes: nosocomiales/MDR, candidiasis, derivadas del donante, sitio quirúrgico, reactivación HSV':(d<180?'1–6 meses: oportunistas (PJP, CMV, hongos, reactivación BK/HBV/TB, Listeria, Nocardia)':'&gt;6 meses: comunitarias + oportunistas tardías si inmunosupresión alta'));
-      h2+=rec('🗓️','Fase post-TX (~'+d+' d) — patógenos esperados',faseTxt+'. [Fishman, NEJM 2007]','var(--purple)');
+        ?(d<30?'fase preinjerto/neutropénica (menos de 30 días): bacterias gramnegativas y grampositivas, Candida y reactivación de herpes simple.':(d<100?'fase temprana (30 a 100 días): citomegalovirus, Aspergillus, Pneumocystis y adenovirus.':'fase tardía (más de 100 días): bacterias encapsuladas, varicela zóster, citomegalovirus tardío y Pneumocystis, sobre todo con enfermedad injerto contra huésped crónica.'))
+        :(d<30?'primer mes: infecciones nosocomiales y por multirresistentes, candidiasis, infecciones derivadas del donante, del sitio quirúrgico y reactivación de herpes simple.':(d<180?'periodo de 1 a 6 meses: infecciones oportunistas — Pneumocystis, citomegalovirus, hongos, reactivación de virus BK, hepatitis B o tuberculosis, Listeria y Nocardia.':'más de 6 meses: predominan las infecciones adquiridas en la comunidad; persisten las oportunistas si la inmunosupresión sigue siendo intensa.'));
+      h2+=rec('Fase post-trasplante (aproximadamente '+d+' días)','Patógenos esperados en esta ventana: '+faseTxt,'var(--purple)');
     }
   }
-  const tienePJP=/tmp|smx|cotrimox|sulfa/.test(prof);
+  const tienePJP=/tmp|smx|cotrimox|sulfa|atovacuona|dapsona|pentamidina/.test(prof);
   if(isSOT||isTCMH||isVIH||isNeutro||isBio){
-    if(tienePJP) h2+=rec('✅','Profilaxis PJP en curso','Continuar TMP-SMX mientras dure la inmunosupresión relevante. [AST-IDCOP 2019; DHHS/IDSA OI]','var(--teal)');
-    else h2+=rec('💊','Profilaxis PJP indicada','Falta TMP-SMX. Indicada en SOT, TCMH alogénico, VIH con CD4<200 y corticoides ≥20 mg/d ≥4 sem o biológicos de alto riesgo. Si G6PD deficiente: atovacuona. Dosis: validación clínica. [AST-IDCOP 2019; DHHS/IDSA]','var(--blue)');
+    if(tienePJP) h2+=rec('Profilaxis para Pneumocystis en curso','Mantenerla mientras persista la inmunosupresión relevante.','var(--teal)');
+    else h2+=rec('Profilaxis para Pneumocystis indicada','No se documenta profilaxis y está indicada en este perfil de inmunosupresión. De elección trimetoprima con sulfametoxazol; usar atovacuona si hay déficit de G6PD. Ajustar la dosis a la función renal (validación clínica).','var(--blue)');
   }
-  if(isSOT||isTCMH) h2+=rec('🔬','CMV — estratificar por D/R','Definir serostatus donante/receptor (D+/R- = máximo riesgo). Profilaxis (valganciclovir; letermovir en TCMH) vs estrategia anticipada por PCR según tipo. Detalle en Pre-Trasplante. [TTS/Kotton 2018]','var(--amber)');
-  if(/Pulmonar/.test(h)) h2+=rec('🍄','Antifúngica (trasplante pulmonar)','Cobertura anti-mohos según protocolo del centro (azol / anfotericina inhalada). [AST-IDCOP 2019]','var(--amber)');
-  if(isTCMH&&isAllo) h2+=rec('🍄','Antifúngica (TCMH alogénico)','Anti-mohos (p. ej. posaconazol) durante neutropenia/EICH; galactomanano de vigilancia. [ECIL]','var(--amber)');
+  if(isTx) h2+=rec('Citomegalovirus','Estratificar por el serostatus donante/receptor; la combinación donante positivo con receptor negativo es la de mayor riesgo. Definir profilaxis (valganciclovir; letermovir en trasplante hematopoyético) o estrategia anticipada guiada por carga viral, según el tipo de trasplante.','var(--amber)');
+  if(/Pulmonar/.test(h)) h2+=rec('Profilaxis antifúngica','Trasplante pulmonar: indicar cobertura frente a hongos filamentosos según el protocolo del centro.','var(--amber)');
+  else if(isTCMH&&isAllo) h2+=rec('Profilaxis antifúngica','Trasplante hematopoyético alogénico: cobertura frente a hongos filamentosos durante la neutropenia y la enfermedad injerto contra huésped, con vigilancia de galactomanano.','var(--amber)');
   if(isVIH){
     if(!isNaN(cd4)){
       const l=[];
-      if(cd4<200)l.push('<b>PJP</b> (TMP-SMX)');
-      if(cd4<100)l.push('<b>Toxoplasma</b> si IgG+ (TMP-SMX) + descartar criptococo (<b>CrAg</b> sérico)');
-      if(cd4<50)l.push('<b>MAC</b> (azitromicina) + vigilar CMV (fondo de ojo)');
-      if(l.length) h2+=rec('🔴','VIH — profilaxis de OI por CD4 ('+cd4+' cels/µL)','Indicadas: '+l.join('; ')+'. Iniciar/optimizar TAR; suspender profilaxis tras reconstitución sostenida. [DHHS/IDSA OI]','var(--red)');
-      else h2+=rec('🟢','VIH — CD4 '+cd4+' cels/µL','Sin profilaxis de OI por recuento (≥200). Mantener TAR + vacunas inactivadas; vivas según CD4. [DHHS/IDSA OI]','var(--teal)');
-    } else h2+=rec('🟡','VIH — falta CD4','Captura CD4 y carga viral: define el escalón de profilaxis (PJP<200, Toxo<100, MAC<50). [DHHS/IDSA OI]','var(--amber)');
+      if(cd4<200)l.push('Pneumocystis con trimetoprima-sulfametoxazol');
+      if(cd4<100)l.push('Toxoplasma si la serología es positiva, y descartar criptococo con antígeno sérico');
+      if(cd4<50)l.push('complejo Mycobacterium avium y vigilancia de citomegalovirus');
+      if(l.length) h2+=rec('VIH — profilaxis por CD4 ('+cd4+' células/µL)','Profilaxis indicada: '+l.join('; ')+'. Optimizar el tratamiento antirretroviral y suspender la profilaxis tras una reconstitución inmune sostenida.','var(--red)');
+      else h2+=rec('VIH — CD4 '+cd4+' células/µL','Sin profilaxis de oportunistas indicada por el recuento (≥200). Mantener el tratamiento antirretroviral.','var(--teal)');
+    } else h2+=rec('VIH — falta el recuento de CD4','Capturar CD4 y carga viral para definir el escalón de profilaxis (Pneumocystis con CD4 <200, Toxoplasma <100, complejo M. avium <50).','var(--amber)');
   }
-  if(isNeutro) h2+=rec('🩸','Neutropenia','Neutropenia febril: hemocultivos + beta-lactámico antipseudomonas en la 1ª hora; estratificar MASCC. [IDSA neutropenia febril]','var(--amber)');
-  if(/Asplenia/.test(h)) h2+=rec('🛡️','Asplenia / hipoesplenia','Riesgo de sepsis fulminante por ENCAPSULADOS (S. pneumoniae, H. influenzae b, N. meningitidis). Vacunar (neumococo, meningococo ACWY+B, Hib); antibiótico de reserva en casa + tarjeta de alerta; umbral bajo para empíricos ante fiebre. [IDSA/CDC]','var(--red)');
-  if(/Biológicos/.test(h)) h2+=rec('🧬','Biológicos — tamizaje dirigido','anti-CD20 (rituximab): tamizar VHB (HBsAg/anti-HBc) → entecavir/tenofovir profiláctico si anti-HBc+ (riesgo de reactivación). anti-TNF: descartar TB latente (IGRA) antes de iniciar. JAK: riesgo de zóster → vacuna recombinante (Shingrix). [AGA/AASLD; IDSA]','var(--amber)');
-  h2+=rec('🧫','TB latente','Tamizar con IGRA + Rx tórax; si positivo, isoniazida (ojo interacción rifamicina-calcineurínicos). [OMS; AST-IDCOP 2019]','var(--blue)');
-  h2+=rec('💉','Vacunación','Inactivadas indicadas (influenza, neumococo PCV+PPSV23, HepB, SARS-CoV-2). VIVAS contraindicadas bajo inmunosupresión (idealmente ≥4 sem pre-TX). [IDSA 2013; AST]','var(--blue)');
-  h2+=rec('ℹ️','Dosis exactas','Las dosis/duración requieren validación clínica del Dr. según función renal, fármacos y protocolo local.','var(--t3)');
+  if(isNeutro) h2+=rec('Neutropenia','Ante fiebre: tomar hemocultivos e iniciar un betalactámico con actividad antipseudomonas dentro de la primera hora, con estratificación de riesgo.','var(--amber)');
+  if(/Asplenia/.test(h)) h2+=rec('Asplenia','Riesgo de sepsis fulminante por bacterias encapsuladas (neumococo, Haemophilus influenzae tipo b y meningococo). Asegurar la vacunación correspondiente, un antibiótico de reserva domiciliario y un umbral bajo para el tratamiento empírico ante fiebre.','var(--red)');
+  if(/Biológicos/.test(h)) h2+=rec('Tamizaje según el biológico','Anti-CD20: tamizar hepatitis B e indicar profilaxis antiviral si hay anti-HBc positivo. Anti-TNF: descartar tuberculosis latente antes de iniciar. Inhibidores de JAK: riesgo de herpes zóster, considerar la vacuna recombinante.','var(--amber)');
+  if(preIS||isBio) h2+=rec('Tuberculosis latente','Tamizar con IGRA y radiografía de tórax; si es positivo, dar tratamiento, vigilando la interacción de las rifamicinas con los inhibidores de calcineurina.','var(--blue)');
+  if(preIS||motivo==='vacunacion') h2+=rec('Vacunación','Indicar las vacunas inactivadas pertinentes (influenza, neumococo conjugada y polisacárida, hepatitis B y SARS-CoV-2). Las vacunas vivas están contraindicadas bajo inmunosupresión; de requerirse, aplicarlas al menos cuatro semanas antes de iniciarla.','var(--blue)');
   el.innerHTML=h2;
 };
 window._txValGenerarNota=function(){
