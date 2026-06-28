@@ -4584,6 +4584,9 @@ window.calcDiaATB=calcDiaATB; window.diaATBLabel=diaATBLabel; window.calcDia=cal
 // W2: motor determinista de alertas PROA (puro). La app inyecta resolveKey/CrCl/días/isMDR.
 import { proaAlerts } from './js/core/alerts.js';
 window.proaAlerts=proaAlerts;
+// W3: AUC de vancomicina por 2 niveles (PK primer orden; NO bayesiano).
+import { vancoAUC2level, vancoSuggestDailyDose } from './js/core/vanco.js';
+window.vancoAUC2level=vancoAUC2level; window.vancoSuggestDailyDose=vancoSuggestDailyDose;
 // Worklist PROA: corre el motor sobre el censo (PACS) y lo presenta. Stateful → vive aquí.
 window.proaWorklist=function(){
   try{
@@ -4616,6 +4619,36 @@ window.proaWorklist=function(){
     html+='</div>';
     (window.abrirContenido||function(){})('🔬 Worklist PROA — recomendaciones', html);
   }catch(e){ if(window.toast)toast('No se pudo generar el worklist: '+(e.message||e),'rd'); }
+};
+// W3: calculadora AUC de vancomicina (2 niveles). UI; el cálculo vive en js/core/vanco.js.
+window._vancoCalc=function(){
+  const fld=(id,lbl,ph)=>'<div class="fg" style="flex:1;min-width:120px;"><label style="font-size:11px;color:var(--t2);">'+lbl+'</label><input id="'+id+'" type="number" step="any" placeholder="'+ph+'" style="width:100%;padding:7px 9px;border:1px solid var(--brd2);border-radius:6px;background:var(--s2);color:var(--t1);font-size:12px;box-sizing:border-box;"></div>';
+  const html='<div style="max-width:600px;margin:0 auto;">'
+    +'<div style="font-size:11px;color:var(--t3);margin-bottom:12px;">AUC₀₋₂₄ por <b>dos niveles</b> (PK de primer orden). Objetivo 400–600 mg·h/L (IDSA/ASHP 2020). <b>No es bayesiano</b>; las dosis sugeridas requieren <b>validación clínica</b>.</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+    +fld('vc_C1','Nivel 1 (mg/L)','30')+fld('vc_t1','t nivel 1 (h)','2')
+    +fld('vc_C2','Nivel 2 (mg/L)','10')+fld('vc_t2','t nivel 2 (h)','11')
+    +fld('vc_tau','Intervalo τ (h)','12')+fld('vc_tinf','Infusión (h)','1')
+    +fld('vc_dd','Dosis diaria actual (mg)','2000')
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--t3);margin:6px 0 10px;">Los tiempos se miden desde el INICIO de la infusión; t1 y t2 ≥ infusión y t1 &lt; t2 &lt; τ.</div>'
+    +'<button onclick="window._vancoCalcRun&&window._vancoCalcRun()" class="btn-main" style="background:linear-gradient(135deg,#7c3aed,#00d4a8);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:700;cursor:pointer;">Calcular AUC</button>'
+    +'<div id="vanco-res" style="margin-top:14px;"></div></div>';
+  (window.abrirContenido||function(){})('🧮 Calculadora AUC vancomicina', html);
+};
+window._vancoCalcRun=function(){
+  const g=id=>parseFloat((document.getElementById(id)||{}).value);
+  const out=document.getElementById('vanco-res'); if(!out)return;
+  const r=window.vancoAUC2level({C1:g('vc_C1'),t1:g('vc_t1'),C2:g('vc_C2'),t2:g('vc_t2'),tau:g('vc_tau'),tinf:g('vc_tinf')});
+  if(!r){ out.innerHTML='<div style="color:var(--red);font-size:12px;">Datos inválidos: el nivel 1 debe ser &gt; nivel 2, y t1 &lt; t2 &lt; τ (tiempos ≥ infusión).</div>'; return; }
+  const dd=g('vc_dd');
+  const nd=(dd>0)?window.vancoSuggestDailyDose(dd,r.auc24,500):null;
+  const col=r.inTarget?'var(--teal)':'var(--amber)';
+  out.innerHTML='<div style="border-left:3px solid '+col+';padding:10px 14px;background:var(--s2);border-radius:0 8px 8px 0;">'
+    +'<div style="font-size:18px;font-weight:800;color:'+col+';">AUC₀₋₂₄ ≈ '+r.auc24.toFixed(0)+' mg·h/L '+(r.inTarget?'· en objetivo':'· fuera de 400–600')+'</div>'
+    +'<div style="font-size:11px;color:var(--t2);margin-top:4px;">ke '+r.ke.toFixed(4)+' h⁻¹ · t½ '+r.thalf.toFixed(1)+' h · Cmax '+r.Cmax.toFixed(1)+' · Cmin '+r.Cmin.toFixed(1)+' mg/L</div>'
+    +(nd?'<div style="font-size:12px;color:var(--t1);margin-top:8px;">Para AUC ≈ 500: dosis diaria ≈ <b>'+nd.toFixed(0)+' mg/día</b> <span style="color:var(--t3);">(validación clínica)</span></div>':'')
+    +'</div>';
 };
 window.calcDiasEstancia=calcDiasEstancia; window.calcDiasPaciente=calcDiasPaciente; window.calcDOT=calcDOT; window.dotPer1000=dotPer1000;
 
@@ -32991,6 +33024,7 @@ input:focus,select:focus,textarea:focus{
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn-sm" style="background:linear-gradient(135deg,#7c3aed,#00d4a8);color:#fff;border:none;" onclick="window.proaWorklist&&window.proaWorklist()">🔬 Worklist PROA</button>
+        <button class="btn-sm" style="background:var(--s3);color:var(--t1);border:1px solid var(--brd2);" onclick="window._vancoCalc&&window._vancoCalc()">🧮 AUC vanco</button>
         <button class="btn-sm btn-sm-teal" onclick="renderAlertas24h()">↻ Actualizar</button>
       </div>
     </div>

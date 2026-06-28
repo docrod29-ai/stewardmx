@@ -1,4 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v385 (Loop clase mundial — W3: AUC de vancomicina por 2 niveles)
+//  Nuevo módulo PURO js/core/vanco.js: AUC₀₋₂₄ por DOS niveles (PK de primer orden), objetivo 400–600
+//  (IDSA/ASHP 2020) + sugerencia de dosis. HONESTO: NO es bayesiano (se etiqueta así en la UI); la dosis
+//  requiere validación clínica. Calculadora "AUC vanco" en la pestaña Alertas. Validado vs caso resuelto
+//  (1 g c/12h → AUC24≈453). vanco.js al SHELL. +1 prueba (299).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v384 (Loop clase mundial — W2: motor de alertas PROA determinista + Worklist)
 //  Nuevo módulo PURO js/core/alerts.js (7 reglas, sin DOM/Firebase, testeable): discordancia
 //  antibiótico–antibiograma, ajuste por función renal, candidato IV→VO, duración prolongada, ATB sin
@@ -1134,7 +1140,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v384';
+const CACHE = 'stewardmx-v385';
 const SHELL = [
   '/',
   '/index.html',
@@ -1147,6 +1153,7 @@ const SHELL = [
   '/js/core/medical-voice.js',
   '/js/core/abg-phenotype.js',
   '/js/core/alerts.js',
+  '/js/core/vanco.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg',
   '/icons/icon-maskable.svg'

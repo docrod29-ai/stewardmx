@@ -2119,3 +2119,20 @@ test('W2 — motor de alertas PROA (reglas deterministas, puro)', async () => {
   assert.ok(all.length >= 5, 'el agregador debería combinar varias alertas, dio ' + all.length);
   assert.ok(all.some(x => x.id.startsWith('mismatch')) && all.some(x => x.id === 'mdr') && all.some(x => x.id === 'renal'), 'faltan alertas clave en el agregado');
 });
+test('W3 — AUC de vancomicina por 2 niveles (PK primer orden) vs caso resuelto', async () => {
+  const { vancoAUC2level, vancoSuggestDailyDose } = await import('../js/core/vanco.js');
+  // Caso: 1 g c/12h, infusión 1h; pico 30 mg/L a las 2h, valle 10 mg/L a las 11h.
+  // ke=ln3/9≈0.1221; Cmax≈33.9; Cmin≈8.85; AUCτ≈226.5; AUC24≈453 (en objetivo 400–600).
+  const r = vancoAUC2level({ C1: 30, t1: 2, C2: 10, t2: 11, tau: 12, tinf: 1 });
+  assert.ok(r, 'no calculó');
+  assert.ok(Math.abs(r.ke - 0.1221) < 0.002, 'ke fuera de rango: ' + r.ke);
+  assert.ok(Math.abs(r.thalf - 5.68) < 0.1, 't1/2 fuera de rango: ' + r.thalf);
+  assert.ok(Math.abs(r.auc24 - 453) < 4, 'AUC24 fuera de rango: ' + r.auc24);
+  assert.equal(r.inTarget, true, 'debería estar en objetivo 400–600');
+  // Sugerencia de dosis (lineal) para objetivo 500.
+  const nd = vancoSuggestDailyDose(2000, r.auc24, 500);
+  assert.ok(Math.abs(nd - 2000 * 500 / r.auc24) < 1, 'sugerencia de dosis incorrecta');
+  // Inválidos → null.
+  assert.equal(vancoAUC2level({ C1: 10, t1: 2, C2: 30, t2: 11, tau: 12, tinf: 1 }), null, 'C1<C2 (ke<0) debería ser null');
+  assert.equal(vancoAUC2level({ C1: 30, t1: 2, C2: 10, t2: 2, tau: 12, tinf: 1 }), null, 't2<=t1 debería ser null');
+});
