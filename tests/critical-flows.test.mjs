@@ -1275,7 +1275,7 @@ test('INMUNO v366: valoración infectológica del inmunocomprometido (historia d
   assert.ok(_idx.includes("{id:'tx-valoracion'"), 'falta la sub-pestaña tx-valoracion');
   assert.ok(_idx.includes('function _renderTxValoracion(p)') && _idx.includes("sub==='tx-valoracion'"), '_renderTxValoracion no está definida/dispatcheada');
   assert.ok(/window\._txValSetModo/.test(_idx) && _idx.includes("window._txValModo='inicial'"), 'falta el toggle de modo Inicial/Seguimiento');
-  assert.ok(_idx.includes('hc_padecimiento') && _idx.includes('hc_inmunosup') && _idx.includes('hc_antecedentes'), 'faltan campos de historia clínica dirigida');
+  assert.ok(_idx.includes('hc_padecimiento') && _idx.includes("ta('hc_notas'") && _idx.includes('_txChipsGroupHTML'), 'faltan elementos de la historia clínica dirigida (padecimiento + notas + chips)');
   assert.ok(_idx.includes('function _txValEstudiosHTML') && _idx.includes('hc_est_igra'), 'falta el checklist de estudios a solicitar');
   assert.ok(/window\._txValRecs/.test(_idx) && _idx.includes('VIH — profilaxis por CD4') && _idx.includes('Tamizaje según el biológico'), 'faltan recomendaciones por huésped (VIH y no-VIH)');
   assert.ok(/window\._txValGenerarNota/.test(_idx) && _idx.includes('txValoracion:data'), 'no genera/persiste la nota de valoración');
@@ -1300,6 +1300,26 @@ test('INMUNO v373: recomendaciones por fase/paciente — SIN emojis ni bibliogra
   assert.ok(!/\[(AST|DHHS|TTS|Fishman|OMS|IDSA|ECIL|AGA|CDC|Kotton)/.test(body), 'las recomendaciones aún tienen bibliografía entre corchetes');
   assert.ok(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}✅ℹ\u{1F9ED}]/u.test(body), 'las recomendaciones aún contienen emojis');
   assert.ok(body.includes("preIS||motivo==='vacunacion'") && body.includes('preIS||isBio'), 'TB/vacunas no están condicionadas a lo pertinente (solo lo que necesita el paciente)');
+});
+test('INMUNO v374: historia por chips (sí/no) + un solo texto libre + resultados Pos/Neg, compuestos al Word', async () => {
+  // El Dr. pidió marcar antecedentes (DM2/HAS/tabaquismo) con chips, un solo campo de texto, y resultados Pos/Neg.
+  assert.ok(_idx.includes('const _TX_CHIPS=') && _idx.includes("dm2:'DM2'") && _idx.includes("tabaco:'Tabaquismo'"), 'falta el catálogo de chips');
+  assert.ok(_idx.includes('function _txChipsGroupHTML') && _idx.includes('function _txResHTML'), 'faltan los helpers de chips/resultados');
+  assert.ok(/window\._txValCompose=function/.test(_idx) && _idx.includes("ta('hc_notas'"), 'falta _txValCompose o el campo único de notas');
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{} };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx);
+  const got = vm.runInContext(block + '\n;({render:_renderTxValoracion, chips:_txChipsGroupHTML, res:_txResHTML})', ctx);
+  const chipHtml = got.chips('comorb', { 'hc_cb_comorb_dm2':'1' });
+  assert.ok(chipHtml.includes('DM2') && chipHtml.includes('id="hc_cb_comorb_dm2"') && chipHtml.includes('checked'), 'el chip DM2 no se marca');
+  const resHtml = got.res({ 'hc_res_cmv':'Positivo' });
+  assert.ok(resHtml.includes('CMV PCR') && resHtml.includes('Positivo'), 'los resultados Pos/Neg no rinden');
+  const r = got.render({ id:'p', txValoracion:{ hc_motivo:'fiebre', hc_huesped:'SOT — Renal' } });
+  assert.ok(r.includes('Comorbilidades') && r.includes('id="hc_notas"'), 'la historia no muestra chips + el campo de notas');
 });
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas
@@ -1343,7 +1363,9 @@ test('INMUNO v370: historia completa (datos grales + antecedentes + estado IS) +
   // y un Word completísimo al final. Verificamos los campos + que render y Word corren sin tronar.
   assert.ok(_idx.includes('🪪 Datos generales') && _idx.includes('Editar / completar datos'), 'falta el bloque de datos generales');
   assert.ok(_idx.includes('Va a iniciar (pre-protocolo)') && _idx.includes('Ninguna / suspendida'), 'falta el estado de inmunosupresión (no todos la reciben)');
-  for (const f of ['hc_is_estado','hc_comorbilidades','hc_antec_quir','hc_habitos']) assert.ok(_idx.includes(f), 'falta campo nuevo de historia: ' + f);
+  assert.ok(_idx.includes('id="hc_is_estado"'), 'falta el estado de inmunosupresión');
+  assert.ok(_idx.includes("ta('hc_notas'"), 'falta el campo único de notas / texto libre');
+  // v374: antecedentes/hábitos/etc. ahora son chips (sí/no), no campos de texto.
   assert.ok(_idx.includes('📋 Solicitado en la valoración inicial'), 'falta el ligado inicial→seguimiento');
   assert.ok(/window\._txValWordExport=function/.test(_idx) && _idx.includes("type:'application/msword'") && _idx.includes("a.download='ValoracionID_'"), 'falta el Word completo de la valoración');
   assert.ok(_idx.includes('const _TX_EST_LABELS='), 'falta el mapa de etiquetas de estudios compartido');

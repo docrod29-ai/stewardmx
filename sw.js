@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v374 (Inmunocomprometido — historia por CHIPS + un solo texto + resultados Pos/Neg)
+//  Feedback del Dr.: que sea super sencillo. La historia (comorbilidades, dispositivos, hábitos,
+//  inmunosupresión, profilaxis, antecedentes infectológicos, exposiciones, vacunación) ahora son CHIPS de
+//  un toque (sí/no), no campos de texto. Un SOLO campo "Notas / texto libre" para todo lo demás (dosis,
+//  exploración, contexto). Resultados (CMV PCR, galactomanano, cultivos…) con selector Positivo/Negativo/
+//  Pendiente. _txValCompose lee chips+resultados+notas una sola vez y arma el Word y la nota en prosa
+//  profesional. El motor lee la profilaxis PJP del chip. El Word ya no imprime correo como autor. +1 prueba (284).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v373 (Inmunocomprometido — recomendaciones por fase/paciente, profesionales)
 //  Feedback del Dr.: el plan debe ser por fase y por paciente, profesional, SIN emojis y SIN bibliografía,
 //  y solo lo que el paciente necesita. Reescrito _txValRecs: se quitaron TODOS los emojis y TODAS las citas;
@@ -1046,7 +1054,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v373';
+const CACHE = 'stewardmx-v374';
 const SHELL = [
   '/',
   '/index.html',
