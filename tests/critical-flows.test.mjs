@@ -1319,7 +1319,7 @@ test('INMUNO v374: historia por chips (sí/no) + un solo texto libre + resultado
   // Los resultados a capturar son EXACTAMENTE los estudios solicitados (hc_est_*), con su valor (hc_res_*).
   const resHtml = got.res({ 'hc_est_cmvpcr':'1', 'hc_res_cmvpcr':'Positivo' });
   assert.ok(resHtml.includes('CMV PCR') && resHtml.includes('Positivo'), 'los resultados Pos/Neg no rinden a partir de los estudios pedidos');
-  assert.ok(got.res({}).includes('Marca los estudios'), 'sin estudios pedidos no invita a marcarlos en Inicial');
+  assert.ok(got.res({}).includes('HBsAg') && got.res({}).includes('Anti-VHC'), 'las serologías basales no están siempre presentes en seguimiento');
   const r = got.render({ id:'p', txValoracion:{ hc_motivo:'fiebre', hc_huesped:'SOT — Renal' } });
   assert.ok(r.includes('Comorbilidades') && r.includes('id="hc_notas"'), 'la historia no muestra chips + el campo de notas');
 });
@@ -1384,7 +1384,7 @@ test('INMUNO v377: COHERENCIA — recomendaciones por estado de IS + dirigidas p
   const resR = runRecs({ hc_huesped:'SOT — Renal', hc_is_estado:'En curso', hc_res_cmvpcr:'Positivo' });
   assert.ok(resR.includes('Citomegalovirus detectable'), 'un resultado positivo no genera la rec dirigida');
   const txResHTML = vm.runInContext('_txResHTML', ctx);
-  assert.ok(txResHTML({ 'hc_est_cmvpcr':'1','hc_est_hemo':'1' }).includes('CMV PCR') && txResHTML({}).includes('Marca los estudios'), 'los resultados no se derivan de los estudios solicitados');
+  assert.ok(txResHTML({ 'hc_est_cmvpcr':'1','hc_est_hemo':'1' }).includes('CMV PCR') && txResHTML({}).includes('HBsAg'), 'los resultados no incluyen lo solicitado + las serologías basales siempre');
 });
 test('INMUNO v378: hepatitis B por prueba separada + recomendaciones por patrón serológico (mejor evidencia)', async () => {
   // El Dr. pidió cada prueba de HBV por separado y, en seguimiento, recs por el PATRÓN (reactivación bajo IS).
@@ -1423,6 +1423,21 @@ test('INMUNO v379: CADA serología capturada emite su recomendación (CMV/EBV/HS
   const negs = runRecs({ hc_huesped:'SOT — Renal', hc_is_estado:'En curso', hc_res_cmv:'Negativo', hc_res_vzv:'Negativo' });
   assert.ok(negs.includes('CMV IgG negativo') && negs.includes('VZV seronegativo'), 'no interpreta los serostatus negativos relevantes');
   assert.ok(!/CMV IgG|seropositivo|Anti-VHC positivo|VDRL/.test(runRecs({ hc_huesped:'SOT — Renal', hc_is_estado:'En curso' })), 'inventa serologías sin resultados capturados');
+});
+test('INMUNO v380: _txResHTML SIEMPRE incluye las serologías basales (hepatitis B) en seguimiento, sin Inicial', async () => {
+  // El Dr.: al separar el perfil de HBV cambiaron las claves y desaparecieron de su seguimiento. Ahora son fijas.
+  assert.ok(_idx.includes("_TX_EST_CATS.find(c=>c.cat==='Serologías basales')") && _idx.includes('const MAND='), 'el seguimiento no fuerza las serologías basales');
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, window:{}, document:STUB, Blob:STUB, URL:STUB, navigator:{}, location:{}, escHtml:x=>x };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx); vm.runInContext(block, ctx);
+  const res = vm.runInContext('_txResHTML', ctx)({});   // sin nada solicitado en Inicial
+  ['HBsAg','Anti-HBc total','Anti-HBs','HBV DNA','VIH Ag/Ab','Anti-VHC','VDRL'].forEach(w=>{
+    assert.ok(res.includes(w), 'falta en seguimiento (debería estar siempre): '+w);
+  });
 });
 test('INMUNO v368: flujo único — 8 sub-pestañas colapsadas en la Valoración + secciones "A detalle"', () => {
   // El Dr. pidió todo conectado en UNA pantalla (sin pestañas sueltas ni redundancia). Las 8 sub-pestañas

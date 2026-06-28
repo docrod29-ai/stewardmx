@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v380 (Inmunocomprometido — serologías basales SIEMPRE en seguimiento)
+//  Feedback del Dr.: al separar el perfil de HBV (v378) cambiaron las claves y las serologías de hepatitis B
+//  desaparecían del seguimiento (tenía marcada la "VHB" combinada vieja). Fix: _txResHTML ahora muestra, además
+//  de los estudios solicitados en Inicial, TODA la categoría "Serologías basales" (VIH, HBsAg, anti-HBc, anti-HBs,
+//  HBV DNA, anti-VHC, VDRL) de forma fija en seguimiento, aunque no se hayan pedido. Eliminado el placeholder
+//  "marca los estudios en Inicial" (ya siempre hay basales). +2 pruebas (290).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v379 (Inmunocomprometido — CADA serología emite su recomendación en seguimiento)
 //  Feedback del Dr.: marcó 10 serologías y faltaban recomendaciones. Ahora _txValRecs interpreta cada resultado
 //  capturado: CMV IgG (R+/R−), EBV IgG (riesgo PTLD), HSV (profilaxis aciclovir), VZV (inmune / vacunar pre-IS),
@@ -1096,7 +1103,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v379';
+const CACHE = 'stewardmx-v380';
 const SHELL = [
   '/',
   '/index.html',

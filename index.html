@@ -25909,14 +25909,17 @@ function _txChipsGroupHTML(gk, s){
   }
   return h+'</div></div>';
 }
-// Los resultados a capturar son EXACTAMENTE los estudios que se solicitaron en el modo Inicial (coherencia total).
+// Resultados a capturar = estudios solicitados en Inicial + las SEROLOGÍAS BASALES (VIH, hepatitis B por prueba,
+// VHC, sífilis), que SIEMPRE deben estar en seguimiento aunque no se hayan pedido en Inicial.
 function _txResHTML(s){
   const E=window.escHtml||(x=>x), opts=['—','Positivo','Negativo','Pendiente'];
   const req=new Set(Object.keys(s).filter(k=>k.indexOf('hc_est_')===0&&s[k]==='1').map(k=>k.slice(7)));
-  if(!req.size) return '<div style="font-size:11px;color:var(--t3);padding:9px 11px;border:1px dashed var(--brd2);border-radius:8px;">Marca los estudios en el modo <b>Inicial</b>; aquí aparecerán para capturar su resultado.</div>';
+  const _baseCat=_TX_EST_CATS.find(c=>c.cat==='Serologías basales');
+  const MAND=new Set(_baseCat?Object.keys(_baseCat.items):[]);   // siempre disponibles en seguimiento
+  const show=k=>req.has(k)||MAND.has(k);
   let h='';
   for(const c of _TX_EST_CATS){
-    const keys=Object.keys(c.items).filter(k=>req.has(k));
+    const keys=Object.keys(c.items).filter(show);
     if(!keys.length)continue;
     h+='<div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin:8px 0 4px;">'+E(c.cat)+'</div>';
     for(const k of keys){ const id='hc_res_'+k, cur=s[id]||'';
