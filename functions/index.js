@@ -2142,9 +2142,13 @@ exports.seedDemoData = onCall(
 //   3. firebase deploy --only functions:exportSheetSA
 // ════════════════════════════════════════════════════════════════════
 exports.exportSheetSA = onCall(
-  { secrets: ['SA_KEY'], cors: true, region: 'us-central1', timeoutSeconds: 300, memory: '512MiB' },
+  // W4: SA_KEY ya NO se declara como secreto obligatorio (su ausencia bloqueaba TODO `firebase deploy
+  // --only functions`). Google Sheets es legacy; la exportación oficial es local (.xlsx). Si algún día se
+  // reactiva, configurar el secreto y leerlo de process.env; la guarda de abajo da un error claro entretanto.
+  { cors: true, region: 'us-central1', timeoutSeconds: 300, memory: '512MiB' },
   async (req) => {
     if (!req.auth) throw new HttpsError('unauthenticated', 'Login requerido');
+    if (!process.env.SA_KEY) throw new HttpsError('failed-precondition', 'La exportación a Google Sheets no está configurada (SA_KEY). Usa la exportación local a Excel (.xlsx).');
     const uid = req.auth.uid;
     const email = req.auth.token.email || '';
     const isSA = email === SUPER_ADMIN_EMAIL;

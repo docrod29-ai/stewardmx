@@ -2,7 +2,7 @@
   "name": "stewardmx-functions",
   "description": "Cloud Functions para StewardMX — proxy seguro a Anthropic API y notificaciones push",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "dependencies": {
