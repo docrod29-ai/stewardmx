@@ -21,6 +21,9 @@ admin.initializeApp();
 const db = admin.firestore();
 // W1.1: pareo de paciente (exp → fhirId → nombre) extraído a un módulo testeable.
 const { findExistingPatient } = require('./lib/pairing');
+// W1.2/W1.3: parser HL7 v2 (ORU^R01) + helpers de ingesta LIS (idempotencia/normalización).
+const { parseORU } = require('./lib/hl7');
+const { labIdFor, normalizeLisInput } = require('./lib/lis');
 
 // ════════════════════════════════════════════════════════════════════
 // ── 1. Proxy seguro a Anthropic ─────────────────────────────────────
@@ -977,23 +980,28 @@ exports.lisSync = onRequest(
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
 
-    const {
-      hospId, patientId, specimenType, organism,
-      antibiogram, collectedAt, reportedAt,
-    } = req.body || {};
-
-    if (!hospId || !patientId) {
-      return res.status(400).json({ ok: false, error: 'hospId y patientId son requeridos' });
+    // ── W1.3: detectar HL7 v2 (texto) vs JSON ────────────────────────
+    const rawStr = (typeof req.body === 'string') ? req.body
+      : (req.rawBody ? req.rawBody.toString('utf8') : '');
+    const looksHL7 = (typeof req.body === 'string' && req.body.trimStart().slice(0, 3) === 'MSH')
+      || /^\s*MSH/.test(rawStr);
+    let hl7 = null;
+    if (looksHL7) {
+      try { hl7 = parseORU(rawStr || req.body); }
+      catch (e) { return res.status(400).json({ ok: false, error: 'HL7 inválido: ' + e.message }); }
     }
 
+    const jsonBody = (req.body && typeof req.body === 'object') ? req.body : {};
+    const hospId = (jsonBody.hospId || req.query.hospId || '').trim();
+    if (!hospId) return res.status(400).json({ ok: false, error: 'hospId requerido' });
+
     // ── Validar token contra ehr_config/main ─────────────────────────
-    const token = req.headers['x-stewardmx-token'];
+    const token = req.headers['x-stewardmx-token'] || req.query.token;
     let validToken = false;
     try {
       const cfgSnap = await db.doc(`hospitals/${hospId}/ehr_config/main`).get();
       if (cfgSnap.exists) {
-        // F-7 SEGURIDAD: exigir webhookToken configurado y NO vacío (antes, si el doc existía sin
-        //   webhookToken, `undefined === undefined` daba validToken=true → bypass de autenticación).
+        // F-7 SEGURIDAD: exigir webhookToken configurado y NO vacío.
         const _wt = cfgSnap.data().webhookToken;
         validToken = !!_wt && _wt === token;
       }
@@ -1004,17 +1012,37 @@ exports.lisSync = onRequest(
       return res.status(401).json({ ok: false, error: 'Token inválido' });
     }
 
-    // ── Lógica CRDT: detectar conflicto clínico vs. laboratorio ──────
-    // Si el médico actualizó el registro clínico DESPUÉS de que se
-    // tomó la muestra → fusionar (lab nunca sobreescribe estado clínico).
-    // Si no hay actualización posterior a la toma → sobreescribir.
+    // ── Normalizar entrada (HL7 o JSON) a campos canónicos ───────────
+    const inp = normalizeLisInput({ hl7, body: jsonBody });
+    const { specimenType, organism, antibiogram, collectedAt, reportedAt, controlId } = inp;
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
+    // ── Resolver paciente: patientId explícito → exp/MRN → nombre ────
+    let patientId = inp.patientId;
+    if (!patientId) {
+      patientId = await findExistingPatient(db, hospId, currentMonth, { exp: inp.exp, name: inp.name });
+    }
+
+    // ── Sin paciente: NO perder el resultado → cola de no pareados ────
+    if (!patientId) {
+      try {
+        await db.collection(`hospitals/${hospId}/lis_unmatched`).add({
+          reason: 'patient_not_found', exp: inp.exp || null, name: inp.name || null,
+          organism: organism || null, antibiogram: antibiogram || [],
+          collectedAt: collectedAt || null, controlId: controlId || null,
+          receivedAt: admin.firestore.FieldValue.serverTimestamp(), source: inp.source,
+        });
+      } catch (e) { console.error('[lisSync] error en lis_unmatched:', e.message); }
+      return res.status(202).json({
+        ok: true, matched: false, queued: 'lis_unmatched',
+        message: 'Resultado recibido pero el paciente no se pudo parear (exp/nombre). Encolado para conciliación.',
+      });
+    }
+
+    // ── Lógica CRDT: el laboratorio nunca pisa el estado clínico ─────
     let resolution = 'overwritten';
     let patientData = null;
-
-    // Buscar el paciente en el mes actual
-    const currentMonth = new Date().toISOString().slice(0, 7);
     const patRef = db.doc(`hospitals/${hospId}/months/${currentMonth}/patients/${patientId}`);
-
     try {
       const patSnap = await patRef.get();
       if (patSnap.exists) {
@@ -1023,47 +1051,34 @@ exports.lisSync = onRequest(
         const clinicalUpdatedTs = patientData.updatedAt?.toMillis
           ? patientData.updatedAt.toMillis()
           : (patientData.updatedAt || 0);
-
-        // Conflict: physician updated AFTER lab collected
         const hasPhysicianUpdate = patientData.accion || patientData.gravedad;
-        if (hasPhysicianUpdate && clinicalUpdatedTs > collectedTs) {
-          resolution = 'merged';
-        }
+        if (hasPhysicianUpdate && clinicalUpdatedTs > collectedTs) resolution = 'merged';
       }
     } catch (e) {
       console.error('[lisSync] error leyendo paciente:', e.message);
     }
 
-    // ── Construir schema FHIR DiagnosticReport compatible ────────────
-    const labId = `DR_${patientId}_${Date.now()}`;
+    // ── DiagnosticReport IDEMPOTENTE (labId determinista) ────────────
+    const labId = labIdFor({ controlId, patientId, organism, collectedAt });
     const labData = {
       resourceType: 'DiagnosticReport',
       fhirId: labId,
       status: 'final',
-      category: [{
-        coding: [{
-          system: 'http://hl7.org/fhir/v2/0074',
-          code: 'MB',
-          display: 'Microbiology',
-        }],
-      }],
+      category: [{ coding: [{ system: 'http://hl7.org/fhir/v2/0074', code: 'MB', display: 'Microbiology' }] }],
       specimenType: specimenType || null,
       organism: organism || null,
       antibiogram: (antibiogram || []).map(a => ({
-        drug: a.drug || null,
-        mic: a.mic || null,
-        interpretation: a.interpretation || null,
-        atcCode: null,
+        drug: a.drug || null, mic: a.mic || null, interpretation: a.interpretation || null, atcCode: null,
       })),
       collectedAt: collectedAt || null,
       reportedAt: reportedAt || null,
       syncedAt: admin.firestore.FieldValue.serverTimestamp(),
-      source: 'LIS',
+      source: inp.source,
       conflictResolution: resolution,
+      controlId: controlId || null,
     };
-
-    // ── Guardar lab en subcolección patients/{patId}/labs/{labId} ────
     try {
+      // .set() con id determinista → reenviar el mismo mensaje sobreescribe (no duplica).
       await db.doc(`hospitals/${hospId}/patients/${patientId}/labs/${labId}`).set(labData);
     } catch (e) {
       console.error('[lisSync] error guardando lab:', e.message);
@@ -1078,19 +1093,13 @@ exports.lisSync = onRequest(
       lisCollectedAt: collectedAt || null,
       lisReportedAt: reportedAt || null,
     };
-
-    // Solo sobreescribir organismo/antibiograma si no hay conflicto clínico
-    if (resolution === 'overwritten') {
-      censoUpdate.bact = organism || null;
-    }
-
+    if (resolution === 'overwritten') censoUpdate.bact = organism || null;
     try {
       await patRef.set(censoUpdate, { merge: true });
     } catch (e) {
       console.error('[lisSync] error actualizando censo:', e.message);
     }
 
-    // ── Registrar en lis_queue si hay conflicto ───────────────────────
     if (resolution === 'merged') {
       try {
         await db.collection(`hospitals/${hospId}/lis_queue`).add({
@@ -1105,15 +1114,13 @@ exports.lisSync = onRequest(
       }
     }
 
-    // ── Disparar verificación de biomarcadores ────────────────────────
     try {
-      // Llamada interna — reutilizamos la lógica de checkBiomarkerAlerts
       await _checkBiomarkerAlertsInternal(hospId, patientId);
     } catch (e) {
       console.error('[lisSync] error en checkBiomarkerAlerts:', e.message);
     }
 
-    return res.json({ ok: true, patientId, resolution, labId });
+    return res.json({ ok: true, matched: true, patientId, resolution, labId, format: hl7 ? 'hl7' : 'json' });
   }
 );
 

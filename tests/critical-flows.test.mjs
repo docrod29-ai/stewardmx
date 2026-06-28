@@ -2049,3 +2049,20 @@ test('W1.2 — parser HL7 v2 ORU^R01 → {exp, organismo, antibiograma} (forma q
   // Robustez: mensaje sin MSH lanza error claro.
   assert.throws(() => parseORU('PID|1||x'), /MSH/, 'debería rechazar lo que no es HL7');
 });
+test('W1.3 — idempotencia (labIdFor) + normalización LIS (HL7/JSON)', async () => {
+  const { labIdFor, normalizeLisInput } = await import('../functions/lib/lis.js');
+  // Idempotencia: mismo control id → misma clave (reenviar no duplica).
+  assert.equal(labIdFor({ controlId: 'MSG001' }), labIdFor({ controlId: 'MSG001' }), 'control id no es idempotente');
+  assert.ok(labIdFor({ controlId: 'MSG001' }).startsWith('LIS_'), 'prefijo LIS_');
+  // Sin control id → hash estable de (paciente, organismo, fecha); mismas entradas → misma clave.
+  const a = labIdFor({ patientId: 'p', organism: 'E. coli', collectedAt: '2026-06-26' });
+  const b = labIdFor({ patientId: 'p', organism: 'E. coli', collectedAt: '2026-06-26' });
+  assert.equal(a, b, 'hash no estable');
+  assert.notEqual(a, labIdFor({ patientId: 'p', organism: 'K. pneumoniae', collectedAt: '2026-06-26' }), 'distinto organismo debería dar otra clave');
+  // Normalización HL7.
+  const nh = normalizeLisInput({ hl7: { patient: { exp: '123', name: 'Juan' }, specimen: { type: 'Sangre', collectedAt: '2026-06-26' }, organism: 'E. coli', antibiogram: [{ drug: 'Mero', mic: '<=0.25', interpretation: 'S' }], controlId: 'MSG001' } });
+  assert.ok(nh.exp === '123' && nh.organism === 'E. coli' && nh.antibiogram.length === 1 && nh.controlId === 'MSG001' && nh.source === 'LIS-HL7', 'normalización HL7 incorrecta');
+  // Normalización JSON.
+  const nj = normalizeLisInput({ body: { patientId: 'pac1', organism: 'K. pneumoniae', antibiogram: [], messageId: 'X9' } });
+  assert.ok(nj.patientId === 'pac1' && nj.organism === 'K. pneumoniae' && nj.controlId === 'X9' && nj.source === 'LIS', 'normalización JSON incorrecta');
+});
