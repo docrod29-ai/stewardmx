@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v397 (Auditoría — datos: dedup de bloqueos de farmacia)
+//  P1: guardarBloqueoATB usaba addDoc (id aleatorio) y el chequeo de duplicados era solo en memoria
+//  (_atbBloqueados) → una carrera creaba 2 docs del mismo ATB y liberarBloqueoATB (por id) dejaba el otro
+//  ACTIVO (bloqueo fantasma que seguía alertando). Ahora: ID DETERMINISTA por ATB (blk_<atb normalizado>)
+//  → los bloqueos concurrentes colapsan en un doc; y 'liberar' desactiva además cualquier otro bloqueo activo
+//  del mismo ATB (sanea duplicados históricos). +1 prueba (312).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v396 (Auditoría — datos: updatedAt de micro en ISO, no cadena localizada)
 //  P1: el reporte de cultivo escribía updatedAt como cadena localizada ("3/7/2026, 14:30") — no comparable
 //  cronológicamente (rompía cualquier anti-pisado/CRDT y el formateo del "Modificado"). Ahora en ISO. +1 (311).
@@ -1222,7 +1229,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v396';
+const CACHE = 'stewardmx-v397';
 const SHELL = [
   '/',
   '/index.html',

@@ -17136,9 +17136,16 @@ window.guardarBloqueoATB=async()=>{
       bloqueadoPor:U.uid,bloqueadoEmail:U.email,
       bloqueadoNombre:window._userName||U.displayName||U.email,
       bloqueadoAt:serverTimestamp(),
+      // v397 (P1 datos): al re-bloquear tras liberar, limpiar los sellos de liberación.
+      liberadoAt:deleteField(),liberadoPor:deleteField(),liberadoNombre:deleteField(),
     };
     if(expiraAt)payload.expiraAt=expiraAt;
-    await addDoc(collection(db,'hospitals',HOSP,'atb_blocks'),payload);
+    // v397 (P1 datos): ID DETERMINISTA por ATB → dos bloqueos concurrentes del mismo ATB colapsan en UN doc.
+    //   Antes addDoc creaba un id aleatorio y el chequeo de duplicados era solo en memoria (_atbBloqueados),
+    //   así que una carrera creaba 2 docs y 'liberar' (por id) dejaba el otro activo (bloqueo fantasma).
+    const _blkId='blk_'+atb.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+    if(_blkId==='blk_'){ await addDoc(collection(db,'hospitals',HOSP,'atb_blocks'),payload); }
+    else { await setDoc(doc(db,'hospitals',HOSP,'atb_blocks',_blkId),payload,{merge:true}); }
     cerrarModal();
     const durMsg=expiraHoras?` (expira en ${expiraHoras}h)`:'';
     toast('ATB bloqueado'+durMsg+'. Se notificará al equipo. ✓');
@@ -17164,10 +17171,12 @@ window.liberarBloqueoATB=(id,atb)=>{
     '¿Quitar el bloqueo global de "'+atb+'"?\n\nEl ATB volverá a estar disponible para prescripción sin alerta de bloqueo.'+_bMsg,
     async()=>{
       try{
-        await setDoc(doc(db,'hospitals',HOSP,'atb_blocks',id),{
-          activo:false,liberadoAt:serverTimestamp(),
-          liberadoPor:U?.uid||'',liberadoNombre:window._userName||U?.email||'—',
-        },{merge:true});
+        const _libStamp={activo:false,liberadoAt:serverTimestamp(),liberadoPor:U?.uid||'',liberadoNombre:window._userName||U?.email||'—'};
+        await setDoc(doc(db,'hospitals',HOSP,'atb_blocks',id),_libStamp,{merge:true});
+        // v397 (P1 datos): desactivar CUALQUIER otro bloqueo activo del mismo ATB (limpia duplicados/fantasmas
+        //   que pudieran existir de una carrera previa; ya no se generan, pero se sanean los históricos).
+        const _dups=(BLOQUEOS||[]).filter(b=>b.id!==id && b.activo!==false && (b.atb||'').toLowerCase().trim()===(atb||'').toLowerCase().trim());
+        await Promise.all(_dups.map(b=>setDoc(doc(db,'hospitals',HOSP,'atb_blocks',b.id),_libStamp,{merge:true}).catch(()=>{})));
         toast(_solPend.length
           ?'✅ '+atb+' desbloqueado — '+_solPend.length+' solicitud(es) regresan al flujo de revisión PROA'
           :'✅ '+atb+' desbloqueado ✓');

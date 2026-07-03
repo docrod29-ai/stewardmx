@@ -1398,6 +1398,19 @@ test('MICRO v396 (P1 datos): el updatedAt del reporte de cultivo se escribe en I
   assert.ok(line.includes('new Date().toISOString()'), 'updatedAt debe ser ISO');
   assert.ok(!line.includes("toLocaleString"), 'updatedAt NO debe ser una cadena localizada');
 });
+test('FARMACIA v397 (P1 datos): bloqueos con ID determinista por ATB + liberar desactiva duplicados', () => {
+  // Antes: addDoc (id aleatorio) + dedup solo en memoria → una carrera creaba 2 docs y 'liberar' (por id)
+  // dejaba el otro activo (bloqueo fantasma). Ahora id determinista por ATB + liberar barre duplicados.
+  const g = _idx.indexOf('window.guardarBloqueoATB=async');
+  const ge = _idx.indexOf('window.liberarBloqueoATB=', g);
+  assert.ok(g >= 0 && ge > g, 'no se ubicó guardarBloqueoATB');
+  const gbody = _idx.slice(g, ge);
+  assert.ok(gbody.includes("const _blkId='blk_'+atb.toLowerCase()") && gbody.includes("setDoc(doc(db,'hospitals',HOSP,'atb_blocks',_blkId)"), 'la creación no usa ID determinista por ATB');
+  const l = _idx.indexOf('window.liberarBloqueoATB=');
+  const le = _idx.indexOf('window.borrarBloqueoATB=', l);
+  const lbody = _idx.slice(l, le);
+  assert.ok(lbody.includes('const _dups=(BLOQUEOS||[]).filter(') && lbody.includes("(b.atb||'').toLowerCase().trim()===(atb||'').toLowerCase().trim()"), 'liberar no desactiva los duplicados del mismo ATB');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');
