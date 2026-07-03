@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v390 (Auditoría — alerta de ATB bloqueado con ≥2 ATBs + reporte de evidencia)
+//  (1) FARMACIA/SEGURIDAD (P1): la alerta "ATB bloqueado por Farmacia" comparaba el string CONCATENADO de
+//  todos los ATBs del paciente (p.atb = "A + B") —o atbListData[0].n, clave inexistente (el campo es .nombre)—
+//  contra un bloqueo individual → con ≥2 ATBs, o cuando el nombre traía dosis/vía, la alerta NUNCA disparaba.
+//  Ahora revisa CADA ATB prescrito por nombre contra el catálogo de bloqueos. (2) BIOESTADÍSTICA (P2):
+//  buildEvidenceReport guardaba el OBJETO {dot,diasPaciente,por1000} bajo la clave dotPer1000 → el reporte
+//  PROA mostraba "[object Object]" y compareEvidence dejaba deltaPct siempre null; ahora guarda el NÚMERO
+//  por1000. +2 pruebas (305). Cola: farmacia (transiciones), reglas (/labs + estados), LIS/HL7, sk-ant, clínicos P1.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v389 (Auditoría — barrido de read-modify-write: censo ATB + historial trasplante)
 //  Mismo defecto raíz que v388 (reescribir un array desde memoria rancia pierde ediciones concurrentes),
 //  ahora en el CENSO y el HISTORIAL de trasplante: (1) _guardarQuickATB (agregar ATB) y (2) _suspenderATB
@@ -1176,7 +1185,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v389';
+const CACHE = 'stewardmx-v390';
 const SHELL = [
   '/',
   '/index.html',

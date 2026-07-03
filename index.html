@@ -4505,8 +4505,14 @@ window.guardar=async()=>{
     // ── Alerta de bloqueo farmacia ──
     // Si el ATB prescrito está bloqueado por farmacia Y no tiene solicitud liberada activa,
     // mostrar aviso y ofrecer crear solicitud de autorización.
-    const _atbNombre=(atb||atbListData[0]?.n||'').trim();
-    const _bloqMatch=BLOQUEOS.find(b=>b.atb&&_atbNombre&&b.atb.toLowerCase()===_atbNombre.toLowerCase());
+    // v390 (P1 seguridad): revisar CADA ATB prescrito (por nombre) contra el catálogo de bloqueos. Antes se
+    // comparaba el string CONCATENADO de todos los ATBs (p.atb = "A + B") o atbListData[0].n (clave inexistente,
+    // el campo real es .nombre) → con ≥2 ATBs, o cuando el nombre traía dosis/vía, la alerta NUNCA disparaba.
+    const _atbNames=(Array.isArray(atbListData)&&atbListData.length)
+      ? atbListData.map(a=>((a&&(a.nombre||a.n))||'').trim()).filter(Boolean)
+      : ((atb||'').trim()?[(atb||'').trim()]:[]);
+    const _bloqMatch=BLOQUEOS.find(b=>b.atb&&_atbNames.some(n=>n.toLowerCase()===b.atb.toLowerCase()));
+    const _atbNombre=_bloqMatch?(_atbNames.find(n=>n.toLowerCase()===_bloqMatch.atb.toLowerCase())||_bloqMatch.atb):(_atbNames[0]||'');
     if(_bloqMatch){
       const yaTieneSol=SOLICITUDES.some(s=>
         s.status==='liberado'&&

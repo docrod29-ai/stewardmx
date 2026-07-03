@@ -1329,6 +1329,16 @@ test('CENSO/TRASPLANTE v389 (pérdida de datos): quick-ATB, suspender e historia
   const hist=bodyOf('window._txValGuardarHist=function','txValoracionHistAt:new Date().toISOString()');
   assert.ok(hist.includes('getDoc(_ref)') && hist.includes('snap.data().txValoracionHist'), 'el historial de trasplante no relee fresco antes de anexar');
 });
+test('FARMACIA v390 (P1 seguridad): la alerta de ATB bloqueado revisa CADA ATB por nombre (no el string concatenado)', () => {
+  // Antes comparaba p.atb (todos los ATBs concatenados "A + B") o atbListData[0].n (clave inexistente) contra
+  // un bloqueo individual → con ≥2 ATBs la alerta NUNCA disparaba. Ahora itera los nombres de atbListData.
+  const s=_idx.indexOf('// ── Alerta de bloqueo farmacia ──');
+  assert.ok(s>=0, 'no se ubicó el bloque de alerta de bloqueo');
+  const body=_idx.slice(s, s+1400);
+  assert.ok(body.includes('const _atbNames=') && body.includes('atbListData.map('), 'la alerta no itera los nombres de atbListData');
+  assert.ok(body.includes('_atbNames.some(n=>n.toLowerCase()===b.atb.toLowerCase())'), 'la alerta no compara cada nombre contra el bloqueo');
+  assert.ok(!/_atbNombre=\(atb\|\|atbListData\[0\]\?\.n/.test(body), 'sigue usando el string concatenado / la clave .n inexistente');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');
@@ -2191,12 +2201,18 @@ test('W5 — arnés de evidencia: aceptación %, MDR % y comparación antes/desp
   assert.equal(r.aceptacionPct, 85, 'aceptación %');
   assert.equal(r.mdrPct, 25, 'MDR %');
   assert.equal(r.pacientes, 0, 'pacientes');
+  // v390: dotPer1000 debe ser el NÚMERO por1000, no el objeto {dot,diasPaciente,por1000} (que rendía "[object Object]").
+  assert.ok(r.dotPer1000 === null || typeof r.dotPer1000 === 'number', 'dotPer1000 debe ser número, no objeto');
   const r2 = E.buildEvidenceReport([], {});
   assert.equal(r2.aceptacionPct, null, 'sin denominador → null');
   assert.equal(r2.mdrPct, null, 'sin aislamientos → null');
+  assert.ok(r2.dotPer1000 === null || typeof r2.dotPer1000 === 'number', 'dotPer1000 (r2) debe ser número, no objeto');
   const cmp = E.compareEvidence({ dotPer1000: 800, mdrPct: 30, aceptacionPct: 70 }, { dotPer1000: 600, mdrPct: 24, aceptacionPct: 85 });
   assert.equal(cmp.dotPer1000.deltaPct, -25, 'delta DOT/1000');
   assert.equal(cmp.mdrPct.deltaPct, -20, 'delta MDR%');
+  // end-to-end: dos reportes REALES alimentan compareEvidence sin romper (delta numérico o null, nunca objeto/NaN).
+  const cmpReal = E.compareEvidence(r, r2);
+  assert.ok(cmpReal && (cmpReal.dotPer1000.deltaPct === null || typeof cmpReal.dotPer1000.deltaPct === 'number'), 'compareEvidence sobre reportes reales debe dar delta numérico o null');
 });
 test('CENSO v387: traspaso de mes — _mesAnterior + _pacsParaTraer (solo activos, sin duplicar) + auto-traspaso protegido', () => {
   // El equipo reportó "se borran los datos al cambiar de mes". No se borran (se guardan por mes); faltaba el

@@ -21,11 +21,15 @@ export function buildEvidenceReport(pacs, opts) {
   const iv = opts.intervenciones || {};
   const r = opts.resistencia || {};
   const pct = (num, den) => (den > 0 ? Math.round((1000 * num / den)) / 10 : null);  // 1 decimal
+  // dotPer1000() devuelve {dot, diasPaciente, por1000}; el reporte necesita el NÚMERO por1000.
+  // Antes se guardaba el objeto entero → el render mostraba "[object Object]" y compareEvidence,
+  // al comparar objetos con delta(a,b) (a>0 falso), dejaba deltaPct siempre en null.
+  const dotPer1000Num = (dot1000 && typeof dot1000 === 'object') ? dot1000.por1000 : dot1000;
   return {
     pacientes: arr.length,
     diasPaciente,
     dot,
-    dotPer1000: dot1000,
+    dotPer1000: dotPer1000Num,
     intervenciones: iv.total || 0,
     aceptadas: iv.aceptadas || 0,
     aceptacionPct: pct(iv.aceptadas || 0, iv.total || 0),
