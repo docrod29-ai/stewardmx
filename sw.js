@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v388 (Auditoría multi-experta — P0 PÉRDIDA DE DATOS: trasplante + micro)
+//  Auditoría de 52 hallazgos confirmados (6 de pérdida de datos). Reparados los 2 primeros P0-datos del
+//  lado cliente, en el ámbito exacto de la preocupación (que no se pierdan datos):
+//  (1) TRASPLANTE — _txSaveValoracion escribía {txValoracion:data} reemplazando el mapa COMPLETO desde
+//  memoria rancia → si otro dispositivo tocaba otro campo, se borraba (última-escritura-gana). Ahora escribe
+//  por DOT-PATHS (txValoracion.<campo>) → Firestore fusiona campo por campo; + refresco de _txCurrentPac
+//  desde el snapshot. (2) MICRO — guardarReporteMicro reescribía muestras[] entero desde memoria (setDoc
+//  merge NO fusiona arrays) → cultivos de otro dispositivo se perdían; ahora RELEE el doc fresco (getDoc)
+//  antes de mutar. +2 pruebas (303; la de trasplante EJECUTA la función real). En cola: farmacia (transiciones
+//  sin precondición), firestore.rules (/labs + máquina de estados de solicitudes), LIS/HL7, key sk-ant.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v387 (Censo — TRASPASO de pacientes activos entre meses)
 //  Reporte del equipo de calidad: "al cambiar de mes se borran los datos, tuvieron que recapturar todo".
 //  Diagnóstico REAL: nada se borra — el censo se guarda por mes (months/{YYYY-MM}/patients) y el mes nuevo
@@ -1156,7 +1167,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v387';
+const CACHE = 'stewardmx-v388';
 const SHELL = [
   '/',
   '/index.html',

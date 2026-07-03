@@ -3046,7 +3046,15 @@ window.guardarReporteMicro=async function(pid){
     // 6) Actualizar la muestra específica en muestras[] del paciente
     const nuevoEstado=res==='negativo'?'negativo':res==='contaminante'?'contaminante':res==='positivo_preliminar'?'en_proceso':'identificado';
     if(window._mrCurrentMuestraId){
-      const _muesBase=Array.isArray(p.muestras)&&p.muestras.length?p.muestras:
+      // v388 (P0-datos): releer muestras[] FRESCAS de Firestore justo antes de mutar. setDoc(...,{merge:true})
+      // NO fusiona arrays: reemplaza muestras[] entero. Si partíamos de p.muestras en memoria y otro
+      // microbiólogo/dispositivo había agregado un cultivo después de nuestro último snapshot, ese cultivo
+      // se perdía. Leyendo el doc fresco, el array base incluye lo agregado por otros; solo tocamos el
+      // elemento objetivo y conservamos el resto.
+      let _freshMuestras=null;
+      try{const _snapP=await getDoc(doc(db,'hospitals',HOSP,'months',currentMonth,'patients',pid));if(_snapP.exists())_freshMuestras=_snapP.data().muestras;}catch(_){}
+      const _srcMuestras=Array.isArray(_freshMuestras)?_freshMuestras:(Array.isArray(p.muestras)?p.muestras:null);
+      const _muesBase=(_srcMuestras&&_srcMuestras.length)?_srcMuestras:
         (p.muestra||p.cult?[{id:window._mrCurrentMuestraId,tipo:p.muestra||p.cult||'',fecha:p.cultFecha||'',rechazada:false,estado:'pendiente'}]:[]);
       // v292: 1 preliminar activo por cultivo, con sello de origen. Micro REEMPLAZA al de PROA;
       // si PROA intenta capturar y YA hay uno de micro, prevalece micro (no se sobrescribe).
@@ -3947,6 +3955,10 @@ function suscribirPacientes(){
   if(unsubP)unsubP();
   unsubP=onSnapshot(query(collection(db,..._pacPath()),orderBy('ts','desc')),snap=>{
     PACS=snap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>!p.alta);
+    // v388 (P0-datos): refrescar la referencia del paciente de trasplante desde el snapshot para que
+    // la base de _txSaveValoracion / recomendaciones / historial no quede rancia (no re-renderiza el
+    // formulario abierto para no interrumpir la captura; el guardado ya usa dot-paths).
+    if(window._txCurrentPac&&window._txCurrentPac.id){const _tp=PACS.find(x=>x.id===window._txCurrentPac.id);if(_tp)window._txCurrentPac=_tp;}
     renderTabla();kpis();stats();alertas();actualizarSelectsWA();_updateICBadge();
     if(currentView==='camas')renderCamas();
     if(currentView==='atb')renderInterconsultasPROA();
@@ -26281,14 +26293,20 @@ window._txSaveValoracion=(function(){
     var p=window._txCurrentPac; if(!p||!p.id)return;
     // Fusiona sobre lo guardado: con revelado progresivo, los campos OCULTOS no están en el DOM y no deben
     // perderse. Partimos de lo previo y sobre-escribimos solo lo visible (inputs y checkboxes).
+    // v388 (P0-datos): escribimos por DOT-PATHS (`txValoracion.<campo>`) para que Firestore FUSIONE
+    // campo por campo. Antes escribíamos {txValoracion:data} reemplazando el mapa completo desde memoria
+    // rancia → si otro dispositivo tocó un campo distinto, se borraba (última-escritura-gana). Con dot-paths,
+    // los campos que este cliente NO tocó (los de otro cliente) se conservan intactos en el servidor.
     var data=Object.assign({}, p.txValoracion||{});
+    var dot={};
     document.querySelectorAll('[id^="hc_"]').forEach(function(el){
-      if(el.type==='checkbox'){ data[el.id]=el.checked?'1':''; }
-      else { data[el.id]=(el.value||'').trim(); }
+      var v=(el.type==='checkbox')?(el.checked?'1':''):((el.value||'').trim());
+      data[el.id]=v; dot['txValoracion.'+el.id]=v;
     });
     clearTimeout(_t);
     _t=setTimeout(function(){
-      updateDoc(doc(db,..._pacPath(),p.id),{txValoracion:data,txValoracionAt:new Date().toISOString()})
+      dot['txValoracionAt']=new Date().toISOString();
+      updateDoc(doc(db,..._pacPath(),p.id),dot)
         .then(function(){ p.txValoracion=data; var pi=PACS.find(function(x){return x.id===p.id;}); if(pi)pi.txValoracion=data; })
         .catch(function(e){ console.warn('[txValoracion save]',e); });
     },1000);

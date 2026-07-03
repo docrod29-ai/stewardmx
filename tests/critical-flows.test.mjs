@@ -1278,8 +1278,46 @@ test('INMUNO v366: valoración infectológica del inmunocomprometido (historia d
   assert.ok(_idx.includes('hc_padecimiento') && _idx.includes("ta('hc_notas'") && _idx.includes('_txChipsGroupHTML'), 'faltan elementos de la historia clínica dirigida (padecimiento + notas + chips)');
   assert.ok(_idx.includes('function _txValEstudiosHTML') && _idx.includes('const _TX_EST_CATS=') && _idx.includes("igra:'IGRA / PPD'"), 'falta el panel de estudios a solicitar (por categorías)');
   assert.ok(/window\._txValRecs/.test(_idx) && _idx.includes('VIH — profilaxis por CD4') && _idx.includes('Tamizaje según el biológico'), 'faltan recomendaciones por huésped (VIH y no-VIH)');
-  assert.ok(/window\._txValGenerarNota/.test(_idx) && _idx.includes('txValoracion:data'), 'no genera/persiste la nota de valoración');
+  assert.ok(/window\._txValGenerarNota/.test(_idx) && _idx.includes("dot['txValoracion.'+el.id]="), 'no genera/persiste la nota de valoración (por dot-paths)');
   assert.ok(_idx.includes("label:'Inmunocomprometido'"), 'la pestaña no se renombró a Inmunocomprometido');
+});
+test('INMUNO v388 (P0-datos): _txSaveValoracion persiste por DOT-PATHS (no reemplaza el mapa txValoracion)', async () => {
+  // Auditoría multi-experta: el guardado hacía read-modify-write sobre _txCurrentPac rancio y escribía
+  // {txValoracion:data} → reemplazaba el mapa COMPLETO → última-escritura-gana borraba campos que otro
+  // dispositivo había tocado. El fix escribe por dot-paths (`txValoracion.<campo>`) para que Firestore fusione.
+  const vm = await import('node:vm');
+  const start = _idx.indexOf('// ══ v366: Valoración'); const end = _idx.indexOf('\nwindow.renderTrasplante=function(){');
+  const block = _idx.slice(start, end);
+  let STUB; STUB = new Proxy(function(){}, { get(t,k){ if(k===Symbol.toPrimitive||k==='toString'||k==='valueOf') return ()=>''; if(k===Symbol.iterator) return function*(){}; if(k==='length') return 0; return STUB; }, apply(){return STUB;}, construct(){return STUB;}, has(){return true;} });
+  const fakeEls = [ { id:'hc_motivo', type:'text', value:'fiebre' }, { id:'hc_cb_comorb_dm2', type:'checkbox', checked:true } ];
+  let captured=null;
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map,
+    window:{}, navigator:{}, location:{}, Blob:STUB, URL:STUB,
+    document:{ querySelectorAll:(sel)=> (sel&&String(sel).includes('hc_'))?fakeEls:[], getElementById:()=>null, querySelector:()=>null, createElement:()=>STUB, addEventListener(){} },
+    PACS:[{id:'p1'}], db:{}, doc:(...a)=>({__ref:a}), _pacPath:()=>['hospitals','H','months','2026-07','patients'],
+    updateDoc:(ref,payload)=>{ captured=payload; return Promise.resolve(); },
+    setTimeout:(fn)=>{ fn(); return 1; }, clearTimeout:()=>{} };
+  const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
+  vm.createContext(ctx);
+  vm.runInContext(block, ctx);
+  ctx.window._txCurrentPac = { id:'p1', txValoracion:{ hc_previo_otro_dispositivo:'valor-de-otro' } };
+  ctx.window._txSaveValoracion();
+  assert.ok(captured, 'no se ejecutó el guardado (updateDoc no fue llamado)');
+  assert.equal(captured['txValoracion.hc_motivo'], 'fiebre', 'no persiste hc_motivo por dot-path');
+  assert.equal(captured['txValoracion.hc_cb_comorb_dm2'], '1', 'no persiste el checkbox por dot-path');
+  assert.ok(captured['txValoracionAt'], 'falta el sello de tiempo');
+  assert.ok(!('txValoracion' in captured), 'REGRESIÓN P0-datos: escribe el mapa txValoracion completo (última-escritura-gana)');
+  assert.ok(!('txValoracion.hc_previo_otro_dispositivo' in captured), 'no debe reescribir campos que este cliente no tocó (los conserva el servidor)');
+});
+test('MICRO v388 (P0-datos): guardarReporteMicro relee muestras[] frescas (getDoc) antes de setDoc(merge)', () => {
+  // setDoc(...,{merge:true}) NO fusiona arrays: reemplaza muestras[] entero. El fix relee el doc fresco
+  // antes de mutar para no pisar cultivos agregados por otro microbiólogo/dispositivo.
+  const s = _idx.indexOf('window.guardarReporteMicro=async function');
+  const e = _idx.indexOf('{muestras:nuevasMuestras', s);
+  assert.ok(s>=0 && e>s, 'no se ubicó guardarReporteMicro / su setDoc de muestras');
+  const body = _idx.slice(s, e);
+  assert.ok(body.includes('getDoc(doc(db'), 'no relee el paciente con getDoc antes de reescribir muestras[]');
+  assert.ok(body.includes('_snapP.data().muestras'), 'no toma las muestras frescas del servidor como base');
 });
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
