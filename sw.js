@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v395 (Auditoría — clínico: Magiorakos exige cobertura para XDR/PDR)
+//  P1 CLÍNICO: clasificarMagiorakos afirmaba "Posible PDR/XDR" con CUALQUIER cobertura → un panel de 3-4
+//  fármacos (MRSA/VRE de rutina) con todo R se etiquetaba "Posible PDR" (pan-resistente), alarmante y falso:
+//  no se probaron las categorías de última línea (glucopéptidos, oxazolidinonas, lipopéptidos). Ahora
+//  posXDR/posPDR requieren cobertura ADECUADA (≥ mitad de las categorías del organismo, y ≥4); por debajo
+//  se degrada a MDR y el resumen indica "cobertura insuficiente para XDR/PDR". +2 pruebas (310).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v394 (Auditoría — clínico: resolveKey no colapsa combos β-lactámico/inhibidor)
 //  P0 CLÍNICO: el Worklist PROA mapea el ATB prescrito a la columna del antibiograma con resolveKey (substring
 //  sobre ABG_ATBS). Como ABG_ATBS nombra los combos corto ("Cef-Avibactam"), el nombre prescrito completo
@@ -1211,7 +1218,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v394';
+const CACHE = 'stewardmx-v395';
 const SHELL = [
   '/',
   '/index.html',

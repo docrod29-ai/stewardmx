@@ -792,6 +792,19 @@ test('MAG: E. coli R en 2 categorías → NO MDR', () => {
 test('MAG: isMDR unificado llama a clasificarMagiorakos', () => {
   assert.match(_idx, /function isMDR\(p\)\{[\s\S]{0,400}clasificarMagiorakos\(abg/);
 });
+test('MAG v395: MRSA con panel escaso (4 fármacos, todo R) es MDR, NO "Posible PDR"', () => {
+  // El bug: con 4 categorías todas R, posPDR se afirmaba aunque no se probaron glucopéptidos/oxazolidinonas/
+  // lipopéptidos (las de última línea). Ahora exige cobertura ≥ mitad de categorías.
+  const r = _clasif({oxa:'R',cip:'R',ery:'R',cli:'R'}, 'Staphylococcus aureus');
+  assert.equal(r.posPDR, false, 'un panel de 4 categorías no puede afirmar Posible PDR');
+  assert.equal(r.classification, 'MDR', 'debe degradar a MDR por cobertura insuficiente');
+  assert.equal(r.adequatePanel, false, 'el panel escaso no es adecuado para XDR/PDR');
+});
+test('MAG v395: Pseudomonas pan-R con cobertura adecuada (≥5 categorías) SÍ marca Posible PDR', () => {
+  const r = _clasif({gen:'R',imi:'R',ctaz:'R',cip:'R',pitaz:'R',azt:'R'}, 'Pseudomonas aeruginosa');
+  assert.equal(r.adequatePanel, true, 'la cobertura debe ser adecuada (≥5 de 9 categorías)');
+  assert.equal(r.posPDR, true, 'con cobertura adecuada y todo no-susceptible, Posible PDR es válido');
+});
 
 /* ═══════════ Renderer ExcelJS — Fase 1 (guardas de presencia) ═══════════ */
 /* Verificación funcional profunda hecha en Node con exceljs (datos intactos + XML con

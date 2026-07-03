@@ -168,11 +168,18 @@ export function clasificarMagiorakos(abg,organismo){
   // posible XDR: non-susc to ≥1 in all but ≤2 categories (panel incompleto)
   // XDR: full data confirming above
   const susceptibleCats=categoriesWithData-nonSuscCats;
-  const posXDR=mdr&&susceptibleCats<=2&&categoriesWithData<totalCats;
+  // v395 (P1 clínico): XDR/PDR exigen cobertura ADECUADA de categorías. Con un panel de 3-4 fármacos
+  //   (p.ej. MRSA/VRE de rutina) NO se puede afirmar "Posible PDR/XDR": las categorías de última línea
+  //   (glucopéptidos, oxazolidinonas, lipopéptidos…) simplemente no se probaron. Magiorakos 2012 exige
+  //   probar todas (o casi todas) las categorías. Requerimos ≥ la mitad (y ≥4) de las categorías para
+  //   posXDR/posPDR; por debajo se degrada a MDR (evita el falso "Posible PDR" alarmante en MRSA/VRE).
+  const minCoverage=Math.max(4,Math.ceil(totalCats/2));
+  const adequatePanel=categoriesWithData>=minCoverage;
+  const posXDR=mdr&&susceptibleCats<=2&&categoriesWithData<totalCats&&adequatePanel;
   const xdr=mdr&&susceptibleCats<=2&&categoriesWithData===totalCats;
-  // posible PDR: non-susc to all in all TESTED categories (panel incompleto)
+  // posible PDR: non-susc to all in all TESTED categories (panel incompleto) — CON cobertura adecuada
   // PDR: non-susc to all agents in all categories (panel completo)
-  const posPDR=nonSuscCats===categoriesWithData&&categoriesWithData>0&&categoriesWithData<totalCats;
+  const posPDR=nonSuscCats===categoriesWithData&&categoriesWithData>0&&categoriesWithData<totalCats&&adequatePanel;
   const pdr=nonSuscCats===totalCats&&categoriesWithData===totalCats;
   let classification='Sensible';
   if(pdr)classification='PDR';
@@ -187,6 +194,7 @@ export function clasificarMagiorakos(abg,organismo){
     totalCategories:totalCats,
     categoriesWithData,
     panelComplete:categoriesWithData===totalCats,
-    summary:`${nonSuscCats}/${categoriesWithData} categorías no-susceptibles (panel ${categoriesWithData===totalCats?'completo':'incompleto'})`
+    adequatePanel,minCoverage,
+    summary:`${nonSuscCats}/${categoriesWithData} categorías no-susceptibles (panel ${categoriesWithData===totalCats?'completo':'incompleto'}${(mdr&&!adequatePanel)?`; cobertura insuficiente para XDR/PDR: ${categoriesWithData}/${totalCats} categorías`:''})`
   };
 }
