@@ -11723,15 +11723,20 @@ window.analizarAbgConIA=async()=>{
     const resultados=parsed?.resultados||[];
     // Guardar MICs en variable global para incluirlos al guardar
     window._abgMICs={};
-    let filled=0;
+    let filled=0; const revisar=[];
     resultados.forEach(r=>{
       if(r.antibiotico&&['S','I','R'].includes((r.resultado||'').toUpperCase())){
         setSIRByKey(r.antibiotico,r.resultado.toUpperCase());filled++;
         if(r.mic)window._abgMICs[r.antibiotico]=r.mic;
+        // v399 (P1 seguridad clínica): la IA marca lo dudoso → avisamos al clínico para que lo VERIFIQUE
+        //   (no se da por cierto). Antes este 2º analizador descartaba needs_review/conf → lecturas S↔R
+        //   dudosas se rellenaban en silencio. Se replica la lógica del otro analizador.
+        if(r.needs_review||r.conf==='baja')revisar.push(r.antibiotico);
       }
     });
     const micCount=Object.keys(window._abgMICs||{}).length;
-    setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+'. '+(window._anthropicProxyURL?'🔒 Análisis seguro (la clave de IA no se expone). ':'')+'Revisa y corrige los valores S/I/R si hace falta.','ok');
+    const _rev=revisar.length?' ⚠ '+revisar.length+' de baja confianza — VERIFICA: '+revisar.join(', '):'';
+    setStatus('✅ '+filled+' antibióticos'+(parsed?.organismo?' | Organismo: '+parsed.organismo:'')+' '+(micCount?' | '+micCount+' MICs detectados':'')+_rev+'. '+(window._anthropicProxyURL?'🔒 Análisis seguro (la clave de IA no se expone). ':'')+'Revisa y corrige los valores S/I/R si hace falta.',revisar.length?'info':'ok');
     if(window._refreshAbgInterpret)window._refreshAbgInterpret();
     // Mostrar la interpretación del motor justo tras analizar (form "Nuevo Paciente" → panel #abg-interpret).
     setTimeout(()=>{try{document.getElementById('abg-interpret')?.scrollIntoView({behavior:'smooth',block:'center'});}catch(_){}},120);

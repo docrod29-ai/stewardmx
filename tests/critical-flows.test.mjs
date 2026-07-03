@@ -1411,6 +1411,15 @@ test('FARMACIA v397 (P1 datos): bloqueos con ID determinista por ATB + liberar d
   const lbody = _idx.slice(l, le);
   assert.ok(lbody.includes('const _dups=(BLOQUEOS||[]).filter(') && lbody.includes("(b.atb||'').toLowerCase().trim()===(atb||'').toLowerCase().trim()"), 'liberar no desactiva los duplicados del mismo ATB');
 });
+test('ABGSAFE v399 (P1 seguridad): el 2º analizador IA avisa las lecturas de baja confianza (needs_review)', () => {
+  // Antes descartaba needs_review/conf → lecturas S↔R dudosas se rellenaban en silencio. Ahora las señala.
+  const s = _idx.indexOf('window._abgMICs={};');
+  const e = _idx.indexOf('if(window._refreshAbgInterpret)', s);
+  assert.ok(s >= 0 && e > s, 'no se ubicó el 2º analizador de antibiograma');
+  const body = _idx.slice(s, e);
+  assert.ok(body.includes("if(r.needs_review||r.conf==='baja')revisar.push(r.antibiotico)"), 'el 2º analizador no recolecta las lecturas de baja confianza');
+  assert.ok(body.includes('de baja confianza — VERIFICA'), 'el 2º analizador no muestra el aviso de verificación al clínico');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

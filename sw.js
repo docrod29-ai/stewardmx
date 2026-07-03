@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v399 (Auditoría — seguridad clínica: 2º analizador IA avisa lo dudoso)
+//  P1: había DOS analizadores de antibiograma por IA. El primero marca las lecturas needs_review/conf=baja
+//  y avisa al clínico ("⚠ N de baja confianza — VERIFICA"). El SEGUNDO descartaba esa señal → lecturas
+//  S↔R dudosas se rellenaban en silencio y se daban por ciertas. Ahora el 2º replica la misma lógica:
+//  recolecta las de baja confianza y las muestra para verificación. +1 prueba (313).
+//  (v398 fue SOLO reglas: ai_usage/voice_usage no reseteables por el cliente, sin cambio de hosting.)
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v397 (Auditoría — datos: dedup de bloqueos de farmacia)
 //  P1: guardarBloqueoATB usaba addDoc (id aleatorio) y el chequeo de duplicados era solo en memoria
 //  (_atbBloqueados) → una carrera creaba 2 docs del mismo ATB y liberarBloqueoATB (por id) dejaba el otro
@@ -1229,7 +1236,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v397';
+const CACHE = 'stewardmx-v399';
 const SHELL = [
   '/',
   '/index.html',
