@@ -44,6 +44,8 @@ before(async () => {
     await setDoc(doc(db, `hospitals/${HOSP_A}/patients/pp/labs/labUnsigned`), { valor: '3.4', firmado: false });
     await setDoc(doc(db, `hospitals/${HOSP_A}/antibiotic_requests/reqDenied`), { status: 'denegado', atb: 'Meropenem' });
     await setDoc(doc(db, `hospitals/${HOSP_A}/antibiotic_requests/reqPending`), { status: 'pendiente', atb: 'Meropenem' });
+    await setDoc(doc(db, `hospitals/${HOSP_A}/antibiotic_requests/reqMine`), { status: 'pendiente', atb: 'X', solicitadoPor: 'userA' });
+    await setDoc(doc(db, `hospitals/${HOSP_A}/antibiotic_requests/reqOther`), { status: 'pendiente', atb: 'X', solicitadoPor: 'someoneElse' });
   });
 });
 after(async () => { if (env) await env.cleanup(); });
@@ -130,4 +132,10 @@ test('SOLICITUDES: miembro SÍ puede editar campos de una denegada SIN cambiar e
 });
 test('SOLICITUDES: miembro SÍ puede AVANZAR una solicitud PENDIENTE (no terminal)', async () => {
   await assertSucceeds(updateDoc(doc(dbA(), `hospitals/${HOSP_A}/antibiotic_requests/reqPending`), { status: 'aprobado' }));
+});
+test('SOLICITUDES delete: el CREADOR (miembro) SÍ puede borrar su propia solicitud (preserva el UI)', async () => {
+  await assertSucceeds(deleteDoc(doc(dbA(), `hospitals/${HOSP_A}/antibiotic_requests/reqMine`)));
+});
+test('SOLICITUDES delete: un miembro NO puede borrar la solicitud de OTRO (más estricto que el catch-all viejo)', async () => {
+  await assertFails(deleteDoc(doc(dbA(), `hospitals/${HOSP_A}/antibiotic_requests/reqOther`)));
 });

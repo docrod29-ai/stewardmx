@@ -268,17 +268,12 @@ service cloud.firestore {
       }
 
       // ── Laboratorios clínicos ────────────────────────────
-      // v391 SEGURIDAD (P0-datos): la regla anterior `allow read, write: if member` daba write LIBRE a
-      //   cualquier miembro, saltándose el candado de inmutabilidad de `firmado` (que sí aplica el comodín
-      //   de subcolecciones de arriba). Un lab FIRMADO podía editarse/borrarse → corrupción de un dato
-      //   validado. Ahora: firmado ⇒ inmutable para miembros (solo super-admin); NO firmado ⇒ el miembro
-      //   aún puede corregir/borrar (no rompe la edición normal de un valor recién capturado).
-      match /patients/{patId}/labs/{labId} {
-        allow read:   if isSuperAdmin() || isHospMember(hospId);
-        allow create: if isSuperAdmin() || isHospMember(hospId);
-        allow update: if isSuperAdmin() || (isHospMember(hospId) && !resource.data.get('firmado', false));
-        allow delete: if isSuperAdmin() || isHospAdmin(hospId) || (isHospMember(hospId) && !resource.data.get('firmado', false));
-      }
+      // v391 SEGURIDAD (P0-datos): antes había una regla específica `/labs` con `allow read, write: if member`
+      //   que daba write LIBRE, saltándose el candado de inmutabilidad de `firmado`. Se ELIMINA esa regla
+      //   permisiva: /labs cae ahora bajo el comodín `/patients/{patId}/{subCol}/{subDocId}` de arriba (que sí
+      //   respeta `firmado`: update solo si !firmado, delete solo admin). Además el catch-all de 3 niveles de
+      //   abajo EXCLUYE `patients` del update para que no vuelva a conceder por unión (OR). Así un lab (o
+      //   cualquier subcolección micro) FIRMADO queda inmutable para miembros.
 
       // ── Sistema de Farmacia: Solicitudes de ATBs ────────
       match /antibiotic_requests/{reqId} {
@@ -295,7 +290,11 @@ service cloud.firestore {
                             request.resource.data.get('status','') == resource.data.get('status','')
                             || !(resource.data.get('status','') in ['denegado','rechazado','eliminado','cancelado'])
                           ));
-        allow delete: if isSuperAdmin() || isHospAdmin(hospId) || isHospPROA(hospId);
+        // delete: admin/PROA, o el CREADOR de la solicitud (preserva "borrar mi propia solicitud" del UI:
+        //   puedeEliminar = _isAdmin || s.solicitadoPor===uid). Más estricto que antes: el catch-all viejo
+        //   dejaba a CUALQUIER miembro borrar CUALQUIER solicitud (ahora excluido de este comodín).
+        allow delete: if isSuperAdmin() || isHospAdmin(hospId) || isHospPROA(hospId)
+                      || (isHospMember(hospId) && resource.data.get('solicitadoPor','') == uid());
       }
       // Subcollection: Recomendaciones de Farmacia Clínica (FC)
       // write: farmacéuticos y admin
@@ -406,13 +405,20 @@ service cloud.firestore {
       // users de arriba. La escritura de users SOLO la gobierna esa regla específica (y joinWithCode).
       match /{anyCol}/{anyDoc} {
         allow read:  if isSuperAdmin() || isHospMember(hospId);
-        allow write: if (isSuperAdmin() || isHospMember(hospId)) && anyCol != 'users';
+        // v391 SEGURIDAD (P0): 'antibiotic_requests' QUEDA FUERA del write del catch-all (igual que 'users'),
+        //   porque Firestore hace OR de TODAS las reglas que matchean: si no, este comodín seguiría concediendo
+        //   cambiar el status a cualquier valor y anularía la máquina de estados de la regla específica.
+        allow write: if (isSuperAdmin() || isHospMember(hospId)) && anyCol != 'users' && anyCol != 'antibiotic_requests';
       }
       // Subcollections de 3 niveles (safety net)
       match /{anyCol}/{anyDoc}/{subCol}/{subDocId} {
         allow read:   if isSuperAdmin() || isHospMember(hospId);
         allow create: if isSuperAdmin() || isHospMember(hospId);
-        allow update: if isSuperAdmin() || isHospMember(hospId);
+        // v391 SEGURIDAD (P0-datos): 'patients' QUEDA FUERA del update del catch-all. Sus subcolecciones
+        //   (labs, antibiogramas, micro, molecular, histo, recomendaciones) ya las gobierna la regla específica
+        //   /patients/{patId}/{subCol}/{subDocId} con el candado de inmutabilidad (update solo si !firmado).
+        //   Sin esta exclusión, el OR de reglas volvería a permitir editar un documento FIRMADO.
+        allow update: if (isSuperAdmin() || isHospMember(hospId)) && anyCol != 'patients';
         allow delete: if isSuperAdmin() || isHospAdmin(hospId);
       }
 
