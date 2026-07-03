@@ -1390,6 +1390,14 @@ test('WORKLIST v394 (P0 clínico): resolveKey NO colapsa combos β-lactámico/in
   assert.equal(resolveKey('Ampicilina/sulbactam'), 'amsul', 'amp-sulbactam a su clave, no a amp');
   assert.equal(resolveKey('Meropenem'), 'mer', 'meropenem solo sigue resolviendo a mer');
 });
+test('MICRO v396 (P1 datos): el updatedAt del reporte de cultivo se escribe en ISO (parseable), no localizado', () => {
+  // Una cadena "3/7/2026, 14:30" no es comparable cronológicamente (rompe anti-pisado/CRDT y el formateo).
+  const s = _idx.indexOf('const upd={cultResultado:res,updatedAt:');
+  assert.ok(s >= 0, 'no se ubicó el upd del reporte de micro');
+  const line = _idx.slice(s, s + 120);
+  assert.ok(line.includes('new Date().toISOString()'), 'updatedAt debe ser ISO');
+  assert.ok(!line.includes("toLocaleString"), 'updatedAt NO debe ser una cadena localizada');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

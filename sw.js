@@ -1,4 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v396 (Auditoría — datos: updatedAt de micro en ISO, no cadena localizada)
+//  P1: el reporte de cultivo escribía updatedAt como cadena localizada ("3/7/2026, 14:30") — no comparable
+//  cronológicamente (rompía cualquier anti-pisado/CRDT y el formateo del "Modificado"). Ahora en ISO. +1 (311).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v395 (Auditoría — clínico: Magiorakos exige cobertura para XDR/PDR)
 //  P1 CLÍNICO: clasificarMagiorakos afirmaba "Posible PDR/XDR" con CUALQUIER cobertura → un panel de 3-4
 //  fármacos (MRSA/VRE de rutina) con todo R se etiquetaba "Posible PDR" (pan-resistente), alarmante y falso:
@@ -1218,7 +1222,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v395';
+const CACHE = 'stewardmx-v396';
 const SHELL = [
   '/',
   '/index.html',

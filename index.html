@@ -2954,7 +2954,9 @@ window.guardarReporteMicro=async function(pid){
 
   try{
     // 1) Actualizar datos del paciente en PACS
-    const upd={cultResultado:res,updatedAt:new Date().toLocaleString('es-MX'),updatedBy:window._userName||U.email};
+    // v396 (P1 datos): updatedAt en ISO (parseable/ordenable), NO cadena localizada "3/7/2026, 14:30" que no
+    //   es comparable cronológicamente (rompía cualquier lógica anti-pisado/CRDT y el formateo del "Modificado").
+    const upd={cultResultado:res,updatedAt:new Date().toISOString(),updatedBy:window._userName||U.email};
     if(muestra)upd.muestra=muestra;
     if(res==='positivo'){
       if(organismo)upd.organismo=organismo;
