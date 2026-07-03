@@ -3950,7 +3950,43 @@ function suscribirPacientes(){
     renderTabla();kpis();stats();alertas();actualizarSelectsWA();_updateICBadge();
     if(currentView==='camas')renderCamas();
     if(currentView==='atb')renderInterconsultasPROA();
+    try{_maybeAutoCarry(snap);}catch(_){}
   },err=>toast('Error: '+err.message,'rd'));
+}
+// ── Traspaso de pacientes activos entre meses (evita que un mes nuevo parezca "vacío/borrado") ──
+// El censo se guarda por mes; los pacientes AÚN hospitalizados deben continuar en el mes nuevo.
+function _mesAnterior(mes){const p=(mes||'').split('-').map(Number);const d=new Date(p[0],(p[1]||1)-1,1);d.setMonth(d.getMonth()-1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function _mesLive(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0');}
+// PURO/testeable: de los pacientes del mes anterior, cuáles traer (activos y que no estén ya en el mes destino).
+function _pacsParaTraer(prevPacs,existingIds){return (prevPacs||[]).filter(p=>!p.alta && !(existingIds&&existingIds.has&&existingIds.has(p.id)));}
+window._traerMesAnterior=async(auto)=>{
+  try{
+    if(!HOSP)return;
+    const prev=_mesAnterior(currentMonth);
+    const [prevSnap,curSnap]=await Promise.all([
+      getDocs(collection(db,'hospitals',HOSP,'months',prev,'patients')),
+      getDocs(collection(db,'hospitals',HOSP,'months',currentMonth,'patients'))
+    ]);
+    const existing=new Set(curSnap.docs.map(d=>d.id));
+    const prevPacs=prevSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const traer=_pacsParaTraer(prevPacs,existing);
+    if(!traer.length){ if(!auto&&typeof toast==='function')toast('No hay pacientes activos en '+nombreMes(prev)+' para traer','am'); return; }
+    for(const p of traer){
+      const data=Object.assign({},p); delete data.id; delete data.alta; delete data.fechaAlta;
+      data._traidoDe=prev; if(!data.ts)data.ts=serverTimestamp();
+      try{await setDoc(doc(db,'hospitals',HOSP,'months',currentMonth,'patients',p.id),data);}catch(_){}
+    }
+    if(typeof toast==='function')toast('✓ '+traer.length+' paciente(s) activo(s) traído(s) de '+nombreMes(prev),'ok');
+  }catch(e){ if(typeof toast==='function')toast('No se pudo traer del mes anterior: '+(e.message||e),'rd'); }
+};
+// Auto-traspaso: SOLO si estás en el mes calendario actual y su censo está totalmente vacío (protege lo ya capturado).
+window._autoCarryDone=window._autoCarryDone||new Set();
+function _maybeAutoCarry(snap){
+  if(!HOSP||currentMonth!==_mesLive())return;      // solo el mes real en curso
+  if(snap&&snap.size>0)return;                      // el mes ya tiene documentos → no tocar
+  if(window._autoCarryDone.has(currentMonth))return;
+  window._autoCarryDone.add(currentMonth);
+  window._traerMesAnterior(true);
 }
 
 // Helper anti-doble-submit: deshabilita botón durante operación async
@@ -32214,7 +32250,8 @@ input:focus,select:focus,textarea:focus{
       <select id="mes-sel" class="mes-sel" onchange="cambiarMes(this.value)"></select>
       <button class="btn-sm btn-sm-ghost" style="padding:2px 7px;" onclick="nextMes()" title="Mes siguiente">▶</button>
       <span id="mes-lbl" class="mes-lbl"></span>
-      <span class="mes-note">Cada mes inicia con censo limpio · los datos históricos se conservan</span>
+      <button class="btn-sm btn-sm-ghost" style="padding:2px 9px;font-size:10px;" onclick="window._traerMesAnterior(false)" title="Trae los pacientes aún hospitalizados del mes anterior (no duplica)">⬇ Traer del mes anterior</button>
+      <span class="mes-note">Los pacientes activos pasan solos al mes nuevo · el histórico se conserva y se puede consultar/editar</span>
     </div>
     <div class="fbar">
       <input class="srch" type="text" placeholder="Buscar paciente, ATB, organismo…" oninput="renderTabla()">

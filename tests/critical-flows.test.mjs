@@ -2149,3 +2149,21 @@ test('W5 — arnés de evidencia: aceptación %, MDR % y comparación antes/desp
   assert.equal(cmp.dotPer1000.deltaPct, -25, 'delta DOT/1000');
   assert.equal(cmp.mdrPct.deltaPct, -20, 'delta MDR%');
 });
+test('CENSO v387: traspaso de mes — _mesAnterior + _pacsParaTraer (solo activos, sin duplicar) + auto-traspaso protegido', () => {
+  // El equipo reportó "se borran los datos al cambiar de mes". No se borran (se guardan por mes); faltaba el
+  // traspaso de pacientes AÚN hospitalizados al mes nuevo. Se verifica la lógica REAL extraída de index.html.
+  const mMes = _idx.match(/function _mesAnterior\(mes\)\{[^{}]*\}/);
+  const mPar = _idx.match(/function _pacsParaTraer\(prevPacs,existingIds\)\{[^{}]*\}/);
+  assert.ok(mMes && mPar, 'no se hallaron las funciones de traspaso');
+  const _mesAnterior = eval('(' + mMes[0] + ')');
+  const _pacsParaTraer = eval('(' + mPar[0] + ')');
+  assert.equal(_mesAnterior('2026-07'), '2026-06', 'jul→jun');
+  assert.equal(_mesAnterior('2026-01'), '2025-12', 'ene→dic del año previo');
+  const r = _pacsParaTraer([{ id:'a', alta:false }, { id:'b', alta:true }, { id:'c' }], new Set(['c']));
+  assert.ok(r.length === 1 && r[0].id === 'a', 'debe traer solo el activo que no existe (no altas, no duplicados)');
+  assert.equal(_pacsParaTraer([{ id:'x', alta:false }, { id:'y', alta:false }], new Set()).length, 2, 'mes destino vacío trae todos los activos');
+  // Salvaguardas del auto-traspaso + botón + que nada se borra al cambiar de mes.
+  assert.ok(_idx.includes('window._traerMesAnterior=async') && _idx.includes('function _maybeAutoCarry'), 'falta el motor de traspaso');
+  assert.ok(_idx.includes('currentMonth!==_mesLive()') && _idx.includes('snap.size>0'), 'el auto-traspaso no está protegido (solo mes actual en curso + censo vacío)');
+  assert.ok(_idx.includes('Traer del mes anterior'), 'falta el botón manual de traspaso');
+});

@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v387 (Censo — TRASPASO de pacientes activos entre meses)
+//  Reporte del equipo de calidad: "al cambiar de mes se borran los datos, tuvieron que recapturar todo".
+//  Diagnóstico REAL: nada se borra — el censo se guarda por mes (months/{YYYY-MM}/patients) y el mes nuevo
+//  arrancaba VACÍO; los pacientes aún hospitalizados NO pasaban solos → parecía pérdida. Fix (aditivo):
+//  (1) _traerMesAnterior — trae del mes previo SOLO los pacientes activos (!alta) que NO estén ya en el mes
+//  destino (idempotente, no duplica, mismo docId = continuidad); botón "⬇ Traer del mes anterior" en el
+//  navegador de mes. (2) Auto-traspaso silencioso SOLO si estás en el mes calendario en curso y su censo está
+//  TOTALMENTE vacío (protege lo ya capturado). Los meses previos siguen consultables y editables por el
+//  selector. Nada borra meses. +1 prueba (301).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v386 (Loop clase mundial — W5: arnés de evidencia/impacto PROA)
 //  Nuevo módulo PURO js/core/evidence.js: buildEvidenceReport (DOT/1000, % aceptación de intervenciones,
 //  % multirresistencia, reusando clinical-days) + compareEvidence (antes/después). Botón "Evidencia" en
@@ -1146,7 +1156,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v386';
+const CACHE = 'stewardmx-v387';
 const SHELL = [
   '/',
   '/index.html',
