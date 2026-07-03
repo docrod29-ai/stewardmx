@@ -351,6 +351,11 @@ service cloud.firestore {
         allow read:  if isSuperAdmin() || isHospAdmin(hospId);
         allow write: if false;
       }
+      // v398: contador de tope mensual de IA (lo escribe anthropicProxy con Admin SDK). Cliente NO escribe.
+      match /ai_usage/{month} {
+        allow read:  if isSuperAdmin() || isHospMember(hospId);
+        allow write: if false;
+      }
 
       // ── Cola LIS ─────────────────────────────────────────
       match /lis_queue/{queueId} {
@@ -408,7 +413,13 @@ service cloud.firestore {
         // v391 SEGURIDAD (P0): 'antibiotic_requests' QUEDA FUERA del write del catch-all (igual que 'users'),
         //   porque Firestore hace OR de TODAS las reglas que matchean: si no, este comodín seguiría concediendo
         //   cambiar el status a cualquier valor y anularía la máquina de estados de la regla específica.
-        allow write: if (isSuperAdmin() || isHospMember(hospId)) && anyCol != 'users' && anyCol != 'antibiotic_requests';
+        // v398 SEGURIDAD (P1 costo): 'ai_usage'/'voice_usage' también EXCLUIDOS del write. Los escribe solo la
+        //   Cloud Function (Admin SDK, que ignora reglas); si el catch-all los concede, cualquier miembro podría
+        //   RESETEAR el contador y saltarse el tope mensual de IA/voz. (El write:if false de voice_usage era
+        //   inefectivo por sí solo justo por esta unión OR.) La LECTURA sigue disponible por el catch-all.
+        allow write: if (isSuperAdmin() || isHospMember(hospId))
+                     && anyCol != 'users' && anyCol != 'antibiotic_requests'
+                     && anyCol != 'ai_usage' && anyCol != 'voice_usage';
       }
       // Subcollections de 3 niveles (safety net)
       match /{anyCol}/{anyDoc}/{subCol}/{subDocId} {

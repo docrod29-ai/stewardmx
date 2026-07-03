@@ -46,6 +46,8 @@ before(async () => {
     await setDoc(doc(db, `hospitals/${HOSP_A}/antibiotic_requests/reqPending`), { status: 'pendiente', atb: 'Meropenem' });
     await setDoc(doc(db, `hospitals/${HOSP_A}/antibiotic_requests/reqMine`), { status: 'pendiente', atb: 'X', solicitadoPor: 'userA' });
     await setDoc(doc(db, `hospitals/${HOSP_A}/antibiotic_requests/reqOther`), { status: 'pendiente', atb: 'X', solicitadoPor: 'someoneElse' });
+    await setDoc(doc(db, `hospitals/${HOSP_A}/ai_usage/2026-06`), { count: 100 });
+    await setDoc(doc(db, `hospitals/${HOSP_A}/voice_usage/2026-06`), { count: 50 });
   });
 });
 after(async () => { if (env) await env.cleanup(); });
@@ -138,4 +140,10 @@ test('SOLICITUDES delete: el CREADOR (miembro) SÍ puede borrar su propia solici
 });
 test('SOLICITUDES delete: un miembro NO puede borrar la solicitud de OTRO (más estricto que el catch-all viejo)', async () => {
   await assertFails(deleteDoc(doc(dbA(), `hospitals/${HOSP_A}/antibiotic_requests/reqOther`)));
+});
+test('COSTO ai_usage: un miembro NO puede resetear el contador de tope de IA', async () => {
+  await assertFails(setDoc(doc(dbA(), `hospitals/${HOSP_A}/ai_usage/2026-06`), { count: 0 }, { merge: true }));
+});
+test('COSTO voice_usage: un miembro NO puede resetear el contador de voz', async () => {
+  await assertFails(setDoc(doc(dbA(), `hospitals/${HOSP_A}/voice_usage/2026-06`), { count: 0 }, { merge: true }));
 });
