@@ -1351,6 +1351,15 @@ test('SEGURIDAD v392 (P0): la API key sk-ant ya NO se persiste a Firestore (solo
   assert.ok(body.includes('window._abgApiKey=k'), 'debe cargar la key solo en memoria de sesión');
   assert.ok(_idx.includes('window._purgarAnthropicKeys=') && _idx.includes('anthropicKey:deleteField()'), 'falta la purga one-shot de claves ya persistidas');
 });
+test('SW v393 (P0 version-skew): js/core/*.js se sirve NETWORK-FIRST (no stale-while-revalidate)', () => {
+  const _sw = readFileSync(join(__d, '..', 'sw.js'), 'utf8');
+  // index.html es network-first; si los módulos ESM fueran stale-while-revalidate, un index NUEVO
+  // cargaría el módulo VIEJO del CACHE anterior. Debe existir una rama network-first para /js/core/.
+  const i = _sw.indexOf("url.includes('/js/core/')");
+  assert.ok(i >= 0, 'el SW no trata js/core como caso especial (network-first)');
+  const seg = _sw.slice(i, i + 400);
+  assert.ok(seg.includes("cache: 'no-store'") && seg.includes('caches.match(e.request)'), 'js/core no es network-first con fallback a caché');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

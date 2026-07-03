@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v393 (Auditoría — version-skew: js/core network-first)
+//  P0: index.html se sirve network-first (siempre fresco) e importa los módulos puros js/core/*.js por ESM,
+//  pero esos módulos caían en stale-while-revalidate → un index NUEVO cargaba la copia VIEJA del CACHE
+//  anterior hasta el siguiente reload (código nuevo + motor puro viejo; p.ej. un fix en alerts.js/evidence.js
+//  no surtía efecto). Ahora js/core/*.js se sirve NETWORK-FIRST (cache:'no-store' + fallback a caché offline),
+//  igual que index.html, así el módulo llega fresco junto al index. +1 prueba (307).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v392 (Auditoría — seguridad: la key sk-ant deja de vivir en Firestore)
 //  P0 SEGURIDAD: guardarApiKeyHosp/Global escribían la Anthropic API key (sk-ant) en config/global y en
 //  hospitals/{HOSP}/config/main (legible por admin). El proxy Cloud Function (_anthropicProxyURL) la hace
@@ -1195,7 +1202,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v392';
+const CACHE = 'stewardmx-v393';
 const SHELL = [
   '/',
   '/index.html',
@@ -1283,6 +1290,26 @@ self.addEventListener('fetch', e => {
           caches.match(e.request)
             .then(r => r || caches.match('/index.html'))
         )
+    );
+    return;
+  }
+
+  // js/core/*.js: NETWORK-FIRST (como index.html) para evitar version-skew (P0 auditoría).
+  // El index.html se sirve network-first (siempre fresco) e importa estos módulos por ESM; si se
+  // sirvieran stale-while-revalidate, un index NUEVO cargaría la copia VIEJA del CACHE anterior hasta
+  // el siguiente reload (código nuevo + motor puro viejo). Con network-first, el módulo llega fresco
+  // junto al index; offline sigue funcionando por el fallback a caché.
+  if (url.includes('/js/core/')) {
+    e.respondWith(
+      fetch(e.request, { cache: 'no-store' })
+        .then(res => {
+          if (res && res.status === 200 && res.type !== 'error') {
+            const clone = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => caches.match(e.request))
     );
     return;
   }
