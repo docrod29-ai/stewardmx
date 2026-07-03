@@ -1925,7 +1925,9 @@ exports.limpiarPacientes = onCall(
     for (const monthDoc of monthsSnap.docs) {
       const patientsSnap = await monthDoc.ref.collection('patients').get();
       for (const docSnap of patientsSnap.docs) {
-        for (const sub of ['visits', 'antibiograms', 'labs', 'molecular', 'histo', 'recos']) {
+        // v404 (P2 datos): nombres REALES de las subcolecciones del paciente. Antes 'recos' (el cliente usa
+        //   'recomendaciones') y faltaba 'micro_reports' → esas quedaban HUÉRFANAS al limpiar el hospital.
+        for (const sub of ['visits', 'antibiograms', 'labs', 'molecular', 'histo', 'recomendaciones', 'micro_reports']) {
           const subSnap = await docSnap.ref.collection(sub).get();
           for (const s of subSnap.docs) {
             batch.delete(s.ref);

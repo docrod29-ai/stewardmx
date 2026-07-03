@@ -1473,6 +1473,14 @@ test('RENAL v403 (P3): ruleRenal muestra la TFG con 1 decimal, no redondeada a l
   const out = A.ruleRenal({atbList:[{nombre:'Vancomicina'}]}, 29.6);
   assert.ok(out.length===1 && /TFG estimada 29\.6 /.test(out[0].detalle), 'debe mostrar 29.6, no 30');
 });
+test('CF v404 (P2 datos): limpiarPacientes borra las subcolecciones con nombres REALES (recomendaciones/micro_reports)', () => {
+  const _fn = readFileSync(join(__d, '..', 'functions', 'index.js'), 'utf8');
+  const s = _fn.indexOf("'visits', 'antibiograms'");
+  assert.ok(s >= 0, 'no se ubicó la lista de subcolecciones de limpiarPacientes');
+  const line = _fn.slice(s, s + 180);
+  assert.ok(line.includes("'recomendaciones'") && line.includes("'micro_reports'"), 'faltan recomendaciones/micro_reports en la limpieza');
+  assert.ok(!/'recos'/.test(line), "sigue usando el nombre equivocado 'recos'");
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');
