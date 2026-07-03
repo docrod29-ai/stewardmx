@@ -1436,6 +1436,27 @@ test('FARMACIA v401 (P2 datos): guardarFCReco escribe la reco y el flag del padr
   assert.ok(body.includes('writeBatch(db)') && body.includes('_fcBatch.set(') && body.includes('_fcBatch.update(') && body.includes('_fcBatch.commit()'), 'guardarFCReco no usa un batch atómico');
   assert.ok(!/await addDoc\(recoRef/.test(body), 'sigue usando addDoc suelto (no atómico)');
 });
+test('FARMACIA v402 (P0-datos #6 cliente): _precheckTransicion revalida el estado fresco antes de transicionar', async () => {
+  const s0 = _idx.indexOf('window._precheckTransicion=async');
+  const e0 = _idx.indexOf('window.confirmarRevision=async');
+  assert.ok(s0 >= 0 && e0 > s0, 'no se ubicó _precheckTransicion');
+  const block = _idx.slice(s0, e0);
+  let curStatus='pendiente', shouldThrow=false;
+  const getDoc = async()=>{ if(shouldThrow) throw new Error('red'); return { exists:()=>curStatus!=null, data:()=>({status:curStatus}) }; };
+  const win = {};
+  const fn = new Function('getDoc','doc','db','HOSP','toast','window', block + '\n;return window._precheckTransicion;')(getDoc, ()=>({}), {}, 'H', ()=>{}, win);
+  curStatus='dispensado';
+  assert.equal(await fn('r','dispensado',['dispensado'],'x'), false, 'debe bloquear el doble-submit al mismo estado destino');
+  curStatus='denegado';
+  assert.equal(await fn('r','aprobado',['denegado','dispensado'],'aprobar'), false, 'debe bloquear transición desde un estado terminal');
+  curStatus='en_revision';
+  assert.equal(await fn('r','aprobado',['denegado','dispensado'],'aprobar'), true, 'debe permitir una transición legítima hacia adelante');
+  shouldThrow=true;
+  assert.equal(await fn('r','aprobado',['denegado'],'x'), true, 'ante error de red debe degradar a permitir (el servidor protege)');
+  // wiring
+  assert.ok(_idx.includes('const _okRev=await window._precheckTransicion(id,nuevoStatus,'), 'confirmarRevision no usa la guarda');
+  assert.ok(_idx.includes("const _okDisp=await window._precheckTransicion(id,'dispensado'"), 'confirmarDispensacion no usa la guarda');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

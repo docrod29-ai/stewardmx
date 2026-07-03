@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v402 (Auditoría — farmacia: guarda de transición en cliente #6)
+//  P0-datos #6 (capa CLIENTE, complementa las reglas de v391): las transiciones de solicitud escribían el
+//  nuevo status sin releer el estado actual → doble-submit o actuar sobre un estado ya cambiado por otro
+//  dispositivo (p.ej. re-decidir una ya resuelta, re-dispensar). Nuevo helper _precheckTransicion relee el
+//  estado FRESCO (getDoc) y aborta si ya está en el destino o en un estado terminal; aplicado a
+//  confirmarRevision (aprobar/denegar/revisar) y confirmarDispensacion. Aditivo y con degradación segura
+//  ante error de red (el servidor sigue protegiendo). +1 prueba que ejecuta el helper real (316).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v401 (Auditoría — datos: guardarFCReco atómico con writeBatch)
 //  P2: la recomendación de Farmacia Clínica y el flag del padre (tieneFCReco, que enciende el badge) se
 //  escribían en DOS operaciones sueltas (addDoc + updateDoc). Si la 1ª pasaba y la 2ª fallaba, la reco
@@ -1248,7 +1256,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v401';
+const CACHE = 'stewardmx-v402';
 const SHELL = [
   '/',
   '/index.html',

@@ -16534,6 +16534,21 @@ window.abrirRevision=(id,accion)=>{
   abrirContenido(tituloModal,html);
 };
 
+// v402 (P0-datos #6, capa cliente): revalida el estado FRESCO de una solicitud antes de una transición.
+//   Complementa las reglas v391 (que bloquean resucitar estados terminales): además evita actuar sobre un
+//   estado ya cambiado por otro dispositivo (p.ej. dispensado→retenido) y el doble-submit. Devuelve true si
+//   la transición es válida; false (y avisa) si el estado fresco es el destino o uno terminal. Ante error de
+//   red devuelve true (no bloquea — degradación segura; el servidor sigue protegiendo).
+window._precheckTransicion=async(id,targetStatus,terminales,etiqueta)=>{
+  try{
+    const _sn=await getDoc(doc(db,'hospitals',HOSP,'antibiotic_requests',id));
+    if(!_sn.exists()){toast('La solicitud ya no existe.','am');return false;}
+    const _st=(_sn.data().status||'').trim();
+    if(targetStatus&&_st===targetStatus){toast('La solicitud ya está en «'+_st+'».','am');return false;}
+    if(terminales&&terminales.includes(_st)){toast('La solicitud ya está en «'+_st+'» (estado final). Recarga antes de '+(etiqueta||'continuar')+'.','am');return false;}
+    return true;
+  }catch(_){ return true; }
+};
 window.confirmarRevision=async(id,accion)=>{
   if(window._revBusy)return;window._revBusy=true; // anti-doble-click (libera en finally + salidas tempranas)
   const motivo=(document.getElementById('rev-motivo')?.value||'').trim();
@@ -16544,6 +16559,10 @@ window.confirmarRevision=async(id,accion)=>{
   const s=SOLICITUDES.find(x=>x.id===id);
   // Mapa de acción → nuevo estado (estado extendido v75)
   const nuevoStatus=accion==='liberar'?'aprobado':accion==='revision'?'en_revision':'denegado';
+  // v402: revalidar estado FRESCO antes de decidir — no re-decidir una solicitud ya resuelta/dispensada por
+  //   otro dispositivo, ni doble-submit.
+  const _okRev=await window._precheckTransicion(id,nuevoStatus,['denegado','rechazado','dispensado','administrado','entregado','eliminado','cancelado'],accion==='liberar'?'aprobar':accion==='revision'?'marcar en revisión':'denegar');
+  if(!_okRev){window._revBusy=false;return;}
   try{
     const upd={
       status:nuevoStatus,
@@ -17115,6 +17134,9 @@ window.abrirNuevoBloqueo=async()=>{
 window.confirmarDispensacion=(id)=>{
   if(!window._isFarmaceutico&&!window._isAdmin){toast('Solo Farmacia puede confirmar la dispensación','rd');return;}
   _confirmModal('¿Confirmar que el ATB fue dispensado al paciente?\n\nEsta acción queda registrada en el expediente de farmacia.',async()=>{
+    // v402: revalidar estado FRESCO — no re-dispensar (doble-submit) ni dispensar sobre un estado terminal.
+    const _okDisp=await window._precheckTransicion(id,'dispensado',['dispensado','administrado','entregado','denegado','rechazado','eliminado','cancelado'],'dispensar');
+    if(!_okDisp)return;
     try{
       await setDoc(doc(db,'hospitals',HOSP,'antibiotic_requests',id),{
         dispensadoAt:serverTimestamp(),
