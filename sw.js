@@ -1,4 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v403 (Auditoría — bioestadística P3: empates Mann-Whitney + TFG 1 decimal)
+//  (1) stat_mannwhitney: corrección por EMPATES en la varianza (Σ t³−t). Con "días de ATB" (enteros
+//  pequeños, muchos empates) la σ sin corregir sobreestimaba la varianza → p demasiado conservador.
+//  Retrocompatible: sin empates da el resultado clásico. (2) ruleRenal: TFG con 1 decimal, no redondeada
+//  a la frontera 30 (Math.round(29.6)=30 parecía normal aunque disparó por <30). +2 pruebas (318).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v402 (Auditoría — farmacia: guarda de transición en cliente #6)
 //  P0-datos #6 (capa CLIENTE, complementa las reglas de v391): las transiciones de solicitud escribían el
 //  nuevo status sin releer el estado actual → doble-submit o actuar sobre un estado ya cambiado por otro
@@ -1256,7 +1262,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v402';
+const CACHE = 'stewardmx-v403';
 const SHELL = [
   '/',
   '/index.html',

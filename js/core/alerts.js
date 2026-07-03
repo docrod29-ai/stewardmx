@@ -35,8 +35,10 @@ export function ruleRenal(p, crcl) {
   if (crcl == null || isNaN(crcl) || crcl >= 30) return [];
   const hits = A(p).filter(a => RENAL_RX.test(a.nombre || ''));
   if (!hits.length) return [];
+  // v403 (P3): TFG con 1 decimal, NO redondear al umbral. Antes Math.round(29.6)=30 mostraba "TFG 30" (la
+  //   frontera de decisión, que parece normal) aunque la regla disparó por <30 → confuso.
   return [{ id: 'renal', sev: 'media', titulo: 'Ajuste por función renal',
-    detalle: 'TFG estimada ' + Math.round(crcl) + ' mL/min: revisar la dosis de ' + hits.map(a => a.nombre).join(', ') + ' (validación clínica).' }];
+    detalle: 'TFG estimada ' + (Math.round(crcl * 10) / 10) + ' mL/min: revisar la dosis de ' + hits.map(a => a.nombre).join(', ') + ' (validación clínica).' }];
 }
 
 // 3) Candidato a switch IV→VO.

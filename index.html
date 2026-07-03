@@ -20505,7 +20505,14 @@ function stat_mannwhitney(group1,group2){
   const U2=n1*n2-U1;
   const U=Math.min(U1,U2);
   const meanU=n1*n2/2;
-  const sdU=Math.sqrt(n1*n2*(n1+n2+1)/12);
+  // v403 (P3 bioestadística): corrección por EMPATES en la varianza. Con "días de ATB" (enteros pequeños,
+  //   muchos empates) la σ sin corregir sobreestima la varianza → p demasiado conservador. Sin empates, tieSum=0
+  //   y varU = n1*n2*(N+1)/12 (idéntico a la fórmula clásica) → retrocompatible.
+  const N=n1+n2;
+  let tieSum=0;
+  for(let a=0;a<all.length;){ let b=a; while(b<all.length&&all[b].v===all[a].v)b++; const t=b-a; tieSum+=t*t*t-t; a=b; }
+  const varU=(N>1)?(n1*n2/12)*((N+1)-tieSum/(N*(N-1))):0;
+  const sdU=Math.sqrt(varU>0?varU:0);
   const z=sdU>0?(U-meanU)/sdU:0;
   const absZ=Math.abs(z);
   const p=absZ>3.29?'<0.001':absZ>2.576?'<0.01':absZ>1.96?'<0.05':'≥0.05';

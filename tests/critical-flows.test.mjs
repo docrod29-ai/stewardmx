@@ -1457,6 +1457,22 @@ test('FARMACIA v402 (P0-datos #6 cliente): _precheckTransicion revalida el estad
   assert.ok(_idx.includes('const _okRev=await window._precheckTransicion(id,nuevoStatus,'), 'confirmarRevision no usa la guarda');
   assert.ok(_idx.includes("const _okDisp=await window._precheckTransicion(id,'dispensado'"), 'confirmarDispensacion no usa la guarda');
 });
+test('MW v403 (P3 bioest.): Mann-Whitney corrige la varianza por empates', () => {
+  const s = _idx.indexOf('function stat_mannwhitney(group1,group2){');
+  const e = _idx.indexOf('\nfunction stat_nnt(', s);
+  assert.ok(s>=0 && e>s, 'no se ubicó stat_mannwhitney');
+  const fn = new Function(_idx.slice(s,e) + '\n;return stat_mannwhitney;')();
+  const r0 = fn([1,2,3,4],[5,6,7,8]);            // sin empates → varianza clásica
+  assert.equal(r0.z, -2.31, 'sin empates debe coincidir con la varianza clásica (z≈-2.31)');
+  assert.equal(r0.p_approx, '<0.05', 'sin empates, grupos separados → p<0.05');
+  const r1 = fn([1,1,2],[2,3,3]);                // con empates → varianza corregida (|z| mayor: -1.75→-1.83)
+  assert.equal(r1.z, -1.83, 'con empates la varianza corregida da |z| mayor (z≈-1.83, no el clásico -1.75)');
+});
+test('RENAL v403 (P3): ruleRenal muestra la TFG con 1 decimal, no redondeada a la frontera 30', async () => {
+  const A = await import('../js/core/alerts.js');
+  const out = A.ruleRenal({atbList:[{nombre:'Vancomicina'}]}, 29.6);
+  assert.ok(out.length===1 && /TFG estimada 29\.6 /.test(out[0].detalle), 'debe mostrar 29.6, no 30');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');
