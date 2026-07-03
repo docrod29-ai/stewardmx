@@ -10198,6 +10198,10 @@ window._goAbgTab=function(){
 
 window.abrirNuevoAntibiograma=(pid)=>{
   window._nabgFoto64=null;window._nabgFotoMime='image/jpeg';
+  // v400 (P1/P2 datos): resetear los CMI detectados por IA al ABRIR. Antes _nabgMICs (global) solo se
+  //   limpiaba al re-analizar → si el clínico abría un antibiograma nuevo y capturaba S/I/R a MANO (sin
+  //   re-analizar), los CMI del análisis del paciente ANTERIOR se guardaban en la subcolección de ESTE.
+  window._nabgMICs={};
   const p=PACS.find(x=>x.id===pid);
   const _muestrasArr=Array.isArray(p?.muestras)&&p.muestras.length?p.muestras:
     (p?.muestra||p?.cult?[{tipo:p.muestra||p.cult||'',fecha:p.cultFecha||'',rechazada:false}]:[]);

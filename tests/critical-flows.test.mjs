@@ -1420,6 +1420,12 @@ test('ABGSAFE v399 (P1 seguridad): el 2º analizador IA avisa las lecturas de ba
   assert.ok(body.includes("if(r.needs_review||r.conf==='baja')revisar.push(r.antibiotico)"), 'el 2º analizador no recolecta las lecturas de baja confianza');
   assert.ok(body.includes('de baja confianza — VERIFICA'), 'el 2º analizador no muestra el aviso de verificación al clínico');
 });
+test('ABGSAFE v400 (P1/P2 datos): abrirNuevoAntibiograma resetea _nabgMICs (no arrastra CMI del paciente anterior)', () => {
+  const s = _idx.indexOf('window.abrirNuevoAntibiograma=(pid)=>{');
+  assert.ok(s >= 0, 'no se ubicó abrirNuevoAntibiograma');
+  const body = _idx.slice(s, s + 700);
+  assert.ok(body.includes('window._nabgMICs={}'), 'no resetea _nabgMICs al abrir el modal (contaminación entre pacientes)');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

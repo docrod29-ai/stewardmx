@@ -1,4 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v400 (Auditoría — datos: _nabgMICs no contamina entre antibiogramas)
+//  P1/P2: los CMI detectados por IA (window._nabgMICs, global) solo se limpiaban al RE-ANALIZAR. Si el
+//  clínico abría un antibiograma nuevo y capturaba S/I/R a mano (sin re-analizar imagen), se guardaban en
+//  la subcolección de ESE paciente los CMI del análisis del paciente ANTERIOR. Ahora abrirNuevoAntibiograma
+//  resetea _nabgMICs al abrir. +1 prueba (314).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v399 (Auditoría — seguridad clínica: 2º analizador IA avisa lo dudoso)
 //  P1: había DOS analizadores de antibiograma por IA. El primero marca las lecturas needs_review/conf=baja
 //  y avisa al clínico ("⚠ N de baja confianza — VERIFICA"). El SEGUNDO descartaba esa señal → lecturas
@@ -1236,7 +1242,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v399';
+const CACHE = 'stewardmx-v400';
 const SHELL = [
   '/',
   '/index.html',
