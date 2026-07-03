@@ -1818,9 +1818,11 @@ window.cargarPlataforma=async()=>{
       const st=document.getElementById('wa-ventas-status');
       if(st)st.textContent=wa?'✓ wa.me/52'+wa:'⚠ Sin configurar — el botón de planes no enviará mensajes';
       if(wa)window._waVentas=wa;
-      // Mostrar estado de API key
+      // v392 SEGURIDAD: el estado "IA disponible" se deriva del proxy (o clave de sesión), NO de leer
+      //   anthropicKey de Firestore. Si el doc aún tiene una key persistida (fuga previa), se purga one-shot.
       const aks=document.getElementById('plat-apikey-status');
-      if(aks){const hasKey=gc.exists()&&gc.data().anthropicKey;aks.style.display=hasKey?'':'none';}
+      if(aks)aks.style.display=(window._anthropicProxyURL||window._abgApiKey)?'':'none';
+      try{ if(gc.exists()&&gc.data().anthropicKey&&!localStorage.getItem('_purgaKeyHecha')){ window._purgarAnthropicKeys&&window._purgarAnthropicKeys(); } }catch(_){}
     }catch(_){}
   }
 
@@ -3656,35 +3658,44 @@ window.guardarConfig=async()=>{
   }catch(e){toast('Error: '+e.message,'rd');}
 };
 
+// v392 SEGURIDAD (P0): la key sk-ant YA NO se persiste en Firestore. Antes se escribía en config/global y en
+//   hospitals/{HOSP}/config/main (legible por admin) — fuga innecesaria porque el proxy Cloud Function
+//   (_anthropicProxyURL) es el modo seguro por default y nunca expone la key. Estas funciones ahora solo
+//   cargan la key EN MEMORIA para la sesión actual (respaldo "modo directo" si un despliegue no tuviera proxy).
 window.guardarApiKeyHosp=async()=>{
   const k=(document.getElementById('cfg-apikey')?.value||'').trim();
   if(!k||!k.startsWith('sk-ant')){toast('API Key inválida (debe empezar con sk-ant…)','am');return;}
-  try{
-    // Super-admin saves globally → disponible para TODOS los hospitales y usuarios
-    if(U?.email===SUPER_ADMIN){
-      await setDoc(doc(db,'config','global'),{anthropicKey:k,updatedAt:new Date().toISOString(),configBy:U.email},{merge:true});
-    }
-    // También por hospital como respaldo
-    await setDoc(doc(db,'hospitals',HOSP,'config','main'),{anthropicKey:k,updatedAt:new Date().toISOString()},{merge:true});
-    window._abgApiKey=k;
-    const aks=document.getElementById('apikey-status');if(aks)aks.style.display='';
-    const msg=U?.email===SUPER_ADMIN?'API Key guardada GLOBALMENTE ✓ — disponible para todos los hospitales y usuarios sin configuración adicional':'API Key guardada ✓ — análisis IA disponible para este hospital';
-    toast(msg);
-    const _akEl=document.getElementById('cfg-apikey');if(_akEl)_akEl.value='';
-  }catch(e){toast('Error: '+e.message,'rd');}
+  window._abgApiKey=k;
+  const aks=document.getElementById('apikey-status');if(aks)aks.style.display='';
+  toast(window._anthropicProxyURL?'El modo seguro (proxy) ya está activo; no hace falta guardar la clave.':'Clave cargada solo para esta sesión (no se guarda en la nube).');
+  const _akEl=document.getElementById('cfg-apikey');if(_akEl)_akEl.value='';
 };
 
 window.guardarApiKeyGlobal=async()=>{
   if(U?.email!==SUPER_ADMIN){toast('Solo el super-admin puede configurar la API Key global','rd');return;}
   const k=(document.getElementById('plat-apikey-inp')?.value||'').trim();
   if(!k||!k.startsWith('sk-ant')){toast('API Key inválida (debe empezar con sk-ant…)','am');return;}
+  window._abgApiKey=k;
+  const aks=document.getElementById('plat-apikey-status');if(aks)aks.style.display='';
+  toast(window._anthropicProxyURL?'El modo seguro (proxy) ya está activo; no hace falta guardar la clave.':'Clave cargada solo para esta sesión (no se guarda en la nube).');
+  const inp=document.getElementById('plat-apikey-inp');if(inp)inp.value='';
+};
+
+// v392 SEGURIDAD (P0): purga one-shot de la key sk-ant ya persistida (super-admin). Borra el campo anthropicKey
+//   de config/global y del config de cada hospital del registro. Se ejecuta oportunistamente al cargar la
+//   configuración de plataforma (guardado por _purgaKeyHecha) y también es invocable a mano. La ROTACIÓN de la
+//   key (invalidar la vieja) la hace el Dr. en console.anthropic.com — esto solo limpia lo persistido.
+window._purgarAnthropicKeys=async()=>{
+  if(U?.email!==SUPER_ADMIN)return;
+  let n=0;
+  try{ await updateDoc(doc(db,'config','global'),{anthropicKey:deleteField()}); n++; }catch(_){}
   try{
-    await setDoc(doc(db,'config','global'),{anthropicKey:k,updatedAt:new Date().toISOString(),configBy:U.email},{merge:true});
-    window._abgApiKey=k;
-    const aks=document.getElementById('plat-apikey-status');if(aks)aks.style.display='';
-    toast('API Key global guardada ✓ — disponible para todos los hospitales y usuarios');
-    const inp=document.getElementById('plat-apikey-inp');if(inp)inp.value='';
-  }catch(e){toast('Error: '+e.message,'rd');}
+    const reg=await getDocs(collection(db,'hospitals_registry'));
+    for(const d of reg.docs){ try{ await updateDoc(doc(db,'hospitals',d.id,'config','main'),{anthropicKey:deleteField()}); n++; }catch(_){} }
+  }catch(_){}
+  try{localStorage.setItem('_purgaKeyHecha','1');}catch(_){}
+  if(n)toast('Claves sk-ant purgadas de Firestore ('+n+'). Recuerda ROTAR la key en console.anthropic.com.','tl');
+  return n;
 };
 
 function cargarConfigEnForm(){

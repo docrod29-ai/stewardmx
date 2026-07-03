@@ -1339,6 +1339,18 @@ test('FARMACIA v390 (P1 seguridad): la alerta de ATB bloqueado revisa CADA ATB p
   assert.ok(body.includes('_atbNames.some(n=>n.toLowerCase()===b.atb.toLowerCase())'), 'la alerta no compara cada nombre contra el bloqueo');
   assert.ok(!/_atbNombre=\(atb\|\|atbListData\[0\]\?\.n/.test(body), 'sigue usando el string concatenado / la clave .n inexistente');
 });
+test('SEGURIDAD v392 (P0): la API key sk-ant ya NO se persiste a Firestore (solo memoria de sesión) + purga', () => {
+  // La fuga: guardarApiKeyHosp/Global escribían anthropicKey en config/global y hospitals/*/config/main
+  // (legible por admin). El proxy la hace innecesaria. Ahora solo se carga en memoria de sesión.
+  const s=_idx.indexOf('window.guardarApiKeyHosp=');
+  const e=_idx.indexOf('window._purgarAnthropicKeys=');
+  assert.ok(s>=0 && e>s, 'no se ubicaron las funciones de API key');
+  const body=_idx.slice(s,e);
+  assert.ok(!/anthropicKey:k\b/.test(body), 'REGRESIÓN: sigue escribiendo la key (anthropicKey:k) a Firestore');
+  assert.ok(!/setDoc\(doc\(db,'config','global'\)/.test(body), 'REGRESIÓN: sigue haciendo setDoc de la key a config/global');
+  assert.ok(body.includes('window._abgApiKey=k'), 'debe cargar la key solo en memoria de sesión');
+  assert.ok(_idx.includes('window._purgarAnthropicKeys=') && _idx.includes('anthropicKey:deleteField()'), 'falta la purga one-shot de claves ya persistidas');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v392 (Auditoría — seguridad: la key sk-ant deja de vivir en Firestore)
+//  P0 SEGURIDAD: guardarApiKeyHosp/Global escribían la Anthropic API key (sk-ant) en config/global y en
+//  hospitals/{HOSP}/config/main (legible por admin). El proxy Cloud Function (_anthropicProxyURL) la hace
+//  innecesaria. Ahora esas funciones cargan la key SOLO en memoria de sesión (respaldo modo directo); el
+//  estado "IA disponible" se deriva del proxy, no de leer la key. Se añade _purgarAnthropicKeys (super-admin,
+//  one-shot con deleteField) que borra la key persistida de config/global + config de cada hospital, y se
+//  dispara oportunistamente al cargar la config de plataforma. NOTA: ROTAR la key (invalidarla) lo hace el
+//  Dr. en console.anthropic.com — el código solo deja de escribirla y limpia lo persistido. +1 prueba (306).
+//  (v391 fue SOLO reglas: inmutabilidad de labs firmados + máquina de estados de solicitudes, sin cambio de hosting.)
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v390 (Auditoría — alerta de ATB bloqueado con ≥2 ATBs + reporte de evidencia)
 //  (1) FARMACIA/SEGURIDAD (P1): la alerta "ATB bloqueado por Farmacia" comparaba el string CONCATENADO de
 //  todos los ATBs del paciente (p.atb = "A + B") —o atbListData[0].n, clave inexistente (el campo es .nombre)—
@@ -1185,7 +1195,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v390';
+const CACHE = 'stewardmx-v392';
 const SHELL = [
   '/',
   '/index.html',
