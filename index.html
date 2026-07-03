@@ -93,7 +93,7 @@
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import{getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged,createUserWithEmailAndPassword,updateProfile,sendPasswordResetEmail,sendEmailVerification}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import{initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,serverTimestamp,getDoc,getDocs,where,limit,setDoc,deleteField,waitForPendingWrites,runTransaction}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import{initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,serverTimestamp,getDoc,getDocs,where,limit,setDoc,deleteField,waitForPendingWrites,runTransaction,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import{initializeAppCheck,ReCaptchaV3Provider}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js';
 
 const firebaseConfig={
@@ -30722,8 +30722,12 @@ window.guardarFCReco=async(solicitudId)=>{
     return;
   }
   try{
-    const recoRef=collection(db,'hospitals',HOSP,'antibiotic_requests',solicitudId,'fc_recomendaciones');
-    await addDoc(recoRef,{
+    // v401 (P2 datos): la recomendación FC y el flag del padre (tieneFCReco) se escriben ATÓMICAMENTE con
+    //   writeBatch. Antes eran dos operaciones sueltas: si la 1ª (addDoc) pasaba y la 2ª (updateDoc) fallaba,
+    //   quedaba una recomendación GUARDADA pero SIN badge en la solicitud (invisible en la UI).
+    const _fcBatch=writeBatch(db);
+    const _recoRef=doc(collection(db,'hospitals',HOSP,'antibiotic_requests',solicitudId,'fc_recomendaciones'));
+    _fcBatch.set(_recoRef,{
       tipo,texto,urgencia,
       farmaceutico:window._userName||U.displayName||U.email,
       farmaceuticoUid:U.uid,
@@ -30731,12 +30735,13 @@ window.guardarFCReco=async(solicitudId)=>{
       creadoAt:serverTimestamp(),
     });
     // Marcar la solicitud como "tiene recomendación FC" para que aparezca el badge
-    await updateDoc(doc(db,'hospitals',HOSP,'antibiotic_requests',solicitudId),{
+    _fcBatch.update(doc(db,'hospitals',HOSP,'antibiotic_requests',solicitudId),{
       tieneFCReco:true,
       ultimaFCReco:tipo,
       ultimaFCRecoUrgencia:urgencia,
       ultimaFCAt:serverTimestamp(),
     });
+    await _fcBatch.commit();
     cerrarModal();
     toast('✅ Recomendación FC guardada');
     // Notificar a PROA por WA si es urgente

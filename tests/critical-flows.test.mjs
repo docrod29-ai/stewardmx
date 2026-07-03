@@ -1426,6 +1426,16 @@ test('ABGSAFE v400 (P1/P2 datos): abrirNuevoAntibiograma resetea _nabgMICs (no a
   const body = _idx.slice(s, s + 700);
   assert.ok(body.includes('window._nabgMICs={}'), 'no resetea _nabgMICs al abrir el modal (contaminación entre pacientes)');
 });
+test('FARMACIA v401 (P2 datos): guardarFCReco escribe la reco y el flag del padre ATÓMICAMENTE (writeBatch)', () => {
+  // Antes: addDoc + updateDoc sueltos → si el 2º fallaba, la reco quedaba GUARDADA pero sin badge (invisible).
+  assert.ok(_idx.includes(',writeBatch}from'), 'writeBatch no está importado');
+  const s = _idx.indexOf('window.guardarFCReco=async');
+  const e = _idx.indexOf('cerrarModal();', s);
+  assert.ok(s >= 0 && e > s, 'no se ubicó guardarFCReco');
+  const body = _idx.slice(s, e);
+  assert.ok(body.includes('writeBatch(db)') && body.includes('_fcBatch.set(') && body.includes('_fcBatch.update(') && body.includes('_fcBatch.commit()'), 'guardarFCReco no usa un batch atómico');
+  assert.ok(!/await addDoc\(recoRef/.test(body), 'sigue usando addDoc suelto (no atómico)');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

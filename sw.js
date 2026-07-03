@@ -1,4 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v401 (Auditoría — datos: guardarFCReco atómico con writeBatch)
+//  P2: la recomendación de Farmacia Clínica y el flag del padre (tieneFCReco, que enciende el badge) se
+//  escribían en DOS operaciones sueltas (addDoc + updateDoc). Si la 1ª pasaba y la 2ª fallaba, la reco
+//  quedaba GUARDADA pero SIN badge → invisible en la UI (PROA no la veía). Ahora ambas van en un writeBatch
+//  (commit atómico: las dos o ninguna). +1 prueba (315).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v400 (Auditoría — datos: _nabgMICs no contamina entre antibiogramas)
 //  P1/P2: los CMI detectados por IA (window._nabgMICs, global) solo se limpiaban al RE-ANALIZAR. Si el
 //  clínico abría un antibiograma nuevo y capturaba S/I/R a mano (sin re-analizar imagen), se guardaban en
@@ -1242,7 +1248,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v400';
+const CACHE = 'stewardmx-v401';
 const SHELL = [
   '/',
   '/index.html',
