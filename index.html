@@ -5108,9 +5108,13 @@ window._guardarQuickATB=async(pid)=>{
   const def=ATBX.find(a=>a.n===nombre);
   const pol=def?.pol||'libre';const aw=def?.aw||'Watch';
   const nuevoAtb={nombre,dosis,via,pol,aware:aw,fechaInicioIV:inicio,fechaFinIV:fin,indicacionClin:indicacion};
-  const nuevaLista=[...(p.atbList||[]),nuevoAtb];
+  // v389 (P1 pérdida de datos): releer atbList FRESCA del servidor antes de anexar. Antes se partía de
+  // p.atbList en memoria y se reescribía el array completo → un ATB agregado por otro dispositivo se perdía.
+  let _freshAtb=null; try{const _s=await getDoc(doc(db,..._pacPath(),pid));if(_s.exists())_freshAtb=_s.data().atbList;}catch(_){}
+  const _baseAtb=Array.isArray(_freshAtb)?_freshAtb:(p.atbList||[]);
+  const nuevaLista=[..._baseAtb,nuevoAtb];
   const updates={atbList:nuevaLista,updatedBy:U?.email||'',updatedAt:serverTimestamp()};
-  if(!p.atb){updates.atb=nombre;updates.pol=pol;updates.aware=aw;}
+  if(!p.atb&&!_baseAtb.length){updates.atb=nombre;updates.pol=pol;updates.aware=aw;}
   try{
     await updateDoc(doc(db,..._pacPath(),pid),updates);
     try{await addDoc(collection(db,..._histPath()),{action:'quick_atb',patientId:pid,patientName:p.nombre,by:U.email,ts:serverTimestamp(),changes:['ATB agregado: '+nombre+(dosis?' '+dosis:'')+(via?' '+via:'')]});}catch(_){}
@@ -5157,12 +5161,22 @@ window.abrirSuspenderATB=(pid)=>{
 window._suspenderATB=async(pid,idx)=>{
   const p=PACS.find(x=>x.id===pid);if(!p)return;
   const _today=new Date().toISOString().slice(0,10);
-  const lista=JSON.parse(JSON.stringify(p.atbList&&p.atbList.length?p.atbList:[{nombre:p.atb||'',fechaInicioIV:p.inicio||'',fechaFinIV:'',pol:p.pol||'libre',dosis:p.dosis||'',via:p.via||''}]));
-  if(!lista[idx]){toast('ATB no encontrado','rd');return;}
-  lista[idx]={...lista[idx],fechaFinIV:_today};
+  // La lista que vio el usuario (índice posicional del botón) puede estar rancia.
+  const _stale=p.atbList&&p.atbList.length?p.atbList:[{nombre:p.atb||'',fechaInicioIV:p.inicio||'',fechaFinIV:'',pol:p.pol||'libre',dosis:p.dosis||'',via:p.via||''}];
+  const _target=_stale[idx];
+  if(!_target){toast('ATB no encontrado','rd');return;}
+  // v389 (P1 pérdida de datos): releer atbList FRESCA y aplicar la suspensión sobre ella, para no reescribir
+  // el array completo desde memoria (que borraría ATBs agregados por otro dispositivo). Localizamos el ATB
+  // objetivo por IDENTIDAD (nombre + inicio) y no por índice, por si la lista cambió de orden.
+  let _fresh=null; try{const _s=await getDoc(doc(db,..._pacPath(),pid));if(_s.exists())_fresh=_s.data().atbList;}catch(_){}
+  const lista=JSON.parse(JSON.stringify(Array.isArray(_fresh)&&_fresh.length?_fresh:_stale));
+  let _fi=lista.findIndex(a=>a&&(a.nombre||'')===(_target.nombre||'')&&(a.fechaInicioIV||'')===(_target.fechaInicioIV||''));
+  if(_fi<0)_fi=lista[idx]?idx:-1;
+  if(_fi<0){toast('ATB no encontrado','rd');return;}
+  lista[_fi]={...lista[_fi],fechaFinIV:_today};
   try{
     await updateDoc(doc(db,..._pacPath(),pid),{atbList:lista,updatedBy:U?.email||'',updatedAt:serverTimestamp()});
-    try{await addDoc(collection(db,..._histPath()),{action:'suspender_atb',patientId:pid,patientName:p.nombre,by:U.email,ts:serverTimestamp(),changes:['ATB suspendido: '+(lista[idx].nombre||'')+ ' · Fin: '+_today]});}catch(_){}
+    try{await addDoc(collection(db,..._histPath()),{action:'suspender_atb',patientId:pid,patientName:p.nombre,by:U.email,ts:serverTimestamp(),changes:['ATB suspendido: '+(lista[_fi].nombre||'')+ ' · Fin: '+_today]});}catch(_){}
     cerrarModal();toast('ATB suspendido ✓');
   }catch(e){toast('Error: '+e.message,'rd');}
 };
@@ -26509,11 +26523,16 @@ window._txValGuardarHist=function(){
   const texto=_txValSnapshotText();
   if(!texto){ if(typeof toast==='function')toast('Captura la valoración primero','am'); return; }
   const entry={ fecha:new Date().toISOString(), modo:(window._txValModo||'inicial'), huesped:((document.getElementById('hc_huesped')||{}).value||''), texto };
-  const hist=Array.isArray(p.txValoracionHist)?p.txValoracionHist.slice():[];
-  hist.push(entry); while(hist.length>50)hist.shift();
-  updateDoc(doc(db,..._pacPath(),p.id),{txValoracionHist:hist,txValoracionHistAt:new Date().toISOString()})
-    .then(function(){ p.txValoracionHist=hist; var pi=PACS.find(function(x){return x.id===p.id;}); if(pi)pi.txValoracionHist=hist; if(typeof toast==='function')toast('Valoración guardada al historial'); if(typeof renderTrasplantePac==='function')renderTrasplantePac(p.id); })
-    .catch(function(e){ console.warn('[txValHist]',e); if(typeof toast==='function')toast('No se pudo guardar','rd'); });
+  const _ref=doc(db,..._pacPath(),p.id);
+  // v389 (P1 pérdida de datos): releer el historial FRESCO del servidor antes de anexar. Antes se partía
+  // de p.txValoracionHist en memoria y se reescribía el array completo → si otro dispositivo había guardado
+  // una valoración entre tanto, se perdía. Ahora anexamos sobre lo que realmente hay en Firestore.
+  getDoc(_ref).then(function(snap){
+    const prev=(snap.exists()&&Array.isArray(snap.data().txValoracionHist))?snap.data().txValoracionHist:(Array.isArray(p.txValoracionHist)?p.txValoracionHist:[]);
+    const hist=prev.slice(); hist.push(entry); while(hist.length>50)hist.shift();
+    return updateDoc(_ref,{txValoracionHist:hist,txValoracionHistAt:new Date().toISOString()})
+      .then(function(){ p.txValoracionHist=hist; var pi=PACS.find(function(x){return x.id===p.id;}); if(pi)pi.txValoracionHist=hist; if(typeof toast==='function')toast('Valoración guardada al historial'); if(typeof renderTrasplantePac==='function')renderTrasplantePac(p.id); });
+  }).catch(function(e){ console.warn('[txValHist]',e); if(typeof toast==='function')toast('No se pudo guardar','rd'); });
 };
 function _txValHistHTML(p){
   const hist=Array.isArray(p&&p.txValoracionHist)?p.txValoracionHist:[];

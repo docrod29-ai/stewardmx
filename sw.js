@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v389 (Auditoría — barrido de read-modify-write: censo ATB + historial trasplante)
+//  Mismo defecto raíz que v388 (reescribir un array desde memoria rancia pierde ediciones concurrentes),
+//  ahora en el CENSO y el HISTORIAL de trasplante: (1) _guardarQuickATB (agregar ATB) y (2) _suspenderATB
+//  (suspender) releían p.atbList en memoria y reescribían el array completo → un ATB agregado/editado por
+//  otro dispositivo se perdía; ahora releen atbList FRESCA (getDoc) antes de anexar/mutar, y suspender
+//  localiza el ATB por IDENTIDAD (nombre+inicio), no por índice posicional. (3) _txValGuardarHist relee el
+//  txValoracionHist FRESCO antes de anexar la nueva valoración. +1 prueba (304); la del historial ejecuta
+//  la función real con getDoc+updateDoc. Cola: farmacia (transiciones), reglas (/labs + estados), LIS/HL7, sk-ant.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v388 (Auditoría multi-experta — P0 PÉRDIDA DE DATOS: trasplante + micro)
 //  Auditoría de 52 hallazgos confirmados (6 de pérdida de datos). Reparados los 2 primeros P0-datos del
 //  lado cliente, en el ámbito exacto de la preocupación (que no se pierdan datos):
@@ -1167,7 +1176,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v388';
+const CACHE = 'stewardmx-v389';
 const SHELL = [
   '/',
   '/index.html',

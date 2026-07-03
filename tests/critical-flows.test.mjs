@@ -1319,6 +1319,16 @@ test('MICRO v388 (P0-datos): guardarReporteMicro relee muestras[] frescas (getDo
   assert.ok(body.includes('getDoc(doc(db'), 'no relee el paciente con getDoc antes de reescribir muestras[]');
   assert.ok(body.includes('_snapP.data().muestras'), 'no toma las muestras frescas del servidor como base');
 });
+test('CENSO/TRASPLANTE v389 (pérdida de datos): quick-ATB, suspender e historial releen fresco antes de reescribir el array', () => {
+  // Mismo patrón que v388: read-modify-write de un array desde memoria rancia pierde ediciones concurrentes.
+  const bodyOf=(a,b)=>{ const s=_idx.indexOf(a); const e=_idx.indexOf(b,s); return (s>=0&&e>s)?_idx.slice(s,e):''; };
+  const quick=bodyOf('window._guardarQuickATB=async','await updateDoc(doc(db,..._pacPath(),pid),updates)');
+  assert.ok(quick.includes('getDoc(doc(db,..._pacPath(),pid))') && quick.includes('_freshAtb'), 'quick-ATB no relee atbList fresca antes de anexar');
+  const susp=bodyOf('window._suspenderATB=async','await updateDoc(doc(db,..._pacPath(),pid),{atbList:lista');
+  assert.ok(susp.includes('getDoc(doc(db,..._pacPath(),pid))') && susp.includes('findIndex'), 'suspender no relee fresco / no localiza el ATB por identidad');
+  const hist=bodyOf('window._txValGuardarHist=function','txValoracionHistAt:new Date().toISOString()');
+  assert.ok(hist.includes('getDoc(_ref)') && hist.includes('snap.data().txValoracionHist'), 'el historial de trasplante no relee fresco antes de anexar');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');
@@ -1508,8 +1518,9 @@ test('INMUNO v382: historial de >2 valoraciones — snapshot fechado, guardado y
   const cap = {};
   const updateDoc = (ref,data) => { cap.data=data; return Promise.resolve(true); };
   const pac = { id:'p', nombre:'Test', txValoracionHist:[] };
+  const getDoc = (ref) => Promise.resolve({ exists:()=>true, data:()=>({ txValoracionHist:(pac.txValoracionHist||[]) }) });
   const docMock = { getElementById:id=>{ if(id==='hc-recs') return { innerText:'Impresión y plan — Infectología\nProfilaxis para Pneumocystis indicada', textContent:'' }; if(id==='hc_motivo') return { options:[{text:'Seguimiento'}], selectedIndex:0, value:'profilaxis' }; if(id&&id.indexOf('hc_cb_')===0) return null; return { value:(id==='hc_huesped'?'SOT — Renal':'') }; }, querySelectorAll:()=>[] };
-  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, navigator:{}, location:{}, escHtml:x=>x, document:docMock, Blob:STUB, URL:STUB, updateDoc, doc:()=>({}), db:{}, _pacPath:()=>['h','H'], PACS:[pac], renderTrasplantePac:()=>{}, toast:()=>{}, window:{ _txValModo:'seguimiento', _txCurrentPac:pac } };
+  const base = { Math,JSON,Date,parseFloat,parseInt,isNaN,isFinite,String,Number,Boolean,Array,Object,RegExp,console,Intl,Set,Map, navigator:{}, location:{}, escHtml:x=>x, document:docMock, Blob:STUB, URL:STUB, updateDoc, getDoc, doc:()=>({}), db:{}, _pacPath:()=>['h','H'], PACS:[pac], renderTrasplantePac:()=>{}, toast:()=>{}, window:{ _txValModo:'seguimiento', _txCurrentPac:pac } };
   const ctx = new Proxy(base, { has(){return true;}, get(t,k){ if(k===Symbol.unscopables) return undefined; if(k in t) return t[k]; return STUB; }, set(t,k,v){ t[k]=v; return true; } });
   vm.createContext(ctx); vm.runInContext(block, ctx);
   ctx.window._txValModo='seguimiento';  // el bloque resetea _txValModo='inicial' al cargar; lo fijamos tras ejecutarlo
@@ -1517,7 +1528,7 @@ test('INMUNO v382: historial de >2 valoraciones — snapshot fechado, guardado y
   const snap = vm.runInContext('_txValSnapshotText', ctx)();
   assert.ok(/Huésped: SOT/.test(snap) && /Pneumocystis indicada/.test(snap), 'el snapshot no captura huésped + plan');
   ctx.window._txValGuardarHist();
-  await Promise.resolve(); await Promise.resolve();
+  await new Promise(r=>setTimeout(r,0)); await new Promise(r=>setTimeout(r,0));
   assert.ok(cap.data && Array.isArray(cap.data.txValoracionHist) && cap.data.txValoracionHist.length===1, 'no guarda una entrada en el historial');
   const e0 = cap.data.txValoracionHist[0];
   assert.ok(e0.modo==='seguimiento' && e0.fecha && /Pneumocystis indicada/.test(e0.texto), 'la entrada no lleva modo/fecha/texto');
