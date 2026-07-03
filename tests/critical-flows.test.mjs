@@ -1502,6 +1502,15 @@ test('DATOS v406 (AWaRe = solo antibacterianos): antifúngicos/anti-TB fuera de 
   // la derivación de aware ya no fabrica 'Watch'
   assert.ok(_idx.includes("aware:(ATBX.find(a=>a.n===nom)||{}).aw||''"), "la derivación de aware ya no debe caer a 'Watch' falso");
 });
+test('DATOS v407 (denominadores/anti-fabricación): sin else→Access, camas sin default 100, %AWaRe sobre nAware', () => {
+  // DI-3: el Dashboard Excel contaba a Access todo lo no-clasificado (sin ATB, antifúngico, desconocido).
+  assert.ok(_idx.includes('pacs.forEach(p=>{if(awareC[p.aware]!==undefined)awareC[p.aware]++;});') && !_idx.includes('else awareC.Access++'), 'ya no debe contar else→Access');
+  assert.ok(_idx.includes('const nAware=awareC.Access+awareC.Watch+awareC.Reserve;'), 'falta el denominador AWaRe correcto');
+  assert.ok(_idx.includes('awareC.Access/nAware*100') && _idx.includes('awareC.Reserve/nAware*100'), 'los %AWaRe deben usar nAware, no n');
+  // DI-1: camas sin default inventado de 100
+  assert.ok(_idx.includes('const dc=(HInfo.camas&&HInfo.camas>0)?HInfo.camas:null;'), 'camas no debe caer a 100 inventado');
+  assert.ok(_idx.includes("'N/D (camas no registradas)'"), 'el proxy /camas-día debe mostrar N/D si faltan camas');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

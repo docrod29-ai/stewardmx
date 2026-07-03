@@ -22030,13 +22030,17 @@ async function _buildGoogleSheet(token,pacs,mode){
   const cultN=pacs.filter(p=>p.cult&&p.cult!=='no').length;
   const cultPos=pacs.filter(p=>p.cult==='positivo').length;
   const awareC={Access:0,Watch:0,Reserve:0};
-  pacs.forEach(p=>{if(awareC[p.aware]!==undefined)awareC[p.aware]++;else awareC.Access++;});
+  // v407 (auditoría datos DI-3): NO contar 'else→Access'. Un paciente sin AWaRe válido (sin ATB, antifúngico
+  //   'NoAplica' o desconocido) NO es Access; se EXCLUYE del % AWaRe (que es sobre antibacterianos clasificados).
+  pacs.forEach(p=>{if(awareC[p.aware]!==undefined)awareC[p.aware]++;});
+  const nAware=awareC.Access+awareC.Watch+awareC.Reserve; // denominador AWaRe correcto (antibacterianos clasificados)
   const polC={Libre:0,Vigilado:0,Restringido:0};
   pacs.forEach(p=>{const k=p.pol||'libre';if(k==='libre')polC.Libre++;else if(k==='vigilado')polC.Vigilado++;else polC.Restringido++;});
   const rest=pacs.filter(p=>p.pol==='restringido');
   const desesc=pacs.filter(p=>p.accion==='desescalar').length;
   const indicSi=pacs.filter(p=>p.indicacion==='sí'||p.indicacion==='si').length;
-  const dc=HInfo.camas||100;
+  // v407 (auditoría datos DI-1): NO inventar camas=100. Si no se capturaron, el proxy /camas-día es N/D.
+  const dc=(HInfo.camas&&HInfo.camas>0)?HInfo.camas:null;
   // Fase 0.2 — denominador REAL días-paciente + DOT NHSN-AUR (cada agente cuenta).
   const _nhsn=window.dotPer1000(pacs,hasta);
   const _diasPac=_nhsn.diasPaciente;
@@ -22055,7 +22059,7 @@ async function _buildGoogleSheet(token,pacs,mode){
     ['Días-paciente (real: ingreso→alta/corte)',_diasPac,'denominador NHSN-AUR',''],
     ['DOT total NHSN (cada agente cuenta)',_nhsn.dot,'',''],
     ['DOT/1000 días-paciente (NHSN-AUR)',_nhsn.por1000,'estándar CDC/NHSN',''],
-    ['DOT/100 camas-día (proxy camas×30 — legacy)',dc?+(dotTot/(dc*30)*100).toFixed(1):0,'usar DOT/1000 días-paciente',''],
+    ['DOT/100 camas-día (proxy camas×30 — legacy)',dc?+(dotTot/(dc*30)*100).toFixed(1):'N/D (camas no registradas)','usar DOT/1000 días-paciente',''],
     ['','','',''],
     ['CALIDAD MICROBIOLÓGICA','','',''],
     ['% Cultivo tomado',n?+(cultN/n*100).toFixed(1):0,'≥60%',n&&cultN/n>=0.6?'CUMPLE':'REVISAR'],
@@ -22067,9 +22071,9 @@ async function _buildGoogleSheet(token,pacs,mode){
     ['Access (n)',awareC.Access,'',''],
     ['Watch (n)',awareC.Watch,'',''],
     ['Reserve (n)',awareC.Reserve,'',''],
-    ['% Access',n?+(awareC.Access/n*100).toFixed(1):0,'≥60%',n&&awareC.Access/n>=0.6?'CUMPLE':'REVISAR'],
-    ['% Watch',n?+(awareC.Watch/n*100).toFixed(1):0,'',''],
-    ['% Reserve',n?+(awareC.Reserve/n*100).toFixed(1):0,'<10%',n&&awareC.Reserve/n<0.1?'CUMPLE':'ALERTA'],
+    ['% Access',nAware?+(awareC.Access/nAware*100).toFixed(1):0,'≥60% (sobre antibacterianos)',nAware&&awareC.Access/nAware>=0.6?'CUMPLE':nAware?'REVISAR':''],
+    ['% Watch',nAware?+(awareC.Watch/nAware*100).toFixed(1):0,'',''],
+    ['% Reserve',nAware?+(awareC.Reserve/nAware*100).toFixed(1):0,'<10% (sobre antibacterianos)',nAware&&awareC.Reserve/nAware<0.1?'CUMPLE':nAware?'ALERTA':''],
     ['','','',''],
     ['INTERVENCIÓN PROA','','',''],
     ['Política libre (n)',polC.Libre,'',''],

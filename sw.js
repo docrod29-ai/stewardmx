@@ -1,4 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v407 (Auditoría DATOS Deploy 3 — denominadores y anti-fabricación)
+//  P0 "dato inventado" del Dashboard Excel/reporte: (DI-3) un paciente sin AWaRe válido (sin ATB, antifúngico
+//  'NoAplica' o desconocido) se contaba como Access → inflaba %Access y la suma AWaRe≠total. Ahora NO hay
+//  else→Access y el %AWaRe se calcula sobre nAware (antibacterianos clasificados). (DI-1) las camas ya no caen
+//  a 100 inventado: si no se capturaron, el proxy /camas-día muestra "N/D (camas no registradas)", nunca un
+//  número falso. La métrica principal sigue siendo DOT/1000 días-paciente (NHSN-AUR). +1 prueba (322).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v406 (Auditoría DATOS Deploy 2 — AWaRe = SOLO antibacterianos)
 //  Causa madre #1 de la auditoría de datos: los conteos AWaRe (%Access/Watch/Reserve en analítica, reporte,
 //  Excel, gráficas) incluían NO-antibacterianos → inflaban Reserve. AWaRe (OMS) es solo antibacterianos.
@@ -1280,7 +1287,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v406';
+const CACHE = 'stewardmx-v407';
 const SHELL = [
   '/',
   '/index.html',
