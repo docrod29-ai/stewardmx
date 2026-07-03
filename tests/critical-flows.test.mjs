@@ -1481,6 +1481,17 @@ test('CF v404 (P2 datos): limpiarPacientes borra las subcolecciones con nombres 
   assert.ok(line.includes("'recomendaciones'") && line.includes("'micro_reports'"), 'faltan recomendaciones/micro_reports en la limpieza');
   assert.ok(!/'recos'/.test(line), "sigue usando el nombre equivocado 'recos'");
 });
+test('DATOS v405 (AWaRe OMS 2023): catálogo con clasificación WHO correcta + DDD meropenem 3g', () => {
+  // Verificado contra OMS AWaRe 2023 + WHO ATC/DDD index (meropenem J01DH02 = 3 g).
+  assert.ok(_idx.includes("n:'Aztreonam',aw:'Reserve',pol:'restringido'"), 'Aztreonam debe ser Reserve (OMS 2023)');
+  assert.ok(_idx.includes("n:'Cefuroxima',aw:'Watch',pol:'vigilado'"), 'Cefuroxima debe ser Watch (OMS 2023)');
+  assert.ok(_idx.includes("n:'Azitromicina',aw:'Watch',pol:'vigilado'"), 'Azitromicina debe ser Watch (OMS 2023)');
+  assert.ok(_idx.includes("n:'Claritromicina',aw:'Watch',pol:'vigilado'") && _idx.includes("n:'Eritromicina',aw:'Watch',pol:'vigilado'"), 'Claritro/Eritro deben ser Watch');
+  assert.ok(!_idx.includes("n:'Azitromicina',aw:'Access'") && !_idx.includes("n:'Cefuroxima',aw:'Access'"), 'macrólidos/cefuroxima ya no deben ser Access');
+  // meropenem DDD = 3 g (OMS ATC/DDD J01DH02); la tabla espejo ya no debe decir 2.000
+  assert.ok(!/'J01DH02','Meropenem','[^']*','Reserve',2\.000/.test(_idx), 'la DDD de meropenem no debe ser 2.000 (OMS = 3 g)');
+  assert.ok(/'J01DH02','Meropenem','[^']*','Reserve',3\.000/.test(_idx), 'la DDD de meropenem debe ser 3.000');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

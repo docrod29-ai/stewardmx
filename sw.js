@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v405 (Auditoría DATOS Deploy 1 — catálogo AWaRe OMS 2023 + DDD meropenem)
+//  Auditoría de calidad de datos (91 agentes, 76 hallazgos). Deploy 1 (catálogo maestro, fuente única ATBX):
+//  clasificaciones AWaRe corregidas contra OMS 2023 (verificadas en who.int): Aztreonam Watch→RESERVE;
+//  Cefuroxima Access→WATCH; Macrólidos (azitro/claritro/eritro) Access→WATCH — más sus tablas espejo DDD/ATC.
+//  DDD de meropenem: la tabla legacy decía 2.000; la OMS ATC/DDD (J01DH02) es 3 g → corregido a 3.000
+//  (la auditoría lo tenía al revés; verificado en whocc.no antes de tocar). Esto corrige el %Access/%Watch/
+//  %Reserve de todos los reportes. Fidaxomicina NO se tocó (tier OMS no verificable → no inventar). +1 (320).
+//  (v404 fue la CF limpiarPacientes, sin cambio de hosting.) Siguen: filtro antibacterianos, denominadores, WHONET.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v403 (Auditoría — bioestadística P3: empates Mann-Whitney + TFG 1 decimal)
 //  (1) stat_mannwhitney: corrección por EMPATES en la varianza (Σ t³−t). Con "días de ATB" (enteros
 //  pequeños, muchos empates) la σ sin corregir sobreestimaba la varianza → p demasiado conservador.
@@ -1262,7 +1271,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v403';
+const CACHE = 'stewardmx-v405';
 const SHELL = [
   '/',
   '/index.html',
