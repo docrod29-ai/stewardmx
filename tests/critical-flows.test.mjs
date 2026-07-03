@@ -1492,6 +1492,16 @@ test('DATOS v405 (AWaRe OMS 2023): catálogo con clasificación WHO correcta + D
   assert.ok(!/'J01DH02','Meropenem','[^']*','Reserve',2\.000/.test(_idx), 'la DDD de meropenem no debe ser 2.000 (OMS = 3 g)');
   assert.ok(/'J01DH02','Meropenem','[^']*','Reserve',3\.000/.test(_idx), 'la DDD de meropenem debe ser 3.000');
 });
+test('DATOS v406 (AWaRe = solo antibacterianos): antifúngicos/anti-TB fuera de AWaRe + gate por política local', () => {
+  // AWaRe (OMS) es SOLO antibacterianos: antifúngicos, anti-TB y antiparasitario → aw:'NoAplica' (no cuentan
+  // en Access/Watch/Reserve → dejan de inflar el %Reserve de los reportes).
+  assert.ok(_idx.includes("n:'Voriconazol',aw:'NoAplica'") && _idx.includes("n:'Caspofungina',aw:'NoAplica'") && _idx.includes("n:'Bedaquilina',aw:'NoAplica'") && _idx.includes("n:'Ivermectina',aw:'NoAplica'"), 'no-antibacterianos deben quedar fuera de AWaRe (NoAplica)');
+  assert.ok(_idx.includes("n:'Rifampicina',aw:'Watch'") && _idx.includes("n:'Fosfomicina',aw:'Access'"), 'antibacterianos del grupo Otros NO deben cambiar');
+  // el gate de justificación se dispara por la política local, preservando la restricción de antifúngicos
+  assert.ok(_idx.includes("if(atbDef&&(atbDef.pol==='restringido'||atbDef.aw==='Reserve')){"), 'el gate debe dispararse por pol==="restringido"');
+  // la derivación de aware ya no fabrica 'Watch'
+  assert.ok(_idx.includes("aware:(ATBX.find(a=>a.n===nom)||{}).aw||''"), "la derivación de aware ya no debe caer a 'Watch' falso");
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

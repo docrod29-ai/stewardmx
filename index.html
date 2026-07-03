@@ -4252,7 +4252,11 @@ window.guardar=async()=>{
     const nomSel=document.getElementById(id+'-nom')?.value||'';
     if(!nomSel)return;
     const atbDef=ATBX.find(a=>a.n===nomSel);
-    if(atbDef&&atbDef.aw==='Reserve'){
+    // v406 (auditoría datos): el GATE de justificación se dispara por la POLÍTICA LOCAL (pol==='restringido'),
+    //   no por la etiqueta AWaRe de OMS. Así, al corregir AWaRe (p.ej. antifúngicos → 'NoAplica', fuera de los
+    //   conteos AWaRe), los agentes restringidos (voriconazol, anfotericina, carbapenémicos…) SIGUEN exigiendo
+    //   justificación. Se conserva aw==='Reserve' como respaldo por si algún restringido no tuviera pol.
+    if(atbDef&&(atbDef.pol==='restringido'||atbDef.aw==='Reserve')){
       // ── REGLA 1: Si el ATB YA EXISTÍA en el paciente, NO pedir justificación de nuevo ──
       // Cubre casos: paciente con ATB Reserve crónico, modificación de notas/labs/cultivos
       // sin tocar ATBs, pacientes legacy creados antes de v192 (sin reserveJus persistido).
@@ -7660,22 +7664,22 @@ const ATBX=[
 // FIDAXOMICINA
 {g:'Otros',n:'Fidaxomicina',aw:'Reserve',pol:'restringido',d:['200mg c/12h VO ×10d (C. difficile)'],v:['VO']},
 // ANTIFÚNGICOS
-{g:'Equinocandinas',n:'Caspofungina',aw:'Reserve',pol:'restringido',d:['70mg carga IV día 1 + 50mg c/24h IV','70mg c/24h IV (>80kg o falla)'],v:['IV']},
-{g:'Equinocandinas',n:'Micafungina',aw:'Reserve',pol:'restringido',d:['100mg c/24h IV (candidemia)','150mg c/24h IV (esofágica/invasiva)','50mg c/24h IV (profilaxis)'],v:['IV']},
-{g:'Equinocandinas',n:'Anidulafungina',aw:'Reserve',pol:'restringido',d:['200mg carga IV + 100mg c/24h IV'],v:['IV']},
-{g:'Azoles antifúngicos',n:'Fluconazol',aw:'Watch',pol:'vigilado',d:['800mg carga IV + 400mg c/24h IV/VO (candidemia step-down)','200mg c/24h VO (esofágica)','150mg VO dosis única (vulvovaginal)','400mg c/24h IV/VO'],v:['IV','VO']},
-{g:'Azoles antifúngicos',n:'Voriconazol',aw:'Reserve',pol:'restringido',d:['6mg/kg c/12h IV ×2 dosis (carga) + 4mg/kg c/12h IV','200mg c/12h VO (>40kg)','300mg c/12h VO (carga) + 200mg c/12h'],v:['IV','VO']},
-{g:'Azoles antifúngicos',n:'Isavuconazol',aw:'Reserve',pol:'restringido',d:['200mg c/8h IV/VO ×6 dosis (carga) + 200mg c/24h'],v:['IV','VO']},
-{g:'Azoles antifúngicos',n:'Posaconazol',aw:'Reserve',pol:'restringido',d:['300mg c/12h IV/VO ×2 dosis (carga) + 300mg c/24h','200mg c/8h VO (suspensión, profilaxis)'],v:['IV','VO']},
-{g:'Polienos',n:'Anfotericina B liposomal',aw:'Reserve',pol:'restringido',d:['3mg/kg c/24h IV (candidemia)','5mg/kg c/24h IV (aspergilosis/mucormicosis)','3-5mg/kg c/24h IV (criptococo)','10mg/kg c/24h IV (mucormicosis grave off-label)'],v:['IV']},
-{g:'Polienos',n:'Anfotericina B deoxicolato',aw:'Reserve',pol:'restringido',d:['0.7-1mg/kg c/24h IV (si no hay liposomal)','1mg/kg c/24h IV + pre-medicación'],v:['IV']},
+{g:'Equinocandinas',n:'Caspofungina',aw:'NoAplica',pol:'restringido',d:['70mg carga IV día 1 + 50mg c/24h IV','70mg c/24h IV (>80kg o falla)'],v:['IV']},
+{g:'Equinocandinas',n:'Micafungina',aw:'NoAplica',pol:'restringido',d:['100mg c/24h IV (candidemia)','150mg c/24h IV (esofágica/invasiva)','50mg c/24h IV (profilaxis)'],v:['IV']},
+{g:'Equinocandinas',n:'Anidulafungina',aw:'NoAplica',pol:'restringido',d:['200mg carga IV + 100mg c/24h IV'],v:['IV']},
+{g:'Azoles antifúngicos',n:'Fluconazol',aw:'NoAplica',pol:'vigilado',d:['800mg carga IV + 400mg c/24h IV/VO (candidemia step-down)','200mg c/24h VO (esofágica)','150mg VO dosis única (vulvovaginal)','400mg c/24h IV/VO'],v:['IV','VO']},
+{g:'Azoles antifúngicos',n:'Voriconazol',aw:'NoAplica',pol:'restringido',d:['6mg/kg c/12h IV ×2 dosis (carga) + 4mg/kg c/12h IV','200mg c/12h VO (>40kg)','300mg c/12h VO (carga) + 200mg c/12h'],v:['IV','VO']},
+{g:'Azoles antifúngicos',n:'Isavuconazol',aw:'NoAplica',pol:'restringido',d:['200mg c/8h IV/VO ×6 dosis (carga) + 200mg c/24h'],v:['IV','VO']},
+{g:'Azoles antifúngicos',n:'Posaconazol',aw:'NoAplica',pol:'restringido',d:['300mg c/12h IV/VO ×2 dosis (carga) + 300mg c/24h','200mg c/8h VO (suspensión, profilaxis)'],v:['IV','VO']},
+{g:'Polienos',n:'Anfotericina B liposomal',aw:'NoAplica',pol:'restringido',d:['3mg/kg c/24h IV (candidemia)','5mg/kg c/24h IV (aspergilosis/mucormicosis)','3-5mg/kg c/24h IV (criptococo)','10mg/kg c/24h IV (mucormicosis grave off-label)'],v:['IV']},
+{g:'Polienos',n:'Anfotericina B deoxicolato',aw:'NoAplica',pol:'restringido',d:['0.7-1mg/kg c/24h IV (si no hay liposomal)','1mg/kg c/24h IV + pre-medicación'],v:['IV']},
 // ANTIPARASITARIOS usados como ATB
-{g:'Antiparasitarios',n:'Ivermectina',aw:'Access',pol:'libre',d:['200mcg/kg VO dosis única','200mcg/kg c/24h VO ×3d (Strongyloides)'],v:['VO']},
+{g:'Antiparasitarios',n:'Ivermectina',aw:'NoAplica',pol:'libre',d:['200mcg/kg VO dosis única','200mcg/kg c/24h VO ×3d (Strongyloides)'],v:['VO']},
 // ANTITUBERCULOSOS
-{g:'Antituberculosos',n:'Isoniazida (INH)',aw:'Access',pol:'libre',d:['5mg/kg c/24h VO (máx 300mg)','10-15mg/kg c/24h VO (meningitis TB)'],v:['VO']},
-{g:'Antituberculosos',n:'Pirazinamida',aw:'Access',pol:'libre',d:['25mg/kg c/24h VO'],v:['VO']},
-{g:'Antituberculosos',n:'Etambutol',aw:'Access',pol:'libre',d:['15-25mg/kg c/24h VO'],v:['VO']},
-{g:'Antituberculosos',n:'Bedaquilina',aw:'Reserve',pol:'restringido',d:['400mg c/24h VO ×14d, luego 200mg 3×/sem VO ×24 sem (total 26 sem en BPaLM)'],v:['VO']},
+{g:'Antituberculosos',n:'Isoniazida (INH)',aw:'NoAplica',pol:'libre',d:['5mg/kg c/24h VO (máx 300mg)','10-15mg/kg c/24h VO (meningitis TB)'],v:['VO']},
+{g:'Antituberculosos',n:'Pirazinamida',aw:'NoAplica',pol:'libre',d:['25mg/kg c/24h VO'],v:['VO']},
+{g:'Antituberculosos',n:'Etambutol',aw:'NoAplica',pol:'libre',d:['15-25mg/kg c/24h VO'],v:['VO']},
+{g:'Antituberculosos',n:'Bedaquilina',aw:'NoAplica',pol:'restringido',d:['400mg c/24h VO ×14d, luego 200mg 3×/sem VO ×24 sem (total 26 sem en BPaLM)'],v:['VO']},
 {g:'Otro — escribir',n:'OTRO (escribir nombre y dosis)',aw:'Watch',pol:'libre',d:['Escribir dosis personalizada'],v:['IV','VO','IM','Inhalada','Intratecal','Tópica','Oftálmica']},
 ];
 
@@ -8270,7 +8274,7 @@ function getAtbList(){
       dosis:document.getElementById(id+'-dosis')?.value||'',
       via:document.getElementById(id+'-via')?.value||'IV',
       pol:document.getElementById(id+'-pol')?.value||'libre',
-      aware:(ATBX.find(a=>a.n===nom)||{}).aw||'Watch',
+      aware:(ATBX.find(a=>a.n===nom)||{}).aw||'',/* v406 (DI-5): NO fabricar 'Watch' si el fármaco no tiene AWaRe (antifúngicos→'NoAplica'; desconocido→'') */
       fechaInicioIV:document.getElementById(id+'-finicio')?.value||'',
       fechaFinIV:document.getElementById(id+'-ffin')?.value||'',
       indicacionClin:document.getElementById(id+'-indclin')?.value||'',

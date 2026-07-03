@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v406 (Auditoría DATOS Deploy 2 — AWaRe = SOLO antibacterianos)
+//  Causa madre #1 de la auditoría de datos: los conteos AWaRe (%Access/Watch/Reserve en analítica, reporte,
+//  Excel, gráficas) incluían NO-antibacterianos → inflaban Reserve. AWaRe (OMS) es solo antibacterianos.
+//  Fix: 14 fármacos de Equinocandinas/Azoles/Polienos/Antiparasitarios/Antituberculosos → aw:'NoAplica'
+//  (salen de Access/Watch/Reserve; los antibacterianos del grupo 'Otros' como fosfomicina/rifampicina NO se
+//  tocan). El GATE de justificación pasa a dispararse por pol==='restringido' (no por AWaRe) → voriconazol,
+//  anfotericina, carbapenémicos, etc. SIGUEN exigiendo justificación. Y la derivación de p.aware ya NO fabrica
+//  'Watch' cuando el fármaco no tiene AWaRe (DI-5). +1 prueba (321). Siguen: denominadores, WHONET, pulido.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v405 (Auditoría DATOS Deploy 1 — catálogo AWaRe OMS 2023 + DDD meropenem)
 //  Auditoría de calidad de datos (91 agentes, 76 hallazgos). Deploy 1 (catálogo maestro, fuente única ATBX):
 //  clasificaciones AWaRe corregidas contra OMS 2023 (verificadas en who.int): Aztreonam Watch→RESERVE;
@@ -1271,7 +1280,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v405';
+const CACHE = 'stewardmx-v406';
 const SHELL = [
   '/',
   '/index.html',
