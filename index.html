@@ -4660,7 +4660,15 @@ window.proaWorklist=function(){
   try{
     const lookup=(typeof ABG_ATBS!=='undefined')?ABG_ATBS.flatMap(g=>g.a):[];
     const norm=s=>(s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-    const resolveKey=name=>{ const n=norm(name); if(!n)return null; let best=null; for(const x of lookup){ const xn=norm(x.n); if(xn&&n.indexOf(xn)>=0){ if(!best||xn.length>norm(best.n).length)best=x; } } return best?best.k:null; };
+    // v394 (P0 clínico): los combos β-lactámico/inhibidor NO deben colapsar a su β-lactámico base por substring.
+    //   ABG_ATBS los nombra corto ("Cef-Avibactam") y NO matchea el nombre prescrito completo
+    //   ("Ceftazidima/avibactam") → caía en 'ctaz'. Si ceftazidima sola era R, marcaba CAZ-AVI como discordante
+    //   y empujaba a ABANDONAR el rescate correcto. Mapa explícito nombre-completo→clave; combo no catalogado
+    //   (contiene inhibidor) → null, nunca colapsa a la base.
+    const _sc=s=>norm(s).replace(/[^a-z0-9]/g,'');
+    const _COMBO_ABG={ 'amoxicilinaclavulanato':'amcl','amoxclav':'amcl','ampicilinasulbactam':'amsul','ampsulbactam':'amsul','ceftazidimaavibactam':'cazavi','cefavibactam':'cazavi','ceftolozanotazobactam':'cfol','ceftoloztazo':'cfol','piperacilinatazobactam':'pitaz','piptazobactam':'pitaz','imipenemrelebactam':'imrel','imirelebactam':'imrel','meropenemvaborbactam':null };
+    const _INHIB=/(avibactam|tazobactam|sulbactam|clavul|vaborbactam|relebactam)/;
+    const resolveKey=name=>{ const n=norm(name); if(!n)return null; const sc=_sc(name); if(Object.prototype.hasOwnProperty.call(_COMBO_ABG,sc))return _COMBO_ABG[sc]; if(_INHIB.test(sc))return null; let best=null; for(const x of lookup){ const xn=norm(x.n); if(xn&&n.indexOf(xn)>=0){ if(!best||xn.length>norm(best.n).length)best=x; } } return best?best.k:null; };
     const E=window.escHtml||(x=>x);
     const rows=[];
     (window.PACS||[]).forEach(p=>{

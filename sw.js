@@ -1,4 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v394 (Auditoría — clínico: resolveKey no colapsa combos β-lactámico/inhibidor)
+//  P0 CLÍNICO: el Worklist PROA mapea el ATB prescrito a la columna del antibiograma con resolveKey (substring
+//  sobre ABG_ATBS). Como ABG_ATBS nombra los combos corto ("Cef-Avibactam"), el nombre prescrito completo
+//  ("Ceftazidima/avibactam") NO matcheaba y colapsaba a la base ('ctaz'). Si ceftazidima sola era R, marcaba
+//  CAZ-AVI (y ceftolozano-tazo, amp-sulbactam, etc.) como DISCORDANTE → empujaba a ABANDONAR el rescate correcto.
+//  Fix: mapa explícito nombre-completo→clave del antibiograma (cazavi/cfol/pitaz/amsul/amcl/imrel) y combo no
+//  catalogado (contiene inhibidor) → null; meropenem/vaborbactam → null (sin clave dedicada, no colapsa a mer).
+//  +1 prueba que ejecuta el resolveKey real (308).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v393 (Auditoría — version-skew: js/core network-first)
 //  P0: index.html se sirve network-first (siempre fresco) e importa los módulos puros js/core/*.js por ESM,
 //  pero esos módulos caían en stale-while-revalidate → un index NUEVO cargaba la copia VIEJA del CACHE
@@ -1202,7 +1211,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v393';
+const CACHE = 'stewardmx-v394';
 const SHELL = [
   '/',
   '/index.html',

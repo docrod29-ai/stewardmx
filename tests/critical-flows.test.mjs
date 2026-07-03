@@ -1360,6 +1360,23 @@ test('SW v393 (P0 version-skew): js/core/*.js se sirve NETWORK-FIRST (no stale-w
   const seg = _sw.slice(i, i + 400);
   assert.ok(seg.includes("cache: 'no-store'") && seg.includes('caches.match(e.request)'), 'js/core no es network-first con fallback a caché');
 });
+test('WORKLIST v394 (P0 clínico): resolveKey NO colapsa combos β-lactámico/inhibidor a su base', () => {
+  // Extrae el bloque REAL (mapa de combos + guardia + resolveKey) de proaWorklist y lo ejecuta.
+  const s0 = _idx.indexOf('const _sc=s=>norm(s)');
+  const end = 'return best?best.k:null; };';
+  const s2 = _idx.indexOf(end, s0);
+  assert.ok(s0 >= 0 && s2 > s0, 'no se ubicó el bloque de resolveKey');
+  const block = _idx.slice(s0, s2 + end.length);
+  const norm = s=>(s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const lookup = [{k:'ctaz',n:'Ceftazidima'},{k:'cazavi',n:'Cef-Avibactam'},{k:'mer',n:'Meropenem'},{k:'pitaz',n:'Pip-Tazobactam'},{k:'amp',n:'Ampicilina'},{k:'amsul',n:'Amp-Sulbactam'}];
+  const resolveKey = new Function('norm','lookup', block + '\n;return resolveKey;')(norm, lookup);
+  assert.equal(resolveKey('Ceftazidima/avibactam'), 'cazavi', 'CAZ-AVI debe resolver a su propia clave, no a ctaz (ceftazidima sola)');
+  assert.equal(resolveKey('Ceftazidima'), 'ctaz', 'ceftazidima sola sigue en ctaz');
+  assert.equal(resolveKey('Meropenem/vaborbactam'), null, 'mero-vaborbactam no tiene clave dedicada → null (NO colapsar a mer)');
+  assert.equal(resolveKey('Piperacilina/tazobactam'), 'pitaz', 'pip-tazo a su clave, no a amp/ampicilina');
+  assert.equal(resolveKey('Ampicilina/sulbactam'), 'amsul', 'amp-sulbactam a su clave, no a amp');
+  assert.equal(resolveKey('Meropenem'), 'mer', 'meropenem solo sigue resolviendo a mer');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');
