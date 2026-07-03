@@ -39,6 +39,11 @@ before(async () => {
     await setDoc(doc(db, `hospitals_registry/hospC`), { adminUid: 'founderC', nombre: 'Hospital C' });
     await setDoc(doc(db, `hospitals/${HOSP_A}/months/${MES}/patients/p1`), { nombre: 'Paciente A', atbList: [] });
     await setDoc(doc(db, `hospitals/${HOSP_A}/months/${MES}/patients/p2`), { nombre: 'Paciente borrado', atbList: [] });
+    // v391: laboratorios firmado (inmutable) vs no firmado (corregible) + solicitudes en estado terminal.
+    await setDoc(doc(db, `hospitals/${HOSP_A}/patients/pp/labs/labSigned`), { valor: '1.2', firmado: true });
+    await setDoc(doc(db, `hospitals/${HOSP_A}/patients/pp/labs/labUnsigned`), { valor: '3.4', firmado: false });
+    await setDoc(doc(db, `hospitals/${HOSP_A}/antibiotic_requests/reqDenied`), { status: 'denegado', atb: 'Meropenem' });
+    await setDoc(doc(db, `hospitals/${HOSP_A}/antibiotic_requests/reqPending`), { status: 'pendiente', atb: 'Meropenem' });
   });
 });
 after(async () => { if (env) await env.cleanup(); });
@@ -105,4 +110,24 @@ test('borrado de paciente: admin SÍ puede borrar', async () => {
 test('_audit_log: crear OK, leer PROHIBIDO desde cliente', async () => {
   await assertSucceeds(setDoc(doc(dbA(), `_audit_log/log1`), { evento: 'x', by: 'userA' }));
   await assertFails(getDoc(doc(dbA(), `_audit_log/log1`)));
+});
+
+// ── v391 SEGURIDAD: inmutabilidad de labs firmados + máquina de estados de solicitudes ──────────
+test('LABS inmutable: miembro NO puede ACTUALIZAR un laboratorio FIRMADO', async () => {
+  await assertFails(updateDoc(doc(dbA(), `hospitals/${HOSP_A}/patients/pp/labs/labSigned`), { valor: '9.9' }));
+});
+test('LABS inmutable: miembro NO puede BORRAR un laboratorio FIRMADO', async () => {
+  await assertFails(deleteDoc(doc(dbA(), `hospitals/${HOSP_A}/patients/pp/labs/labSigned`)));
+});
+test('LABS: miembro SÍ puede corregir un laboratorio NO firmado (no rompe la edición normal)', async () => {
+  await assertSucceeds(updateDoc(doc(dbA(), `hospitals/${HOSP_A}/patients/pp/labs/labUnsigned`), { valor: '5.5' }));
+});
+test('SOLICITUDES máquina de estados: miembro NO puede RESUCITAR una solicitud DENEGADA (denegado→aprobado)', async () => {
+  await assertFails(updateDoc(doc(dbA(), `hospitals/${HOSP_A}/antibiotic_requests/reqDenied`), { status: 'aprobado' }));
+});
+test('SOLICITUDES: miembro SÍ puede editar campos de una denegada SIN cambiar el status', async () => {
+  await assertSucceeds(updateDoc(doc(dbA(), `hospitals/${HOSP_A}/antibiotic_requests/reqDenied`), { nota: 'aclaración' }));
+});
+test('SOLICITUDES: miembro SÍ puede AVANZAR una solicitud PENDIENTE (no terminal)', async () => {
+  await assertSucceeds(updateDoc(doc(dbA(), `hospitals/${HOSP_A}/antibiotic_requests/reqPending`), { status: 'aprobado' }));
 });
