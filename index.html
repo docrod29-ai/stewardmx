@@ -22515,8 +22515,10 @@ async function _buildGoogleSheet(token,pacs,mode){
   _orgSet.forEach(org=>{
     const _oa=_aisDedup.filter(a=>(a.organismo||'Sin identificar')===org);
     const tot=_oa.length;
-    const _pctS=_abgKeys.map(([k])=>{const t=_oa.filter(a=>(a.abg||{})[k]);return t.length?+(t.filter(a=>(a.abg||{})[k]==='S').length/t.length*100).toFixed(1):''});
-    const _pctR=_abgKeys.map(([k])=>{const t=_oa.filter(a=>(a.abg||{})[k]);return t.length?+(t.filter(a=>(a.abg||{})[k]==='R').length/t.length*100).toFixed(1):''});
+    // v410 (auditoría Excel P1): sin aislamientos probados → celda EN BLANCO (null), no '' (string). Así la
+    //   columna %S/%R queda numérica limpia (Excel promedia/ordena bien; "no probado" ≠ 0% ni texto vacío).
+    const _pctS=_abgKeys.map(([k])=>{const t=_oa.filter(a=>(a.abg||{})[k]);return t.length?+(t.filter(a=>(a.abg||{})[k]==='S').length/t.length*100).toFixed(1):null});
+    const _pctR=_abgKeys.map(([k])=>{const t=_oa.filter(a=>(a.abg||{})[k]);return t.length?+(t.filter(a=>(a.abg||{})[k]==='R').length/t.length*100).toFixed(1):null});
     _sumRows.push([org,tot,..._pctS,..._pctR]);
   });
   const hasAbg=true; // siempre crear las hojas aunque estén vacías

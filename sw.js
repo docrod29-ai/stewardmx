@@ -1,4 +1,17 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v410 (Auditoría EXCEL Deploy 2 — %S/%R en blanco + verificación)
+//  Continuación de la revisión del generador .xlsx CON verificación estricta. La mayoría de los "P0/P1" del
+//  lente ExcelJS resultaron FALSOS POSITIVOS o ya arreglados en v408 — verificar evitó ~6 regresiones:
+//  · P0-D "índices de hoja desalineados": FALSO — hay 18 hojas fijas (0-17) y Antibiogramas es el índice 18;
+//    hasAbg=true siempre y hasTend sí se contabiliza. El hardcode es correcto.
+//  · "_abgRows irregular (ragged)": FALSO — usa el mismo flatMap que el encabezado (mismas columnas).
+//  · "booleanos Censo vs SPSS inconsistentes": FALSO — el Censo usa texto legible (Sí/No) y SPSS usa 1/0
+//    para análisis; es intencional y cada hoja es consistente.
+//  Fix REAL aplicado: hoja Antibiogramas — %S/%R sin aislamientos probados = celda EN BLANCO (null), no ''
+//  (string), para una columna numérica limpia. +1 prueba (324).
+//  Real PENDIENTE (verificando + LIS no en vivo): WHONET/GLASS (expandir catálogos de organismo/muestra +
+//  exportar CMI + fallback de código válido) — requiere verificar la spec WHONET antes de tocar (no inventar).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v409 (INCIDENTE producción — duplicados del traspaso de mes)
 //  El equipo reportó: la app "volvía a sacar" registros duplicados y duplicados de pacientes ya dados de alta;
 //  al editar salía "no se puede guardar porque la cama está ocupada" (un duplicado). CAUSA RAÍZ: el traspaso
@@ -1308,7 +1321,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v409';
+const CACHE = 'stewardmx-v410';
 const SHELL = [
   '/',
   '/index.html',
