@@ -21941,12 +21941,12 @@ async function _buildExcelJSWorkbook(opts){
     if(lastRow>hdrExcel)ws.autoFilter={from:{row:hdrExcel,column:1},to:{row:hdrExcel,column:nCols}};
     const headers=(aoa[hdrRowIdx]||[]).map(h=>String(h||''));
     const bodyFrom=hdrExcel+1, bodyTo=Math.max(bodyFrom,lastRow);
-    const _semR={fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFFEE2E2'}},font:{color:{argb:'FF991B1B'}}};
-    const _semA={fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFFEF3C7'}},font:{color:{argb:'FF92400E'}}};
-    const _semG={fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFD1FAE5'}},font:{color:{argb:'FF065F46'}}};
+    const _semR={fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFFEE2E2'},bgColor:{argb:'FFFEE2E2'}},font:{color:{argb:'FF991B1B'}}};
+    const _semA={fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFFEF3C7'},bgColor:{argb:'FFFEF3C7'}},font:{color:{argb:'FF92400E'}}};
+    const _semG={fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FFD1FAE5'},bgColor:{argb:'FFD1FAE5'}},font:{color:{argb:'FF065F46'}}};
     headers.forEach((h,ci)=>{
       const L=_colLetter(ci+1), ref=L+bodyFrom+':'+L+bodyTo;
-      const dd=list=>{for(let r=bodyFrom;r<=Math.min(bodyTo,bodyFrom+2000);r++)ws.getCell(L+r).dataValidation={type:'list',allowBlank:true,formulae:['"'+list.join(',')+'"']};};
+      const dd=list=>{for(let r=bodyFrom;r<=bodyTo;r++)ws.getCell(L+r).dataValidation={type:'list',allowBlank:true,formulae:['"'+list.join(',')+'"']};};
       if(/AWaRe/i.test(h)){dd(['Access','Watch','Reserve']);ws.addConditionalFormatting({ref,rules:[{type:'cellIs',operator:'equal',priority:1,formulae:['"Reserve"'],style:_semR},{type:'cellIs',operator:'equal',priority:2,formulae:['"Watch"'],style:_semA},{type:'cellIs',operator:'equal',priority:3,formulae:['"Access"'],style:_semG}]});}
       else if(/Pol[ií]tica/i.test(h))dd(['Libre','Vigilado','Restringido']);
       else if(/Acci[oó]n/i.test(h))dd(['desescalar','suspender','continuar','vo','ampliar']);

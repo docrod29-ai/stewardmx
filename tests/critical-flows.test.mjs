@@ -1511,6 +1511,13 @@ test('DATOS v407 (denominadores/anti-fabricación): sin else→Access, camas sin
   assert.ok(_idx.includes('const dc=(HInfo.camas&&HInfo.camas>0)?HInfo.camas:null;'), 'camas no debe caer a 100 inventado');
   assert.ok(_idx.includes("'N/D (camas no registradas)'"), 'el proxy /camas-día debe mostrar N/D si faltan camas');
 });
+test('EXCEL v408: semáforos de formato condicional se pintan (fgColor+bgColor) + validación sin tope de 2000 filas', () => {
+  // ExcelJS: en FORMATO CONDICIONAL (dxf) el color sólido va en bgColor; en celdas normales en fgColor. Poner
+  // AMBOS garantiza que el semáforo (R/I/S, AWaRe, alertas) se pinte sin importar el quirk. Verificado vs docs ExcelJS.
+  assert.ok(_idx.includes("fgColor:{argb:'FFFEE2E2'},bgColor:{argb:'FFFEE2E2'}") && _idx.includes("fgColor:{argb:'FFD1FAE5'},bgColor:{argb:'FFD1FAE5'}"), 'los semáforos condicionales deben llevar fgColor+bgColor');
+  assert.ok(_idx.includes('for(let r=bodyFrom;r<=bodyTo;r++)ws.getCell(L+r).dataValidation='), 'la validación de lista debe cubrir TODAS las filas (no truncar a 2000)');
+  assert.ok(!/Math\.min\(bodyTo,bodyFrom\+2000\)/.test(_idx), 'ya no debe existir el tope de 2000 filas en dataValidation');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');

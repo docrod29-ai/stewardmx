@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v408 (Auditoría EXCEL Deploy 1 — motor ExcelJS: semáforos + validación)
+//  3ª auditoría (dedicada al generador .xlsx, 134 agentes, 94 hallazgos). Deploy 1 = motor ExcelJS, con
+//  VERIFICACIÓN experta (2 "P0" del lente resultaron falsos positivos y NO se aplicaron):
+//  · Semáforos de formato condicional (R/I/S, AWaRe, alertas): se pintan con fgColor+bgColor AMBOS. En dxf de
+//    ExcelJS el color sólido va en bgColor (opuesto a celdas normales); poner ambos garantiza el color.
+//  · Validación de lista (desplegables): se ELIMINA el tope de 2000 filas (cubría solo las primeras). La
+//    sintaxis "a,b,c" de la lista SÍ es correcta (la auditoría recomendaba romperla — no se aplicó).
+//  · 'vo' en la lista de Acción NO es typo (es switch IV→VO, 10 usos) — no se tocó.
+//  +1 prueba (323). Siguen (con verificación): WHONET/GLASS códigos+MIC, índices de escritura, descarga.
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v407 (Auditoría DATOS Deploy 3 — denominadores y anti-fabricación)
 //  P0 "dato inventado" del Dashboard Excel/reporte: (DI-3) un paciente sin AWaRe válido (sin ATB, antifúngico
 //  'NoAplica' o desconocido) se contaba como Access → inflaba %Access y la suma AWaRe≠total. Ahora NO hay
@@ -1287,7 +1297,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v407';
+const CACHE = 'stewardmx-v408';
 const SHELL = [
   '/',
   '/index.html',
