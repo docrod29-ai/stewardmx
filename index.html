@@ -23305,6 +23305,7 @@ async function _buildGoogleSheet(token,pacs,mode){
     {title:'\u{2705} Control de Calidad'},
     {title:'\u{1F4BB} Scripts (SPSS-R-Python)'},
     {title:'\u{1F4C9} Tasas IAAS (densidad)'},
+    {title:'\u{1F4CB} Completitud de Datos'}, // v411 (aditiva, al final): % de campos capturados por sección
   ];
 
   // ── Crear o reusar spreadsheet ──
@@ -23663,6 +23664,40 @@ async function _buildGoogleSheet(token,pacs,mode){
     ['MÉTODO','Numeradores CLABSI/CAUTI INFERIDOS (dispositivo presente + dx/bacteriemia compatible) — etiquetados "inferido". Denominador = días-dispositivo reales (inserción→retiro/corte). Tasa por 1000 días-dispositivo con IC95% Poisson (Byar). VAP no calculable: falta capturar ventilador.','','','']
   ];
 
+  // v411 (aditiva): hoja de COMPLETITUD — convierte los datos faltantes en un KPI accionable en vez de sesgo
+  //   oculto. Solo LEE el censo (pacs); no escribe ni asume nada. Campos verificados del modelo de datos.
+  const _complRows=(()=>{
+    const N=pacs.length;
+    const _campos=[
+      ['Nombre', p=>!!(p.nombre&&String(p.nombre).trim())],
+      ['Servicio', p=>!!(p.servicio&&String(p.servicio).trim())],
+      ['Cama', p=>!!(p.cama&&String(p.cama).trim())],
+      ['Expediente', p=>!!(p.exp&&String(p.exp).trim())],
+      ['Edad', p=>p.edad!=null&&p.edad!==''],
+      ['Sexo', p=>!!(p.sexo&&String(p.sexo).trim())],
+      ['Diagnóstico', p=>!!(p.dx&&String(p.dx).trim())],
+      ['Antibiótico', p=>!!(p.atb||(Array.isArray(p.atbList)&&p.atbList.some(a=>a&&a.nombre)))],
+      ['Fecha inicio ATB', p=>!!(p.inicio||(Array.isArray(p.atbList)&&p.atbList.some(a=>a&&a.fechaInicioIV)))],
+      ['AWaRe (antibacteriano clasificado)', p=>['Access','Watch','Reserve'].includes(p.aware)],
+      ['Política (libre/vigilado/restringido)', p=>['libre','vigilado','restringido'].includes(p.pol)],
+      ['Indicación documentada', p=>!!(p.indicacion&&String(p.indicacion).trim())],
+      ['Acción PROA', p=>!!(p.accion&&String(p.accion).trim())],
+      ['Cultivo tomado', p=>!!(p.cult&&p.cult!=='no'&&p.cult!=='')],
+      ['Organismo aislado', p=>!!(p.organismo&&String(p.organismo).trim())],
+      ['Médico tratante', p=>!!(p.medico&&String(p.medico).trim())],
+      ['Gravedad', p=>!!(p.gravedad&&String(p.gravedad).trim())],
+    ];
+    const rows=[['CAMPO','CAPTURADOS (n)','TOTAL PACIENTES','% COMPLETITUD','ESTADO']];
+    _campos.forEach(([label,fn])=>{
+      const cap=N?pacs.filter(p=>{try{return fn(p);}catch(_){return false;}}).length:0;
+      const pct=N?+(cap/N*100).toFixed(1):null;
+      const estado=pct==null?'Sin pacientes':pct>=90?'CUMPLE':pct>=70?'Aceptable':pct>=50?'REVISAR':'DEFICIENTE';
+      rows.push([label,cap,N,pct,estado]);
+    });
+    rows.push([]);
+    rows.push(['Nota','La completitud mide qué tan lleno está el censo. "No probado/No aplica" no cuenta como faltante en AWaRe (antibacterianos).','','','']);
+    return rows;
+  })();
   const _newSheets=[
     bioRows,                  // 🧮 Bioestadística (IC95% + fórmulas vivas) — v221
     catPivotRows,             // 🎯 Categorías Dx (Pivot)
@@ -23695,6 +23730,7 @@ async function _buildGoogleSheet(token,pacs,mode){
     qcRows,                   // ✅ Control de Calidad (v287)
     scriptsRows,              // 💻 Scripts SPSS/R/Python (v287)
     iaasDensRows,             // 📉 Tasas IAAS por densidad (v289)
+    _complRows,               // 📋 Completitud de Datos (v411)
   ];
   _newSheets.forEach(rows=>{
     if(_abgSheetIdx<sttl.length)writeData.push({range:sttl[_abgSheetIdx]+'!A1',values:rows});

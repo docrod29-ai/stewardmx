@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v411 (Auditoría EXCEL Deploy 3 — hoja de Completitud de Datos, aditiva)
+//  Recomendación #9 de la auditoría de datos: convertir los datos faltantes en un KPI accionable en vez de
+//  sesgo oculto. Nueva hoja "📋 Completitud de Datos" (aditiva, AL FINAL — mapea 1:1 con _newSheets, NO toca el
+//  índice fijo de Antibiogramas): % de campos capturados por sección (nombre, servicio, cama, exp, dx, ATB,
+//  fecha inicio, AWaRe clasificado, política, indicación, acción, cultivo, organismo, médico, gravedad) con
+//  semáforo CUMPLE/Aceptable/REVISAR/DEFICIENTE. Solo LEE el censo (filtros defensivos try/catch), no escribe
+//  ni asume campos inexistentes. +1 prueba (325).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v410 (Auditoría EXCEL Deploy 2 — %S/%R en blanco + verificación)
 //  Continuación de la revisión del generador .xlsx CON verificación estricta. La mayoría de los "P0/P1" del
 //  lente ExcelJS resultaron FALSOS POSITIVOS o ya arreglados en v408 — verificar evitó ~6 regresiones:
@@ -1321,7 +1329,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v410';
+const CACHE = 'stewardmx-v411';
 const SHELL = [
   '/',
   '/index.html',

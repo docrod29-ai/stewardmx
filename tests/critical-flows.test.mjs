@@ -1523,6 +1523,14 @@ test('EXCEL v410 (P1 tipo de celda): %S/%R sin aislamientos = celda EN BLANCO (n
   assert.ok(_idx.includes("length/t.length*100).toFixed(1):null"), 'el %S/%R sin datos debe ser null (blanco), no cadena vacía');
   assert.ok(!/length\/t\.length\*100\)\.toFixed\(1\):''/.test(_idx), "ya no debe devolver '' (string) para %S/%R vacío");
 });
+test('EXCEL v411 (aditiva): hoja de Completitud de Datos (% campos capturados) al final, sin romper índices', () => {
+  // Aditiva: nueva hoja al FINAL (mapea 1:1 con _newSheets) → no toca el índice fijo de Antibiogramas.
+  assert.ok(_idx.includes('Completitud de Datos'), 'falta la hoja de completitud en sheetDefs');
+  assert.ok(_idx.includes('const _complRows=(()=>{') && _idx.includes('_complRows,'), 'falta la construcción/registro de _complRows en _newSheets');
+  assert.ok(_idx.includes("'% COMPLETITUD'") && _idx.includes("'CAPTURADOS (n)'") && _idx.includes("'ESTADO'"), 'faltan columnas de la hoja de completitud');
+  // La lógica solo LEE (filtros sobre pacs), no escribe ni asume campos inexistentes con crash (try/catch por campo)
+  assert.ok(_idx.includes('pacs.filter(p=>{try{return fn(p);}catch(_){return false;}})'), 'la completitud debe leer defensivamente (try/catch por campo)');
+});
 test('INMUNO v367: auto-bridge alta→valoración + recomendaciones profundizadas (fase/CD4/asplenia/biológicos)', () => {
   // Auto-bridge: al guardar el alta rápida, abre directo la 🧬 Historia clínica ID del paciente nuevo.
   assert.ok(/_txGuardarSimple[\s\S]{0,1500}window\._txSubTab='tx-valoracion'/.test(_idx), 'el alta rápida no lleva a la valoración (auto-bridge)');
