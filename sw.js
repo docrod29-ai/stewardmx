@@ -1,4 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v409 (INCIDENTE producción — duplicados del traspaso de mes)
+//  El equipo reportó: la app "volvía a sacar" registros duplicados y duplicados de pacientes ya dados de alta;
+//  al editar salía "no se puede guardar porque la cama está ocupada" (un duplicado). CAUSA RAÍZ: el traspaso
+//  de mes (v387) deduplicaba SOLO por docId; el mismo paciente recapturado a mano en el mes nuevo tenía OTRO
+//  docId → el traspaso (auto al cargar, o botón) lo re-traía → dos copias del mismo paciente en la misma cama.
+//  FIX (sin tocar ningún dato capturado): (1) AUTO-traspaso DESACTIVADO (era el que "volvía a sacar" solo);
+//  (2) el traspaso manual ahora deduplica por IDENTIDAD (nombre+exp), no solo por docId → no puede duplicar
+//  ni revivir a un dado de alta; (3) botón "🧹 Limpiar duplicados" que elimina SOLO las copias del traspaso
+//  (las que tienen _traidoDe y un gemelo capturado a mano), con confirmación. El alta ya libera la cama
+//  (cama:null). Prueba real actualizada (323).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v408 (Auditoría EXCEL Deploy 1 — motor ExcelJS: semáforos + validación)
 //  3ª auditoría (dedicada al generador .xlsx, 134 agentes, 94 hallazgos). Deploy 1 = motor ExcelJS, con
 //  VERIFICACIÓN experta (2 "P0" del lente resultaron falsos positivos y NO se aplicaron):
@@ -1297,7 +1308,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v408';
+const CACHE = 'stewardmx-v409';
 const SHELL = [
   '/',
   '/index.html',

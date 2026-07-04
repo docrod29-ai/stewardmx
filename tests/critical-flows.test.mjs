@@ -2393,21 +2393,28 @@ test('W5 — arnés de evidencia: aceptación %, MDR % y comparación antes/desp
   const cmpReal = E.compareEvidence(r, r2);
   assert.ok(cmpReal && (cmpReal.dotPer1000.deltaPct === null || typeof cmpReal.dotPer1000.deltaPct === 'number'), 'compareEvidence sobre reportes reales debe dar delta numérico o null');
 });
-test('CENSO v387: traspaso de mes — _mesAnterior + _pacsParaTraer (solo activos, sin duplicar) + auto-traspaso protegido', () => {
-  // El equipo reportó "se borran los datos al cambiar de mes". No se borran (se guardan por mes); faltaba el
-  // traspaso de pacientes AÚN hospitalizados al mes nuevo. Se verifica la lógica REAL extraída de index.html.
+test('CENSO v409 (incidente duplicados): dedup por id + IDENTIDAD; auto-traspaso DESACTIVADO + limpieza segura', () => {
+  // INCIDENTE en prod: el traspaso deduplicaba solo por docId; el mismo paciente recapturado a mano tenía OTRO
+  // docId → se re-traía → duplicado en la misma cama → "cama ocupada" al editar. Fix: dedup por identidad +
+  // auto-traspaso off + limpieza de las copias ya creadas. Se verifica la lógica REAL extraída de index.html.
   const mMes = _idx.match(/function _mesAnterior\(mes\)\{[^{}]*\}/);
-  const mPar = _idx.match(/function _pacsParaTraer\(prevPacs,existingIds\)\{[^{}]*\}/);
-  assert.ok(mMes && mPar, 'no se hallaron las funciones de traspaso');
+  const mId  = _idx.match(/function _pacIdentity\(p\)\{[^{}]*\}/);
+  const mPar = _idx.match(/function _pacsParaTraer\(prevPacs,existingIds,existingIdent\)\{[^{}]*\}/);
+  assert.ok(mMes && mId && mPar, 'no se hallaron las funciones de traspaso (nueva firma con identidad)');
   const _mesAnterior = eval('(' + mMes[0] + ')');
-  const _pacsParaTraer = eval('(' + mPar[0] + ')');
+  const fns = new Function(mId[0] + '\n' + mPar[0] + '\n;return {_pacIdentity,_pacsParaTraer};')();
   assert.equal(_mesAnterior('2026-07'), '2026-06', 'jul→jun');
   assert.equal(_mesAnterior('2026-01'), '2025-12', 'ene→dic del año previo');
-  const r = _pacsParaTraer([{ id:'a', alta:false }, { id:'b', alta:true }, { id:'c' }], new Set(['c']));
-  assert.ok(r.length === 1 && r[0].id === 'a', 'debe traer solo el activo que no existe (no altas, no duplicados)');
-  assert.equal(_pacsParaTraer([{ id:'x', alta:false }, { id:'y', alta:false }], new Set()).length, 2, 'mes destino vacío trae todos los activos');
-  // Salvaguardas del auto-traspaso + botón + que nada se borra al cambiar de mes.
-  assert.ok(_idx.includes('window._traerMesAnterior=async') && _idx.includes('function _maybeAutoCarry'), 'falta el motor de traspaso');
-  assert.ok(_idx.includes('currentMonth!==_mesLive()') && _idx.includes('snap.size>0'), 'el auto-traspaso no está protegido (solo mes actual en curso + censo vacío)');
-  assert.ok(_idx.includes('Traer del mes anterior'), 'falta el botón manual de traspaso');
+  // dedup por id: 'c' ya existe por docId → no se trae; 'b' es alta → no se trae
+  const r = fns._pacsParaTraer([{ id:'a', alta:false, nombre:'Ana' }, { id:'b', alta:true, nombre:'Beto' }, { id:'c', nombre:'Caro' }], new Set(['c']), new Set());
+  assert.ok(r.length === 1 && r[0].id === 'a', 'trae solo el activo que no existe por id (no altas)');
+  // dedup por IDENTIDAD (el fix del incidente): mismo paciente con OTRO docId ya capturado a mano → NO se re-trae
+  const idJuan = fns._pacIdentity({ nombre:'Juan Pérez', exp:'123' });
+  const r2 = fns._pacsParaTraer([{ id:'docViejo', alta:false, nombre:'Juan Pérez', exp:'123' }], new Set(), new Set([idJuan]));
+  assert.equal(r2.length, 0, 'NO debe re-traer a un paciente ya capturado con otro docId (dedup por identidad)');
+  // auto-traspaso DESACTIVADO (era la causa raíz del duplicado)
+  assert.ok(/function _maybeAutoCarry\(snap\)\{\s*return;\s*\}/.test(_idx), 'el auto-traspaso debe estar desactivado (no-op)');
+  assert.ok(!_idx.includes('window._traerMesAnterior(true)'), 'ya no debe existir la llamada automática del traspaso');
+  // botón manual (sigue) + limpieza de duplicados YA creados
+  assert.ok(_idx.includes('Traer del mes anterior') && /window\._limpiarDuplicadosTraspaso=async/.test(_idx), 'faltan el botón de traspaso o la limpieza de duplicados');
 });
