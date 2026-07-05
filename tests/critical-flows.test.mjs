@@ -2431,3 +2431,12 @@ test('CENSO v409 (incidente duplicados): dedup por id + IDENTIDAD; auto-traspaso
   // botón manual (sigue) + limpieza de duplicados YA creados
   assert.ok(_idx.includes('Traer del mes anterior') && /window\._limpiarDuplicadosTraspaso=async/.test(_idx), 'faltan el botón de traspaso o la limpieza de duplicados');
 });
+test('CENSO v412 (diagnóstico): _verDuplicadosTraspaso es SOLO LECTURA (no borra ni modifica)', () => {
+  const s=_idx.indexOf('window._verDuplicadosTraspaso=async');
+  const e=_idx.indexOf('// v409 INCIDENTE: el AUTO-traspaso', s);
+  assert.ok(s>=0 && e>s, 'no se ubicó _verDuplicadosTraspaso');
+  const body=_idx.slice(s,e);
+  assert.ok(body.includes('getDocs(collection(db') && body.includes('abrirContenido('), 'el diagnóstico debe leer el censo y mostrarlo');
+  assert.ok(!/deleteDoc|updateDoc|setDoc|addDoc/.test(body), 'el diagnóstico NO debe escribir ni borrar (SOLO LECTURA)');
+  assert.ok(_idx.includes('window._verDuplicadosTraspaso()') && _idx.includes('🔍 Ver duplicados'), 'falta el botón de ver duplicados');
+});

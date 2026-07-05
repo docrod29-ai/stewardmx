@@ -1,4 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v412 (Diagnóstico SOLO LECTURA de duplicados del traspaso)
+//  El Dr. pidió ver qué datos hay en un hospital (SLP) tras el incidente de duplicados. No hay acceso admin a
+//  Firestore desde el entorno de desarrollo (solo despliegue), así que se agrega una herramienta EN LA APP:
+//  botón "🔍 Ver duplicados" (barra de mes) → _verDuplicadosTraspaso: relee el censo del mes y MUESTRA (tabla)
+//  cuántos pacientes activos/altas/registros hay y lista cada duplicado del traspaso (original capturado a mano
+//  vs copia con _traidoDe, servicio+cama, ids). SOLO LECTURA — no borra ni modifica NADA (prueba lo verifica).
+//  Complementa "🧹 Limpiar duplicados" (v409). +1 prueba (326).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v411 (Auditoría EXCEL Deploy 3 — hoja de Completitud de Datos, aditiva)
 //  Recomendación #9 de la auditoría de datos: convertir los datos faltantes en un KPI accionable en vez de
 //  sesgo oculto. Nueva hoja "📋 Completitud de Datos" (aditiva, AL FINAL — mapea 1:1 con _newSheets, NO toca el
@@ -1329,7 +1337,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v411';
+const CACHE = 'stewardmx-v412';
 const SHELL = [
   '/',
   '/index.html',

@@ -4036,6 +4036,37 @@ window._limpiarDuplicadosTraspaso=async()=>{
     toast('✓ '+n+' duplicado(s) de traspaso eliminado(s). Tus datos capturados a mano quedan intactos.','ok');
   },{labelYes:'Sí, eliminar SOLO las copias del traspaso'});
 };
+// v412 (diagnóstico SOLO LECTURA): lista lo que hay en el censo del mes y marca los duplicados del traspaso
+//   (original capturado a mano vs copia con `_traidoDe`). NO borra ni modifica NADA — solo muestra.
+window._verDuplicadosTraspaso=async()=>{
+  let all;
+  try{ const snap=await getDocs(collection(db,..._pacPath())); all=snap.docs.map(d=>({id:d.id,...d.data()})); }
+  catch(e){ toast('No se pudo leer el censo: '+(e.message||e),'rd'); return; }
+  const activos=all.filter(p=>!p.alta).length, altas=all.filter(p=>p.alta).length;
+  const byIdent={};
+  all.forEach(p=>{ const k=_pacIdentity(p); (byIdent[k]=byIdent[k]||[]).push(p); });
+  const grupos=Object.values(byIdent).filter(g=>g.length>1 && g.some(p=>p._traidoDe) && g.some(p=>!p._traidoDe));
+  const totalCopias=grupos.reduce((s,g)=>s+g.filter(p=>p._traidoDe).length,0);
+  const _traidosTotal=all.filter(p=>p._traidoDe).length;
+  let html='<div style="font-size:13px;margin-bottom:10px;line-height:1.6;">Censo de <b>'+escHtml(nombreMes(currentMonth))+'</b>:<br>'
+    +'• <b>'+activos+'</b> pacientes activos · <b>'+altas+'</b> dados de alta · <b>'+all.length+'</b> registros totales.<br>'
+    +'• Traídos del mes anterior (marca <code>_traidoDe</code>): <b>'+_traidosTotal+'</b>.</div>';
+  if(!grupos.length){
+    html+='<div style="color:var(--teal);font-weight:700;padding:10px;background:rgba(0,212,168,.08);border-radius:8px;">✓ No hay duplicados de traspaso en este mes. Todo limpio.</div>';
+  }else{
+    html+='<div style="color:var(--amber);font-weight:700;margin-bottom:8px;">⚠ '+grupos.length+' paciente(s) con duplicado · '+totalCopias+' copia(s) del traspaso. (SOLO LECTURA — no se borra nada.)</div>';
+    html+='<table style="width:100%;font-size:12px;border-collapse:collapse;"><tr style="text-align:left;color:var(--t3);border-bottom:1px solid var(--brd);"><th style="padding:4px;">Paciente</th><th>Servicio · Cama</th><th>Original (a mano)</th><th>Copia del traspaso</th></tr>';
+    grupos.forEach(g=>{
+      const o=(g.filter(p=>!p._traidoDe)[0])||{}, cop=g.filter(p=>p._traidoDe);
+      html+='<tr style="border-bottom:1px solid var(--brd2);"><td style="padding:4px;">'+escHtml(o.nombre||cop[0]&&cop[0].nombre||'—')+(o.exp?' · Exp '+escHtml(o.exp):'')+'</td>'
+        +'<td>'+escHtml(o.servicio||'—')+' · '+escHtml(String(o.cama||'—'))+'</td>'
+        +'<td style="font-family:var(--mono);font-size:10px;color:var(--teal);">'+escHtml(String(o.id||'—')).slice(0,10)+'…</td>'
+        +'<td style="font-family:var(--mono);font-size:10px;color:var(--red);">'+cop.map(c=>escHtml(String(c.id)).slice(0,10)+'… '+(c._traidoDe?'(de '+escHtml(c._traidoDe)+')':'')).join('<br>')+'</td></tr>';
+    });
+    html+='</table><div style="margin-top:10px;font-size:11px;color:var(--t3);">Para quitar las copias: botón "🧹 Limpiar duplicados" (pide confirmación) o el bote de basura de ese registro. Tus datos capturados a mano NO se tocan.</div>';
+  }
+  abrirContenido('🔍 Diagnóstico de duplicados — '+escHtml(nombreMes(currentMonth)),html);
+};
 // v409 INCIDENTE: el AUTO-traspaso queda DESHABILITADO. Causaba duplicados en producción: al arrancar el mes
 //   (o por una primera snapshot en caché con size 0) re-traía pacientes del mes anterior YA capturados a mano
 //   con otro docId → dos copias del mismo paciente en la misma cama → "cama ocupada" al editar; y revivía a
@@ -32442,6 +32473,7 @@ input:focus,select:focus,textarea:focus{
       <button class="btn-sm btn-sm-ghost" style="padding:2px 7px;" onclick="nextMes()" title="Mes siguiente">▶</button>
       <span id="mes-lbl" class="mes-lbl"></span>
       <button class="btn-sm btn-sm-ghost" style="padding:2px 9px;font-size:10px;" onclick="window._traerMesAnterior(false)" title="Trae los pacientes aún hospitalizados del mes anterior (deduplica por identidad — no duplica)">⬇ Traer del mes anterior</button>
+      <button class="btn-sm btn-sm-ghost" style="padding:2px 9px;font-size:10px;border-color:rgba(61,155,255,.35);color:var(--blue);" onclick="window._verDuplicadosTraspaso()" title="SOLO LECTURA: muestra qué hay en el censo del mes y lista los duplicados del traspaso (no borra nada)">🔍 Ver duplicados</button>
       <button class="btn-sm btn-sm-ghost" style="padding:2px 9px;font-size:10px;border-color:rgba(255,77,109,.35);color:var(--red);" onclick="window._limpiarDuplicadosTraspaso()" title="Elimina SOLO las copias que el traspaso automático duplicó (tus datos capturados a mano quedan intactos)">🧹 Limpiar duplicados</button>
       <span class="mes-note">El censo se guarda por mes; el histórico se conserva y se puede consultar/editar. El traspaso es manual y no duplica.</span>
     </div>
