@@ -1523,6 +1523,46 @@ test('EXCEL v410 (P1 tipo de celda): %S/%R sin aislamientos = celda EN BLANCO (n
   assert.ok(_idx.includes("length/t.length*100).toFixed(1):null"), 'el %S/%R sin datos debe ser null (blanco), no cadena vacía');
   assert.ok(!/length\/t\.length\*100\)\.toFixed\(1\):''/.test(_idx), "ya no debe devolver '' (string) para %S/%R vacío");
 });
+test('EXCEL v413: hoja Microorganismos cuenta AISLAMIENTOS REALES (no solo p.organismo)', () => {
+  // Regresión del bug de completitud: ~700 pacientes salían como 7 organismos porque contaba solo
+  // el campo viejo p.organismo. Ahora se recomputa desde _aisDedup (subcolección + muestras + legacy).
+  assert.ok(!/const orgM=\{\};pacs\.forEach\(p=>\{if\(p\.organismo\)\{const k=p\.organismo\.trim\(\);orgM/.test(_idx),
+    'la hoja Microorganismos ya NO debe contar únicamente p.organismo (bug de completitud)');
+  assert.ok(/microRows=\[\['Microorganismo','Aislamientos \(n\)'/.test(_idx) && _idx.includes('_aisDedup.forEach(a=>{'),
+    'microRows debe reconstruirse desde _aisDedup');
+  // Orden correcto: _aisDedup se define ANTES de recomputar microRows, y microRows se consume DESPUÉS.
+  const iDedup=_idx.indexOf('const _aisDedup=window.clsim39Deduplicate');
+  const iRecalc=_idx.indexOf('const _orgFreq={};');   // marcador único del bloque de recomputación
+  const iUse=_idx.indexOf('values:microRows');
+  assert.ok(iDedup>0 && iRecalc>iDedup && iUse>iRecalc, 'orden roto: _aisDedup → recompute microRows → uso');
+
+  // FUNCIONAL: ejecutar el bloque REAL extraído del código con aislamientos simulados.
+  const s=_idx.indexOf('const _orgFreq={};');
+  const e=_idx.indexOf('d.mdr])];', s)+'d.mdr])];'.length;
+  assert.ok(s>0 && e>s, 'no se pudo extraer el bloque de agregación de organismos');
+  const chunk=_idx.slice(s,e);
+  const _abgOrgNorm=(o)=>{o=(o||'').trim();const parts=o.split(/\s+/).slice(0,2).join(' ');return parts.charAt(0).toUpperCase()+parts.slice(1);};
+  const isMDR=(p)=>/BLEE|MRSA|CRE|MDR|XDR|VRE|KPC|NDM/i.test((p.organismo||'')+(p.fenotipo||'')+(p.mecRaw||''));
+  const run=new Function('_aisDedup','_abgOrgNorm','isMDR','let microRows;\n'+chunk+'\nreturn microRows;');
+  const _aisDedup=[
+    {organismo:'Escherichia coli (BLEE)',fenotipo:'BLEE'},   // → 'Escherichia coli', MDR
+    {organismo:'Escherichia coli'},                           // → 'Escherichia coli'
+    {organismo:'Pseudomonas aeruginosa'},                     // → 'Pseudomonas aeruginosa'
+    {organismo:'Sin crecimiento (30/06)'},                    // excluido
+    {organismo:''},                                           // excluido
+    {organismo:'—'},                                          // excluido
+  ];
+  const rows=run(_aisDedup,_abgOrgNorm,isMDR);
+  const body=rows.slice(1);
+  const eco=body.find(r=>r[0]==='Escherichia coli');
+  const pae=body.find(r=>r[0]==='Pseudomonas aeruginosa');
+  assert.ok(eco && eco[1]===2, 'E. coli debe fusionar (BLEE) y quedar n=2, no separado');
+  assert.strictEqual(eco[3],1,'MDR de E. coli debe ser 1 (el BLEE)');
+  assert.ok(pae && pae[1]===1,'Pseudomonas n=1');
+  assert.strictEqual(body.length,2,'solo 2 organismos válidos (los "Sin crecimiento"/vacío se excluyen)');
+  assert.strictEqual(eco[2],66.7,'% del total sobre aislamientos: 2/3=66.7');
+  assert.strictEqual(pae[2],33.3,'% del total sobre aislamientos: 1/3=33.3');
+});
 test('EXCEL v411 (aditiva): hoja de Completitud de Datos (% campos capturados) al final, sin romper índices', () => {
   // Aditiva: nueva hoja al FINAL (mapea 1:1 con _newSheets) → no toca el índice fijo de Antibiogramas.
   assert.ok(_idx.includes('Completitud de Datos'), 'falta la hoja de completitud en sheetDefs');

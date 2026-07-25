@@ -1,4 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
+//  StewardMX — Service Worker v413 (BUG de completitud del Excel: hoja Microorganismos vacía)
+//  El Dr. reportó (con capturas) que con ~700 pacientes la hoja "Microorganismos" del Excel mostraba solo 7
+//  organismos con n=1. CAUSA RAÍZ: esa hoja agregaba SOLO el campo viejo `p.organismo` del documento del
+//  paciente, pero los cultivos capturados con "Agregar aislamiento" viven en la subcolección `antibiograms`
+//  (y los de "Capturar preliminar" se espejan ahí). El dato NUNCA se perdió: ya salía en las hojas
+//  "Cultivos"/"Aislamientos Detalle". FIX: la hoja Microorganismos se recomputa desde `_aisDedup`
+//  (aislamientos REALES, dedup CLSI M39, incluye subcolección + muestras + legacy), con nombre normalizado
+//  (une "E. coli (BLEE)"→"E. coli") y % sobre total de aislamientos; MDR contado por aislamiento. +1 prueba
+//  funcional (327). NOTA: la hoja "MDR Tipos" y las gráficas del tablero in-app comparten la causa (pendiente).
+// ═══════════════════════════════════════════════════════════════
 //  StewardMX — Service Worker v412 (Diagnóstico SOLO LECTURA de duplicados del traspaso)
 //  El Dr. pidió ver qué datos hay en un hospital (SLP) tras el incidente de duplicados. No hay acceso admin a
 //  Firestore desde el entorno de desarrollo (solo despliegue), así que se agrega una herramienta EN LA APP:
@@ -1337,7 +1347,7 @@
 //   v204 dispositivos multi-instancia + alarmas PICC; v200 design polish Emil Kowalski;
 //   v198 fix scope módulo; v194-195 base epidemiológica AMR + Magiorakos.)
 // ═══════════════════════════════════════════════════════════════
-const CACHE = 'stewardmx-v412';
+const CACHE = 'stewardmx-v413';
 const SHELL = [
   '/',
   '/index.html',

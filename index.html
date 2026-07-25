@@ -22404,12 +22404,12 @@ async function _buildGoogleSheet(token,pacs,mode){
   rest.forEach(p=>restRows.push([p.nombre||'',p.servicio||'',p.cama||'',p.atb||'',p.aware||'',calcDia(p),p.organismo||'',p.fenotipo||'',(authM[p.nombre]||'SIN SOLICITUD').toUpperCase(),(p.accion||'').toUpperCase(),p.notas||'']));
 
   // ── Hoja 6: Microorganismos ──
-  const orgM={};pacs.forEach(p=>{if(p.organismo){const k=p.organismo.trim();orgM[k]=(orgM[k]||0)+1;}});
-  const topOrgs=Object.entries(orgM).sort((a,b)=>b[1]-a[1]).slice(0,15);
-  const microRows=[['Microorganismo','n','% del total','MDR'],...topOrgs.map(([o,c])=>{
-    const orgMDR=pacs.filter(p=>(p.organismo||'').trim()===o&&isMDR(p)).length;
-    return[o,c,n?+(c/n*100).toFixed(1):0,orgMDR];
-  })];
+  // v413 (BUG de completitud del Excel): antes contaba SOLO el campo viejo `p.organismo` del paciente y
+  //   dejaba fuera casi todos los cultivos — los capturados con "Agregar aislamiento" viven en la
+  //   subcolección `antibiograms`, no en el doc del paciente. Resultado real: ~700 pacientes → 7 organismos.
+  //   Ahora se recomputa MÁS ABAJO, a partir de `_aisDedup` (aislamientos REALES dedup CLSI M39, que ya
+  //   incluye subcolección + muestras + legacy). Aquí solo se declara con `let` para reasignarlo.
+  let microRows=[['Microorganismo','Aislamientos (n)','% del total','MDR (n)']];
 
   // ── Hoja 7: ATB por DOT ──
   const atbDM={};
@@ -22540,6 +22540,25 @@ async function _buildGoogleSheet(token,pacs,mode){
   // cultivos repetidos del mismo paciente. Mismo criterio que renderCumAbg (v323). El listado crudo
   // (_abgRows) NO se deduplica — solo el resumen epidemiológico.
   const _aisDedup=window.clsim39Deduplicate?window.clsim39Deduplicate(_allAislamientos):_allAislamientos;
+  // v413: hoja "Microorganismos" desde AISLAMIENTOS REALES (subcolección + muestras + legacy), dedup CLSI
+  //   M39 y con nombre normalizado (une "E. coli (BLEE)" → "E. coli"). Denominador = total de aislamientos
+  //   (no pacientes) → el % ahora refleja la distribución real. MDR contado por aislamiento con isMDR().
+  {
+    const _orgFreq={};
+    _aisDedup.forEach(a=>{
+      const raw=(a.organismo||'').trim();
+      if(!raw||/^sin\s+(identificar|crecimiento)/i.test(raw)||raw==='—')return;
+      const k=(typeof _abgOrgNorm==='function'?_abgOrgNorm(raw):raw)||raw;
+      if(!_orgFreq[k])_orgFreq[k]={n:0,mdr:0};
+      _orgFreq[k].n++;
+      let _m=false;try{_m=isMDR({abg:a.abg,organismo:a.organismo,fenotipo:a.fenotipo,mecRaw:a.mecanismos});}catch(_){}
+      if(_m)_orgFreq[k].mdr++;
+    });
+    const _orgTot=Object.values(_orgFreq).reduce((s,o)=>s+o.n,0);
+    const _topOrg=Object.entries(_orgFreq).sort((a,b)=>b[1].n-a[1].n).slice(0,15);
+    microRows=[['Microorganismo','Aislamientos (n)','% del total','MDR (n)'],
+      ..._topOrg.map(([o,d])=>[o,d.n,_orgTot?+(d.n/_orgTot*100).toFixed(1):null,d.mdr])];
+  }
   const _orgSet=[...new Set(_aisDedup.map(a=>a.organismo||'Sin identificar').filter(Boolean))];
   const _sumHdr=['Organismo','Total aislamientos (M39, sin duplicados)',..._abgKeys.map(([,l])=>l+' %S'),..._abgKeys.map(([,l])=>l+' %R')];
   const _sumRows=[_sumHdr];
